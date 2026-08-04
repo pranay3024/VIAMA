@@ -121,33 +121,83 @@ def _client(name):
 
         if name == "drive":
 
-            creds = _creds_from_service_account()
-            source = "GOOGLE_SA_JSON"
+            raw = (os.getenv("DRIVE_TOKEN_JSON") or "").strip()
 
-            if creds is None:
-                creds = _creds_from_pickle(DRIVE_TOKEN_PATH, "Drive")
-                source = "token_drive.pickle"
+            if raw:
+
+                from google.oauth2.credentials import Credentials
+
+                creds = Credentials.from_authorized_user_info(
+                    json.loads(raw)
+                )
+
+                source = "DRIVE_TOKEN_JSON"
+
+            else:
+
+                creds = _creds_from_service_account()
+                source = "GOOGLE_SA_JSON"
+
+                if creds is None:
+
+                    creds = _creds_from_pickle(
+                        DRIVE_TOKEN_PATH,
+                        "Drive"
+                    )
+
+                    source = "token_drive.pickle"
 
             service, version = "drive", "v3"
 
         else:
 
-            creds = _creds_from_pickle(GMAIL_TOKEN_PATH, "Gmail")
-            source = "token_gmail.pickle"
+            raw = (os.getenv("GMAIL_TOKEN_JSON") or "").strip()
+
+            if raw:
+
+                from google.oauth2.credentials import Credentials
+
+                creds = Credentials.from_authorized_user_info(
+                    json.loads(raw)
+                )
+
+                source = "GMAIL_TOKEN_JSON"
+
+            else:
+
+                creds = _creds_from_pickle(
+                    GMAIL_TOKEN_PATH,
+                    "Gmail"
+                )
+
+                source = "token_gmail.pickle"
 
             service, version = "gmail", "v1"
 
         try:
-            _clients[name] = build(service, version, credentials=creds)
+
+            _clients[name] = build(
+                service,
+                version,
+                credentials=creds
+            )
 
         except Exception as exc:
+
             raise GoogleUnavailable(
                 "{} client could not be built from {}: {}: {}".format(
-                    name, source, type(exc).__name__, exc
+                    name,
+                    source,
+                    type(exc).__name__,
+                    exc
                 )
             ) from exc
 
-        log.info("google %s: authenticated via %s", name, source)
+        log.info(
+            "google %s: authenticated via %s",
+            name,
+            source
+        )
 
         return _clients[name]
 

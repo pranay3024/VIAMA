@@ -142,6 +142,7 @@ def admin_dashboard():
     cycle = request.args.get("cycle")
     week = request.args.get("week")
     day = request.args.get("day")
+    agency = request.args.get("agency", "")
     
 
     query = Survey.query.filter_by(
@@ -167,6 +168,32 @@ def admin_dashboard():
 
     if state:
         query = query.filter_by(state=state)
+
+    if agency == "krish":
+
+     query = query.filter(
+        Survey.state.in_([
+            "MEGHALAYA",
+            "WEST BENGAL",
+            "ASSAM",
+            "BIHAR"
+        ])
+    )
+
+    elif agency == "godbole":
+ 
+     query = query.filter(
+        Survey.state == "ODISHA"
+    )
+
+    elif agency == "aspizo":
+
+     query = query.filter(
+        Survey.state.in_([
+            "UTTAR PRADESH",
+            "JHARKHAND"
+        ])
+    )
 
     if captain_name:
         query = query.filter_by(
@@ -639,6 +666,7 @@ def admin_dashboard():
     alerts=alerts,
     cycles=cycles,
     weeks=weeks,
+    agency=agency,
     resurvey_requests=resurvey_requests,
     roadvision_pending=roadvision_pending,
     team1_states=team1_states,

@@ -300,6 +300,27 @@ class="logout-btn">
 
     </select>
 
+<select name="agency">
+
+<option value="">All Agencies</option>
+
+<option value="krish"
+{% if request.args.get('agency') == 'krish' %}selected{% endif %}>
+Krish
+</option>
+
+<option value="godbole"
+{% if request.args.get('agency') == 'godbole' %}selected{% endif %}>
+Godbole
+</option>
+
+<option value="aspizo"
+{% if request.args.get('agency') == 'aspizo' %}selected{% endif %}>
+Aspizo
+</option>
+
+</select>
+
     <select name="captain_name">
 
     <option value="">
@@ -315,6 +336,8 @@ class="logout-btn">
     {% endfor %}
 
     </select>
+
+    
 
     <!-- Week -->
 

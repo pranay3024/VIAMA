@@ -344,6 +344,24 @@ function handlePDFUpload(e){
 
     if(!file) return;
 
+    // 50 MB limit
+    const MAX_SIZE = 50 * 1024 * 1024;
+
+    if(file.size > MAX_SIZE){
+
+        alert("⚠ PDF size cannot exceed 50 MB.");
+
+        e.target.value = "";
+
+        document.getElementById("pdf_name").style.display = "none";
+
+        photoUploaded = false;
+
+        updateButton();
+
+        return;
+    }
+
     document.getElementById("pdf_name").style.display = "block";
 
     document.getElementById("pdf_name").innerHTML =

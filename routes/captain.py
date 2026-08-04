@@ -540,6 +540,13 @@ def complete_survey():
             if survey:
 
                 pdf = request.files.get("survey_pdf")
+                pdf.seek(0, os.SEEK_END)
+                size = pdf.tell()
+                pdf.seek(0)
+
+                if size > 50 * 1024 * 1024:
+                 flash("PDF size cannot exceed 50 MB.")
+                 return redirect("/recording")
 
                 if not pdf:
 

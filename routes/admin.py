@@ -1506,6 +1506,7 @@ def extract_list():
     cycle = request.args.get("cycle")
     week = request.args.get("week")
     day = request.args.get("day")
+    agency = request.args.get("agency")
     from_date = request.args.get("from_date")
     to_date = request.args.get("to_date")
 
@@ -1523,6 +1524,32 @@ def extract_list():
 
     if state:
         query = query.filter_by(state=state)
+
+    if agency == "krish":
+
+     query = query.filter(
+        Survey.state.in_([
+            "MEGHALAYA",
+            "WEST BENGAL",
+            "ASSAM",
+            "BIHAR"
+        ])
+    )
+
+    elif agency == "godbole":
+
+     query = query.filter(
+        Survey.state == "ODISHA"
+    )
+
+    elif agency == "aspizo":
+
+     query = query.filter(
+        Survey.state.in_([
+            "UTTAR PRADESH",
+            "JHARKHAND"
+        ])
+    )
 
     if captain_name:
         query = query.filter_by(

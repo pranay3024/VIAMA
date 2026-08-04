@@ -302,21 +302,21 @@ class="logout-btn">
 
 <select name="agency">
 
-<option value="">Agencies</option>
+<option value="">Teams</option>
 
 <option value="krish"
 {% if request.args.get('agency') == 'krish' %}selected{% endif %}>
-Krish
+North-East
 </option>
 
 <option value="godbole"
 {% if request.args.get('agency') == 'godbole' %}selected{% endif %}>
-Godbole
+Odisha
 </option>
 
 <option value="aspizo"
 {% if request.args.get('agency') == 'aspizo' %}selected{% endif %}>
-Aspizo
+UP-Jharkhand
 </option>
 
 </select>
@@ -456,7 +456,7 @@ Video Uploaded - Form Pending
 
     <option value="groundwork_completed"
     {% if request.args.get('status') == 'groundwork_completed' %}selected{% endif %}>
-    Groundwork Completed - Video Pending
+    Groundwork Completed - Video and Form Pending
 </option>
 
 

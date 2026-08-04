@@ -23,7 +23,7 @@ body{
 <body>
 
 {% for survey in surveys -%}
-Stretch No.{{ survey.section_no }}_Cycle{{ survey.cycle_no }}<br>
+{{ survey.section_no }}_Cycle{{ survey.cycle_no }}<br>
 {%- endfor %}
 
 </body>

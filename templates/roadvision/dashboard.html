@@ -1,0 +1,465 @@
+<link rel="stylesheet"
+href="{{ url_for('static',
+filename='css/admin.css') }}">
+
+<div class="top-navbar">
+
+    <div class="nav-left">
+
+        <img
+        src="{{ url_for('static',
+        filename='images/viama_logo.png') }}"
+        class="logo-img">
+
+        <div class="welcome-text">
+
+            <h2>Welcome RoadVision</h2>
+
+            <p>
+                RoadVision Verification Portal
+            </p>
+
+        </div>
+
+    </div>
+
+    <a
+    href="/logout"
+    class="logout-btn">
+
+    Logout
+
+    </a>
+
+</div>
+
+<div class="dashboard-content">
+
+<div class="card" style="margin-bottom:20px;">
+
+<h2>📋 Completed Surveys Awaiting RoadVision Verification</h2>
+
+<p style="color:#666;">
+Click <b>Acknowledge</b> to review the survey and submit your remark.
+</p>
+
+</div>
+
+<form method="GET" class="filters">
+
+    <select name="state">
+        <option value="">All States</option>
+
+        {% for s in states %}
+        <option value="{{ s.state }}"
+        {% if request.args.get('state') == s.state %}selected{% endif %}>
+            {{ s.state }}
+        </option>
+        {% endfor %}
+    </select>
+
+    <select name="captain_name">
+        <option value="">All Captains</option>
+
+        {% for c in captains %}
+        <option value="{{ c.name }}"
+        {% if request.args.get('captain_name') == c.name %}selected{% endif %}>
+            {{ c.name }}
+        </option>
+        {% endfor %}
+    </select>
+
+    <select name="cycle">
+        <option value="">All Cycles</option>
+
+        {% for c in cycles %}
+        <option value="{{ c.cycle_no }}"
+        {% if request.args.get('cycle') == c.cycle_no|string %}selected{% endif %}>
+            Cycle {{ c.cycle_no }}
+        </option>
+        {% endfor %}
+    </select>
+
+    <select name="week">
+        <option value="">All Weeks</option>
+
+        {% for w in weeks %}
+        <option value="{{ w }}"
+        {% if request.args.get('week') == w|string %}selected{% endif %}>
+            Week {{ w }}
+        </option>
+        {% endfor %}
+    </select>
+
+    <input
+        type="date"
+        name="survey_date"
+        value="{{ request.args.get('survey_date','') }}">
+
+    <button type="submit" class="apply-btn">
+        Apply Filters
+    </button>
+
+</form>
+
+<div class="table-wrapper">
+
+<table class="survey-table">
+
+<thead>
+
+<tr>
+
+<th>UPC Code</th>
+<th>Section</th>
+<th>Cycle</th>
+<th>Scheduled</th>
+<th>Started On</th>
+<th>Captain</th>
+<th>Status</th>
+<th>Duration</th>
+<th>Upload</th>
+<th>RoadVision</th>
+<th>Details</th>
+<th>Remark</th>
+
+
+</tr>
+
+</thead>
+
+<tbody>
+
+{% for survey in all_surveys %}
+
+<tr>
+
+<td>
+
+{{ survey.upc_code }}
+
+</td>
+
+<td>
+
+{{ survey.section_no }}
+
+</td>
+
+<td>
+
+{% if survey.is_resurvey %}
+
+{{ survey.cycle_no }} (R)
+
+{% else %}
+
+{{ survey.cycle_no }}
+
+{% endif %}
+
+</td>
+
+<td>
+
+{{ survey.scheduled_day }}
+
+</td>
+
+<td>
+
+{% if survey.display_start_time %}
+
+{{ survey.display_start_time.strftime("%A") }}
+
+<br>
+
+<small style="color:#666;">
+
+{{ survey.display_start_time.strftime("%d %b %Y") }}
+
+</small>
+
+{% else %}
+
+-
+
+{% endif %}
+
+</td>
+
+<td>
+
+{{ survey.captain_name }}
+
+</td>
+
+<td>
+
+{% if survey.status=="ongoing" %}
+
+<span class="status-live">
+
+🟢 Ongoing
+
+</span>
+
+{% elif survey.status=="video_pending" %}
+
+<span class="status-pending">
+
+🟡 Video Pending
+
+</span>
+
+{% elif survey.status=="completed" %}
+
+<span class="status-completed">
+
+✅ Completed
+
+</span>
+
+{% elif survey.status=="missed" %}
+
+<span class="status-missed">
+
+🔴 Missed
+
+</span>
+
+{% else %}
+
+{{ survey.status }}
+
+{% endif %}
+
+</td>
+
+<td>
+
+{% if survey.status=="ongoing" %}
+
+<span
+class="live-duration"
+data-start="{{ survey.start_time.timestamp() }}">
+
+0h 0m
+
+</span>
+
+{% elif survey.start_time and survey.end_time %}
+
+{% set total_mins=((survey.end_time-survey.start_time).total_seconds()/60)|int %}
+
+{% set hrs=total_mins//60 %}
+
+{% set mins=total_mins%60 %}
+
+{{ hrs }}h {{ mins }}m
+
+{% else %}
+
+-
+
+{% endif %}
+
+</td>
+
+<td>
+
+{% if survey.upload_duration_minutes>0 %}
+
+{% set hrs=survey.upload_duration_minutes//60 %}
+
+{% set mins=survey.upload_duration_minutes%60 %}
+
+{{ hrs }}h {{ mins }}m
+
+{% else %}
+
+-
+
+{% endif %}
+
+</td>
+
+<!-- ROADVISION -->
+
+<td>
+
+{% if survey.roadvision_completed %}
+
+<span
+style="
+color:green;
+font-weight:bold;">
+
+✅ Reviewed
+
+</span>
+{% else %}
+
+<a
+href="/roadvision/review/{{ survey.id }}"
+class="view-btn">
+
+📝 Acknowledge
+
+</a>
+
+{% endif %}
+
+</td>
+
+
+
+<td>
+
+<a
+href="/roadvision/survey/{{ survey.id }}"
+class="view-btn">
+
+View
+
+</a>
+
+</td>
+<!-- REMARK -->
+
+<td>
+
+{# Outcome of the automated bucket check. NULL means it has never run, which
+   is not the same as a failure, so nothing is shown in that case. #}
+{% if survey.video_count_matched is not none %}
+
+{% if survey.video_count_matched %}
+
+<span
+title="Automated check: the GCP bucket holds at least the enlisted video count."
+style="color:green;font-weight:bold;">
+✅
+</span>
+
+{% else %}
+
+<span
+title="Automated check: videos missing from the bucket, or the section could not be matched. Open the remark for detail."
+style="color:#c00;font-weight:bold;">
+⚠️
+</span>
+
+{% endif %}
+
+{% endif %}
+
+{% if survey.roadvision_remark %}
+
+<a
+href="/roadvision/remark/{{ survey.id }}"
+class="view-btn">
+
+View
+
+</a>
+
+{% else %}
+
+-
+
+{% endif %}
+
+</td>
+
+</tr>
+
+{% endfor %}
+
+{% if all_surveys|length==0 %}
+
+<tr>
+
+<td colspan="11"
+style="text-align:center;padding:30px;">
+
+No surveys found.
+
+</td>
+
+</tr>
+
+{% endif %}
+
+</tbody>
+
+</table>
+
+</div>
+
+<script>
+
+function updateLiveDurations(){
+
+    document
+    .querySelectorAll(".live-duration")
+    .forEach(function(el){
+
+        const startTimestamp =
+        parseFloat(
+            el.dataset.start
+        );
+
+        const now =
+        Date.now() / 1000;
+
+        const totalMinutes =
+        Math.floor(
+            (now - startTimestamp) / 60
+        );
+
+        const hrs =
+        Math.floor(
+            totalMinutes / 60
+        );
+
+        const mins =
+        totalMinutes % 60;
+
+        el.innerHTML =
+        hrs + "h " +
+        mins + "m";
+
+        if(totalMinutes > 480){
+
+            el.style.color =
+            "red";
+
+            el.style.fontWeight =
+            "700";
+
+        }
+
+    });
+
+}
+
+updateLiveDurations();
+
+setInterval(
+    updateLiveDurations,
+    60000
+);
+
+setInterval(function () {
+    window.location.reload();
+}, 300000);
+
+document.addEventListener("visibilitychange", function () {
+    if (!document.hidden) {
+        window.location.reload();
+    }
+});
+
+</script>
+
+</div>

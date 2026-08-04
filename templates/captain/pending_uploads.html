@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+
+<title>Pending Video Uploads</title>
+
+<meta name="viewport"
+content="width=device-width, initial-scale=1.0">
+
+<link rel="stylesheet"
+href="{{ url_for('static',
+filename='css/mobile.css') }}">
+
+</head>
+
+<body>
+
+<div class="mobile-header">
+
+PENDING VIDEO UPLOADS
+
+</div>
+
+<div class="container">
+
+{% for survey in surveys %}
+
+<div class="card">
+
+<h3>
+{{ survey.stretch_code }}
+</h3>
+
+<table style="width:100%; margin-top:15px; font-size:16px;">
+
+<tr>
+    <td><b>Section No</b></td>
+    <td>{{ survey.section_no }}</td>
+</tr>
+
+<tr>
+    <td><b>UPC Code</b></td>
+    <td>{{ survey.upc_code }}</td>
+</tr>
+
+<tr>
+    <td><b>Cycle</b></td>
+    <td>{{ survey.cycle_no }}</td>
+</tr>
+
+<tr>
+    <td><b>Survey Day</b></td>
+    <td>{{ survey.survey_day }}</td>
+</tr>
+
+</table>
+
+<hr style="margin:20px 0;">
+
+{% if survey.pdf_reupload_required %}
+
+<p style="color:#d32f2f;font-weight:bold;">
+⚠ PDF Re-upload Required
+</p>
+
+<p>
+Reason:
+<b>{{ survey.pdf_reupload_reason }}</b>
+</p>
+
+<a
+href="/reupload-survey-pdf/{{ survey.id }}"
+class="main-btn">
+
+📄 RE-UPLOAD PDF
+
+</a>
+
+<hr style="margin:25px 0;">
+
+{% endif %}
+
+{% if survey.status in ["ongoing", "groundwork_completed", "video_pending"] %}
+
+<p>
+Has the video been uploaded?
+</p>
+
+<form
+action="/upload-video/{{ survey.id }}"
+method="POST">
+
+<button
+type="submit"
+name="video_status"
+value="yes"
+class="main-btn">
+
+YES
+
+</button>
+
+<button
+type="submit"
+name="video_status"
+value="no"
+class="main-btn secondary-btn">
+
+NO
+
+</button>
+
+</form>
+
+{% endif %}
+
+</div>
+
+{% endfor %}
+
+</div>
+
+</body>
+
+</html>

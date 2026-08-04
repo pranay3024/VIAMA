@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+
+<title>Completed Surveys</title>
+
+<meta name="viewport"
+content="width=device-width, initial-scale=1.0">
+
+<link rel="stylesheet"
+href="{{ url_for('static',
+filename='css/mobile.css') }}">
+
+</head>
+
+<body>
+
+<div class="mobile-header">
+
+COMPLETED SURVEYS
+
+</div>
+
+<div class="container">
+
+{% if surveys %}
+
+{% for survey in surveys %}
+
+<div class="card">
+
+<h3>
+{{ survey.stretch_code }}
+</h3>
+
+<p>
+📅 {{ survey.survey_day }}
+</p>
+
+<p>
+📝 {{ survey.survey_type }}
+</p>
+
+<p>
+✅ Completed
+</p>
+
+<p>
+⏰
+{{ survey.end_time.strftime('%d %b %Y %I:%M %p')
+if survey.end_time else '-' }}
+</p>
+
+<a
+href="/completed-survey/{{ survey.id }}"
+class="main-btn dashboard-link">
+
+VIEW DETAILS
+
+</a>
+
+</div>
+
+{% endfor %}
+
+{% else %}
+
+<div class="card">
+
+<h3>
+No Completed Surveys
+</h3>
+
+</div>
+
+{% endif %}
+
+</div>
+
+</body>
+
+</html>

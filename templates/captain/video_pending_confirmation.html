@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+
+<title>Video Upload Confirmation</title>
+
+<link rel="stylesheet"
+href="{{ url_for('static',
+filename='css/mobile.css') }}">
+
+</head>
+
+<body>
+
+<div class="container">
+
+<div class="card">
+
+<h2>Video Upload</h2>
+
+<p>
+
+Has the video been uploaded?
+
+</p>
+
+<form method="POST">
+
+<button
+type="submit"
+name="video_status"
+value="yes"
+class="main-btn">
+
+YES
+
+</button>
+
+<button
+type="submit"
+name="video_status"
+value="no"
+class="main-btn secondary-btn">
+
+NO
+
+</button>
+
+</form>
+
+</div>
+
+</div>
+
+</body>
+
+</html>

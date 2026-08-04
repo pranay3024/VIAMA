@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+
+<title>Gmail Drafts</title>
+
+<link
+rel="stylesheet"
+href="{{ url_for('static',
+filename='css/admin.css') }}">
+
+</head>
+
+<body>
+
+<div class="top-navbar">
+
+<div class="nav-left">
+
+<img
+src="{{ url_for('static',
+filename='images/viama_logo.png') }}"
+class="logo-img">
+
+<div class="welcome-text">
+
+<h2>
+
+📧 Gmail Drafts
+
+</h2>
+
+<p>
+
+Select Email Template
+
+</p>
+
+</div>
+
+</div>
+
+<a
+href="/admin"
+class="logout-btn">
+
+⬅ Dashboard
+
+</a>
+
+</div>
+
+<div class="dashboard-content">
+
+<div class="stats">
+
+<a
+href="/admin/gmail-drafts/defect"
+class="stat-card"
+style="text-decoration:none;">
+
+<h2>
+📄 Defect Report
+</h2>
+
+<p>
+Processed Data Email
+</p>
+
+</a>
+
+<a
+href="/admin/gmail-drafts/raw"
+class="stat-card"
+style="text-decoration:none;">
+
+<h2>
+📁 Raw Data & Survey Form
+</h2>
+
+<p>
+Raw Data Email
+</p>
+
+</a>
+
+<a
+href="/admin/gmail-drafts/discrepancy"
+class="stat-card"
+style="text-decoration:none;">
+
+<h2>
+📋 Discrepancy - Final Survey Report
+</h2>
+
+<p>
+Discrepancy Email
+</p>
+
+</a>
+
+</div>
+
+</div>
+
+</body>
+
+</html>

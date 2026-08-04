@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+
+<title>Reports</title>
+
+<link rel="stylesheet"
+href="{{ url_for('static',
+filename='css/admin.css') }}">
+
+</head>
+
+<body>
+
+<div class="top-navbar">
+
+    <div class="nav-left">
+
+        <img
+        src="{{ url_for('static',
+        filename='images/viama_logo.png') }}"
+        class="logo-img">
+
+        <div class="welcome-text">
+
+            <h2>Reports</h2>
+
+            <p>
+                Survey Reporting Dashboard
+            </p>
+
+        </div>
+
+    </div>
+
+    <a
+    href="/admin"
+    class="logout-btn">
+
+    ⬅ Dashboard
+
+    </a>
+
+</div>
+
+<div class="dashboard-content">
+
+<!-- ===================== FILTERS ===================== -->
+
+<div class="card">
+
+<h2>
+
+📊 Generate Report
+
+</h2>
+
+<a
+href="{{ url_for(
+    'admin.export_report',
+    week=request.args.get('week'),
+    cycle=request.args.get('cycle'),
+    team=request.args.get('team'),
+    state=request.args.get('state'),
+    from_date=request.args.get('from_date'),
+    to_date=request.args.get('to_date')
+) }}"
+class="search-btn"
+style="
+display:inline-flex;
+align-items:center;
+justify-content:center;
+text-decoration:none;
+margin-left:10px;">
+
+📥 Export Excel
+
+</a>
+
+
+
+<form method="GET">
+
+<div class="advanced-filter">
+
+<select name="week">
+
+<option value="">
+ Weeks
+</option>
+
+{% for w in weeks %}
+
+<option
+value="{{ w }}"
+{% if request.args.get('week') == w|string %}
+selected
+{% endif %}>
+
+Week {{ w }}
+
+</option>
+
+{% endfor %}
+
+</select>
+
+<select name="cycle">
+
+<option value="">
+ Cycles
+</option>
+
+{% for c in cycles %}
+
+<option
+value="{{ c.cycle_no }}"
+{% if request.args.get('cycle') == c.cycle_no|string %}
+selected
+{% endif %}>
+
+Cycle {{ c.cycle_no }}
+
+</option>
+
+{% endfor %}
+
+</select>
+
+<select name="team">
+
+<option value="">
+ Teams
+</option>
+
+<option
+value="Krish"
+{% if request.args.get('team')=="Krish" %}
+selected
+{% endif %}>
+Krish
+</option>
+
+<option
+value="Godbole"
+{% if request.args.get('team')=="Godbole" %}
+selected
+{% endif %}>
+Viama
+</option>
+
+<option
+value="Aspizo"
+{% if request.args.get('team')=="Aspizo" %}
+selected
+{% endif %}>
+Aspizo
+</option>
+
+</select>
+
+<!-- NEW STATE FILTER -->
+
+<select name="state">
+
+<option value="">
+States
+</option>
+
+<option value="ASSAM" {% if request.args.get('state')=="ASSAM" %}selected{% endif %}>ASSAM</option>
+
+<option value="BIHAR" {% if request.args.get('state')=="BIHAR" %}selected{% endif %}>BIHAR</option>
+
+<option value="JHARKHAND" {% if request.args.get('state')=="JHARKHAND" %}selected{% endif %}>JHARKHAND</option>
+
+<option value="ODISHA" {% if request.args.get('state')=="ODISHA" %}selected{% endif %}>ODISHA</option>
+
+<option value="UTTAR PRADESH" {% if request.args.get('state')=="UTTAR PRADESH" %}selected{% endif %}>UTTAR PRADESH</option>
+
+<option value="WEST BENGAL" {% if request.args.get('state')=="WEST BENGAL" %}selected{% endif %}>WEST BENGAL</option>
+
+</select>
+
+<input
+type="date"
+name="from_date"
+value="{{ request.args.get('from_date','') }}">
+
+<input
+type="date"
+name="to_date"
+value="{{ request.args.get('to_date','') }}">
+
+<button
+type="submit"
+class="search-btn">
+
+Generate Report
+
+</button>
+
+<a
+href="{{ url_for('admin.reports') }}"
+class="search-btn"
+style="
+background:#6c757d;
+text-decoration:none;
+display:inline-flex;
+align-items:center;
+justify-content:center;
+margin-left:10px;">
+
+✖ Clear Filters
+
+</a>
+
+</div>
+
+</form>
+
+</div>
+
+<!-- ===================== SUMMARY ===================== -->
+
+<div class="stats">
+
+<div class="stat-card">
+
+<h3>
+
+✅ Completed
+
+</h3>
+
+<h1>
+
+{{ completed_surveys }}
+
+</h1>
+
+</div>
+
+<div class="stat-card">
+
+<h3>
+
+🛣 Total KM
+
+</h3>
+
+<h1>
+
+{{ "%.2f"|format(total_km) }}
+
+</h1>
+
+</div>
+
+<div class="stat-card">
+
+<h3>
+
+👮 Captains
+
+</h3>
+
+<h1>
+
+{{ captains }}
+
+</h1>
+
+</div>
+
+<div class="stat-card">
+
+<h3>
+
+⏱ Hours
+
+</h3>
+
+<h1>
+
+{{ total_hours }}
+
+</h1>
+
+</div>
+
+</div>
+
+<!-- ===================== REPORT TABLE ===================== -->
+
+<div class="card" style="margin-top:30px;">
+
+<h2>
+
+📋 Survey Report
+
+</h2>
+
+<div style="overflow-x:auto;">
+
+<table class="report-table">
+
+<thead>
+
+<tr>
+<th>UPC Code</th>
+
+<th>Section No</th>
+
+<th>Cycle</th>
+
+<th>Date</th>
+
+<th>Captain</th>
+
+<th>State</th>
+
+<th>Stretch</th>
+
+<th>KM</th>
+
+<th>Survey Type</th>
+
+<th>Status</th>
+
+</tr>
+
+</thead>
+
+<tbody>
+
+{% for survey in surveys %}
+
+<tr>
+
+<td>
+{{ survey.upc_code }}
+</td>
+
+<td>
+{{ survey.section_no }}
+</td>
+
+<td>
+{{ survey.cycle_no }}
+</td>
+
+<td>
+{{ survey.start_time.strftime("%d-%m-%Y") if survey.start_time else "-" }}
+</td>
+
+
+<td>
+{{ survey.captain_name }}
+</td>
+
+<td>
+{{ survey.state }}
+</td>
+
+
+
+<td>
+{{ survey.stretch_code }}
+</td>
+
+<td>
+{{ "%.2f"|format(survey.section_length or 0) }}
+</td>
+
+<td>
+{{ survey.survey_type }}
+</td>
+
+<td>
+{{ survey.status }}
+</td>
+
+</tr>
+
+{% endfor %}
+
+{% if surveys|length == 0 %}
+
+<tr>
+
+<td colspan="10"
+style="text-align:center;padding:30px;">
+
+No surveys found for selected filters.
+
+</td>
+
+</tr>
+
+{% endif %}
+
+</tbody>
+
+</table>
+
+</div>
+
+</div>
+
+</div>
+
+</body>
+
+</html>

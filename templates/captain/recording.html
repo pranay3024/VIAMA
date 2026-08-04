@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+
+<title>Recording Started</title>
+
+<meta name="viewport"
+content="width=device-width, initial-scale=1.0">
+
+<link rel="stylesheet"
+href="{{ url_for('static',
+filename='css/mobile.css') }}">
+
+</head>
+
+<body>
+
+<div class="mobile-header">
+
+SURVEY ONGOING
+
+</div>
+
+<div class="container">
+
+<div class="card">
+
+<h2>Survey Recording</h2>
+
+<a href="{{ '/backup-home' if session.get('role') == 'backup_captain' else '/captain-home' }}"
+onclick="return confirm('Your survey will remain ongoing. Continue to Dashboard?')"
+style="
+display:inline-block;
+padding:8px 16px;
+margin-bottom:18px;
+background:#1f4e79;
+color:white;
+text-decoration:none;
+border-radius:8px;
+font-size:14px;
+font-weight:600;
+">
+
+← Dashboard
+
+</a>
+
+<div class="status-badge">
+
+🟢 Recording In Progress
+
+</div>
+
+{% if survey.status == "ongoing" %}
+<form method="POST" action="/groundwork-complete" style="margin:25px 0;">
+
+    <button type="submit"
+        style="
+            width:100%;
+            background:#ff7a00;
+            color:white;
+            border:none;
+            border-radius:14px;
+            padding:18px;
+            font-size:18px;
+            font-weight:700;
+            cursor:pointer;
+            transition:.2s;
+            box-shadow:0 4px 12px rgba(255,122,0,.25);
+        "
+        onmouseover="this.style.background='#e66d00'"
+        onmouseout="this.style.background='#ff7a00'"
+        onclick="return confirm('Have you completed the entire ground survey?');">
+
+         Complete Groundwork
+
+    </button>
+
+    <p style="
+        margin-top:10px;
+        text-align:center;
+        font-size:13px;
+        color:#666;
+    ">
+        Click only after completing the entire ground survey.
+    </p>
+
+</form>
+{% endif %}
+
+<div class="detail-item">
+
+<div class="detail-label">
+Survey Day
+</div>
+
+<div class="detail-value">
+{{ survey.survey_day }}
+</div>
+
+</div>
+
+<div class="detail-item">
+
+    <div class="detail-label">
+        Cycle No
+    </div>
+
+    <div class="detail-value">
+        {{ survey.cycle_no }}
+    </div>
+
+</div>
+
+<div class="detail-item">
+
+<div class="detail-label">
+Survey Type
+</div>
+
+<div class="detail-value">
+{{ survey.survey_type }}
+</div>
+
+</div>
+
+<div class="detail-item">
+
+<div class="detail-label">
+Section No
+</div>
+
+<div class="detail-value">
+{{ survey.section_no }}
+</div>
+
+</div>
+
+<div class="detail-item">
+
+<div class="detail-label">
+UPC Code
+</div>
+
+<div class="detail-value">
+{{ survey.upc_code }}
+</div>
+
+</div>
+
+<div class="detail-item">
+
+<div class="detail-label">
+Started At
+</div>
+
+<div class="detail-value">
+{{ start_time }}
+</div>
+
+</div>
+
+</div>
+
+<div class="card">
+
+<h2> Final Verification Checklist</h2>
+
+<label class="check-item">
+<input
+type="checkbox"
+class="verify-check"
+{% if session.get("verification_done") %}
+checked
+{% endif %}>
+If it is sunrise time, avoid moving towards the East while recording
+</label>
+
+<label class="check-item">
+<input
+type="checkbox"
+class="verify-check"
+{% if session.get("verification_done") %}
+checked
+{% endif %}>
+If it is sunset time, avoid moving towards the West while recording
+</label>
+
+
+
+<label class="check-item">
+<input
+type="checkbox"
+class="verify-check"
+{% if session.get("verification_done") %}
+checked
+{% endif %}>
+If it is a 2-lane or 4-lane road, drive in the left-most lane
+</label>
+
+<label class="check-item">
+<input
+type="checkbox"
+class="verify-check"
+{% if session.get("verification_done") %}
+checked
+{% endif %}>
+If it is a 6-lane road, drive in the middle lane
+</label>
+
+<label class="check-item">
+<input
+type="checkbox"
+class="verify-check"
+{% if session.get("verification_done") %}
+checked
+{% endif %}>
+If it is an 8-lane road, drive in the second lane from the left-most lane
+</label>
+
+<label class="check-item">
+<input
+type="checkbox"
+class="verify-check"
+{% if session.get("verification_done") %}
+checked
+{% endif %}>
+Maintain approximately 20 meters distance from the vehicle ahead
+</label>
+
+<label class="check-item">
+<input
+type="checkbox"
+class="verify-check"
+{% if session.get("verification_done") %}
+checked
+{% endif %}>
+Vehicle speed while driving should be around 40 km/hr
+</label>
+
+
+
+
+
+</div>
+
+<form
+id="finishSurveyForm"
+action="/complete-survey"
+method="POST"
+enctype="multipart/form-data">
+
+<input
+type="hidden"
+name="verification_done"
+value="yes">
+
+<hr>
+
+<h3>📄 Upload Duly Signed & Stamped Survey Form (PDF)</h3>
+
+<label
+for="survey_pdf"
+class="upload-card">
+
+📄 Select PDF
+
+</label>
+
+<input
+type="file"
+id="survey_pdf"
+name="survey_pdf"
+accept="application/pdf"
+hidden>
+
+<div
+id="pdf_name"
+style="
+margin-top:15px;
+font-weight:600;
+color:#1b5e20;
+display:none;
+">
+</div>
+
+<button
+type="submit"
+id="nextBtn"
+class="main-btn"
+disabled>
+
+FINISH SURVEY
+
+</button>
+</form>
+
+</div>
+
+<script>
+
+const surveyStatus = "{{ survey.status }}";
+
+const checks =
+document.querySelectorAll(
+    ".verify-check"
+);
+
+const nextBtn =
+document.getElementById(
+    "nextBtn"
+);
+
+let photoUploaded = false;
+
+function updateButton(){
+
+    const allChecked =
+    [...checks].every(
+        check => check.checked
+    );
+
+    nextBtn.disabled =
+    !(allChecked && photoUploaded);
+
+    if(allChecked && photoUploaded){
+
+        nextBtn.innerHTML =
+        "✅ FINISH SURVEY";
+
+    }else{
+
+        nextBtn.innerHTML =
+        "COMPLETE CHECKLIST & UPLOAD PHOTO";
+
+    }
+
+}
+
+function handlePDFUpload(e){
+
+    const file = e.target.files[0];
+
+    if(!file) return;
+
+    document.getElementById("pdf_name").style.display = "block";
+
+    document.getElementById("pdf_name").innerHTML =
+        "✅ " + file.name;
+
+    photoUploaded = true;
+
+    updateButton();
+
+}
+
+document
+.getElementById("survey_pdf")
+.addEventListener(
+    "change",
+    handlePDFUpload
+);
+
+checks.forEach(
+    check => {
+
+        check.addEventListener(
+            "change",
+            updateButton
+        );
+
+    }
+);
+
+updateButton();
+
+</script>
+
+<script>
+
+history.pushState(
+    null,
+    null,
+    location.href
+);
+
+window.onpopstate = function () {
+
+    history.go(1);
+
+};
+
+document
+.getElementById("finishSurveyForm")
+.addEventListener("submit", function(e){
+
+   if (
+    ![
+        "groundwork_completed",
+        "video_uploaded_pending_form"
+    ].includes(surveyStatus)
+){
+    e.preventDefault();
+
+    alert(
+        "⚠ Please click 'Complete Groundwork' before finishing the survey."
+    );
+
+    return false;
+}
+
+});
+
+</script>
+
+</body>
+
+</html>

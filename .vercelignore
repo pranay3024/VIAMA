@@ -1,0 +1,17 @@
+# Keep secrets and dead weight out of the deployment bundle.
+# NOTE: token_drive.pickle and token_gmail.pickle HAVE to ship - google_drive.py
+# reads them from disk. Setting GOOGLE_SA_JSON removes that requirement for
+# Drive; Gmail drafts still need a real mailbox token. See API_GUIDE.md.
+.env
+.env.*
+!.env.example
+client_secret.json
+
+viama_portal/
+__pycache__/
+*.py[cod]
+*.db
+*.sqlite3
+*.log
+.git/
+.gitignore

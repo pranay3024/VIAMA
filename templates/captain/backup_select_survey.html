@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+
+    
+
+    <title>Select Survey</title>
+
+    <meta name="viewport"
+          content="width=device-width, initial-scale=1.0">
+
+    <link rel="stylesheet"
+href="{{ url_for('static',
+filename='css/mobile.css') }}">
+
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+
+</head>
+
+<body>
+
+<div class="mobile-header">
+
+    <div class="logo-title">
+        VIAMA SURVEILLANCE
+    </div>
+
+    
+
+</div>
+
+<div class="container">
+
+    <div class="card">
+
+        <div class="captain-card">
+
+    <div class="captain-name">
+        👤 {{ user.name }}
+    </div>
+
+    <div class="captain-state">
+         {{ assignments|length }} Missed Surveys
+    </div>
+
+    <div class="captain-status">
+         Ready For Survey
+    </div>
+
+</div>
+
+        <h2>Select Survey</h2>
+
+        {% if session.get("success_message") %}
+
+<div class="success-box">
+
+    {{ session.pop("success_message") }}
+
+</div>
+
+{% endif %}
+
+        <form method="POST">
+
+            <div class="form-group">
+
+<label>
+Missed Survey
+</label>
+
+
+
+<select
+id="stretchSelect"
+name="assignment_id"
+required>
+
+<option value=""></option>
+
+{% for assignment in assignments %}
+
+<option value="{{ assignment.id }}">
+[{{ assignment.survey_day }}]
+[Section {{ assignment.section_no }}]
+{{ assignment.stretch_code }}
+</option>
+
+{% endfor %}
+
+</select>
+</div>
+
+            <div class="section-title">
+                Survey Day
+            </div>
+
+            <select
+                name="survey_day"
+                class="input-box"
+                required>
+
+                <option value="">
+                    Select Day
+                </option>
+
+                <option>Monday</option>
+                <option>Tuesday</option>
+                <option>Wednesday</option>
+                <option>Thursday</option>
+                <option>Friday</option>
+                <option>Saturday</option>
+                <option>Sunday</option>
+
+            </select>
+
+            <div class="section-title">
+                Survey Type
+            </div>
+
+            <div class="survey-type-container">
+
+    <label class="survey-card">
+
+        <input
+            type="radio"
+            name="survey_type"
+            value="Day"
+            required>
+
+        <span>
+            ☀️ Day Survey
+        </span>
+
+    </label>
+
+    <label class="survey-card">
+
+        <input
+            type="radio"
+            name="survey_type"
+            value="Night">
+
+        <span>
+            🌙 Night Survey
+        </span>
+
+    </label>
+
+</div>
+
+            <button
+                type="submit"
+                class="main-btn">
+
+                CONTINUE
+
+            </button>
+            
+            <div class="action-buttons">
+
+<button
+type="button"
+class="main-btn secondary-btn"
+onclick="window.location.href='/backup-home'">
+
+⬅ BACK TO DASHBOARD
+
+</button>
+
+
+</div>
+
+        </form>
+
+    </div>
+
+</div>
+
+<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+
+<script>
+$(document).ready(function() {
+
+    $('#stretchSelect').select2({
+        placeholder: "Select Assigned Stretch",
+        allowClear: true,
+        width: '100%'
+    });
+
+});
+</script>
+
+
+
+</body>
+
+</html>

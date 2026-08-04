@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+
+    <title>Survey Details</title>
+
+    <meta name="viewport"
+          content="width=device-width, initial-scale=1.0">
+
+    <link rel="stylesheet"
+href="{{ url_for('static',
+filename='css/mobile.css') }}">
+
+</head>
+
+<div class="mobile-header">
+
+    SURVEY DETAILS
+
+</div>
+
+<div class="container">
+
+    <div class="status-badge">
+        READY TO START
+    </div>
+
+    <div class="card">
+
+        <div class="detail-item">
+            <div class="detail-label">Stretch</div>
+            <div class="detail-value">
+                {{ assignment.stretch_code }}
+            </div>
+        </div>
+
+        <div class="detail-item">
+            <div class="detail-label">State</div>
+            <div class="detail-value">
+                {{ assignment.state }}
+            </div>
+        </div>
+
+        <div class="detail-item">
+            <div class="detail-label">Main Person</div>
+            <div class="detail-value">
+                {{ assignment.main_person }}
+            </div>
+        </div>
+
+        <div class="detail-item">
+            <div class="detail-label">Dashcam</div>
+            <div class="detail-value">
+                {{ assignment.dashcam_code }}
+            </div>
+        </div>
+
+        <div class="detail-item">
+            <div class="detail-label">Powerbank</div>
+            <div class="detail-value">
+                {{ assignment.powerbank_code }}
+            </div>
+        </div>
+
+        <div class="detail-item">
+            <div class="detail-label">Survey Day</div>
+            <div class="detail-value">
+                {{ survey_day }}
+            </div>
+        </div>
+
+        <div class="detail-item">
+            <div class="detail-label">Survey Type</div>
+            <div class="detail-value">
+                {{ survey_type }}
+            </div>
+        </div>
+
+    </div>
+
+    <form action="/checklist">
+
+        <button
+            type="submit"
+            class="main-btn">
+
+            PROCEED TO CHECKLIST
+
+        </button>
+
+    </form>
+
+</div>
+
+    
+
+</div>
+
+</body>
+
+</html>

@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+
+<title>Unable To Survey</title>
+
+<link rel="stylesheet"
+href="{{ url_for('static',
+filename='css/mobile.css') }}">
+
+</head>
+
+<body>
+
+<div class="mobile-header">
+
+UNABLE TO SURVEY
+
+</div>
+
+<div class="container">
+
+<div class="card">
+
+<form method="POST">
+
+<label>
+Stretch
+</label>
+
+<select
+name="assignment_id"
+class="input-box"
+required>
+
+{% for assignment in assignments %}
+
+<option value="{{ assignment.id }}">
+{{ assignment.stretch_code }}
+</option>
+
+{% endfor %}
+
+</select>
+
+<br><br>
+
+<label>
+Reason
+</label>
+
+<textarea
+name="reason"
+class="input-box"
+rows="4"
+placeholder="Enter reason"
+required></textarea>
+
+<br>
+
+<button
+type="submit"
+class="main-btn">
+
+SUBMIT
+
+</button>
+
+</form>
+
+</div>
+
+</div>
+
+</body>
+
+</html>

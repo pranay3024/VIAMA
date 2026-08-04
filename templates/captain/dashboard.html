@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html>
+<head>
+
+    <title>VIAMA Captain Dashboard</title>
+
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <link rel="stylesheet"
+href="{{ url_for('static',
+filename='css/mobile.css') }}">
+
+</head>
+
+<body>
+
+    <div class="navbar">
+        VIAMA SURVEILLANCE
+    </div>
+
+    <div class="container">
+
+        <div class="card">
+
+            <div class="title">
+                Today's Assigned Survey
+            </div>
+
+            <div class="info">
+                <b>Stretch:</b><br>
+                {{ schedule.stretch_code }}
+            </div>
+
+            <div class="info">
+                <b>State:</b><br>
+                {{ schedule.state }}
+            </div>
+
+            <div class="info">
+                <b>Survey Type:</b><br>
+                {{ schedule.survey_type }}
+            </div>
+
+            <div class="info">
+                <b>Dashcam:</b><br>
+                {{ schedule.dashcam_code }}
+            </div>
+
+            <div class="info">
+                <b>Powerbank:</b><br>
+                {{ schedule.powerbank_code }}
+            </div>
+
+            <br>
+
+            <span class="status">
+                READY TO START
+            </span>
+
+            <form action="/checklist">
+
+                <button class="btn">
+                    START SURVEY
+                </button>
+
+            </form>
+
+        </div>
+
+        
+
+    </div>
+
+</body>
+</html>

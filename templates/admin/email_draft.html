@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+
+<title>
+
+{% if email_type=="defect" %}
+
+Defect Report Draft
+
+{% elif email_type=="discrepancy" %}
+
+Discrepancy - Final Survey Report
+
+{% else %}
+
+Raw Data & Survey Form
+
+{% endif %}
+
+</title>
+
+<link
+rel="stylesheet"
+href="{{ url_for('static',
+filename='css/admin.css') }}">
+
+</head>
+
+<body>
+
+<div class="top-navbar">
+
+<div class="nav-left">
+
+<img
+src="{{ url_for('static',
+filename='images/viama_logo.png') }}"
+class="logo-img">
+
+<div class="welcome-text">
+
+<h2>
+
+{% if email_type=="defect" %}
+
+📄 Defect Report Draft
+
+{% elif email_type=="discrepancy" %}
+
+📋 Discrepancy - Final Survey Report
+
+{% else %}
+
+📁 Raw Data & Survey Form
+
+{% endif %}
+
+</h2>
+
+<p>
+
+Generate Gmail Draft
+
+</p>
+
+</div>
+
+</div>
+
+<a
+href="/admin/gmail-drafts"
+class="logout-btn">
+
+⬅ Back
+
+</a>
+
+</div>
+
+<div class="dashboard-content">
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+        {% for category, message in messages %}
+            <div style="
+                background:#d4edda;
+                color:#155724;
+                border:1px solid #c3e6cb;
+                padding:15px;
+                border-radius:8px;
+                margin-bottom:20px;
+                font-weight:bold;
+            ">
+                {{ message }}
+            </div>
+        {% endfor %}
+    {% endif %}
+{% endwith %}
+
+<div class="card">
+
+<form method="POST">
+
+<label>Week</label>
+
+<select name="week">
+
+<option value="">Select Week</option>
+
+{% for w in weeks %}
+
+<option value="{{w}}"
+
+{% if selected_week==w|string %}
+
+selected
+
+{% endif %}>
+
+Week {{w}}
+
+</option>
+
+{% endfor %}
+
+</select>
+
+<br><br>
+
+<label>UPC Code</label>
+
+<input
+type="text"
+name="upc_code"
+value="{{ upc_code }}"
+placeholder="Enter UPC Code">
+
+<br><br>
+
+<label>Cycle Number</label>
+
+<select name="cycle_no">
+
+<option value="">Select Cycle</option>
+
+{% for c in cycles %}
+
+<option
+value="{{ c.cycle_no }}"
+
+{% if cycle_no==c.cycle_no|string %}
+
+selected
+
+{% endif %}>
+
+Cycle {{ c.cycle_no }}
+
+</option>
+
+{% endfor %}
+
+</select>
+
+<br><br>
+
+<button
+type="submit"
+class="search-btn">
+
+🔍 Search Surveys
+
+</button>
+
+{% if no_records %}
+
+<div style="
+    margin-top:20px;
+    padding:15px;
+    background:#fff3cd;
+    color:#856404;
+    border:1px solid #ffeeba;
+    border-radius:8px;
+    font-weight:bold;
+">
+
+⚠️ No records found for the selected filters.
+
+</div>
+
+{% endif %}
+
+{% if request.method == "POST" and surveys %}
+
+<hr style="margin:30px 0;">
+
+<label>
+
+Section
+
+</label>
+
+<select
+name="survey_id"
+required>
+
+<option value="">
+Select Section
+</option>
+
+{% for survey in surveys %}
+
+<option
+value="{{ survey.id }}"
+
+{% if selected_section==survey.id|string %}
+
+selected
+
+{% endif %}>
+
+{{ survey.section_no }}
+
+|
+
+Cycle {{ survey.cycle_no }}
+
+|
+
+{{ survey.upc_code }}
+
+|
+
+{{ survey.stretch_code }}
+
+
+</option>
+
+{% endfor %}
+
+</select>
+
+<br><br>
+
+<label>
+
+Survey Start Date
+
+</label>
+
+<input
+type="date"
+name="start_date"
+value="{{ start_date }}"
+required>
+
+<br><br>
+
+<label>
+
+Survey End Date
+
+</label>
+
+<input
+type="date"
+name="end_date"
+value="{{ end_date }}"
+required>
+
+<br><br>
+
+<button
+type="submit"
+name="action"
+value="generate"
+class="search-btn">
+
+Generate Draft
+
+</button>
+
+{% endif %}
+
+</form>
+
+</div>
+
+{% if subject %}
+
+<div class="card" style="margin-top:30px;">
+
+<h2>
+
+📧 Generated Subject
+
+</h2>
+
+<input
+type="text"
+id="subject"
+value="{{ subject }}"
+readonly
+style="
+width:100%;
+padding:12px;
+font-size:15px;
+margin-bottom:15px;
+">
+
+<button
+type="button"
+class="search-btn"
+onclick="copySubject()">
+
+📋 Copy Subject
+
+</button>
+
+</div>
+
+<div class="card" style="margin-top:25px;">
+
+<h2>
+
+📄 Gmail Preview
+
+</h2>
+
+<div
+id="emailPreview"
+class="email-preview">
+
+{{ email_html|safe }}
+
+</div>
+
+<br>
+
+<button
+type="button"
+class="search-btn"
+onclick="copyEmail()">
+
+📋 Copy Email
+
+</button>
+
+&nbsp;
+
+<a
+id="gmailLink"
+target="_blank"
+class="search-btn"
+style="
+text-decoration:none;
+display:inline-block;
+">
+
+📧 Open Gmail
+
+</a>
+
+</div>
+
+{% endif %}
+
+</div>
+
+<script>
+
+function copySubject(){
+
+navigator.clipboard.writeText(
+document.getElementById("subject").value
+);
+
+alert("Subject copied successfully.");
+
+}
+
+async function copyEmail(){
+
+const html=document.getElementById("emailPreview").innerHTML;
+const text=document.getElementById("emailPreview").innerText;
+
+await navigator.clipboard.write([
+
+new ClipboardItem({
+
+"text/html":new Blob([html],{type:"text/html"}),
+
+"text/plain":new Blob([text],{type:"text/plain"})
+
+})
+
+]);
+
+alert("Email copied successfully.");
+
+}
+
+window.onload=function(){
+
+const subject=document.getElementById("subject");
+const preview=document.getElementById("emailPreview");
+const gmail=document.getElementById("gmailLink");
+
+if(subject && preview && gmail){
+
+gmail.href=
+
+"https://mail.google.com/mail/?view=cm&fs=1"
+
++
+
+"&su="
+
++
+
+encodeURIComponent(subject.value)
+
++
+
+"&body="
+
++
+
+encodeURIComponent(preview.innerText);
+
+}
+
+}
+
+</script>
+
+</body>
+
+</html>

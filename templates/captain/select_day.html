@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+
+    <title>Select Survey Day</title>
+
+    <meta name="viewport"
+          content="width=device-width, initial-scale=1.0">
+
+    <link rel="stylesheet"
+href="{{ url_for('static',
+filename='css/mobile.css') }}">
+
+</head>
+
+<body>
+
+<div class="navbar">
+    VIAMA SURVEILLANCE
+</div>
+
+<div class="container">
+
+    <div class="card">
+
+        <div class="title">
+            Select Survey Day
+        </div>
+
+        <form method="POST">
+
+            <div class="checkbox-row">
+                <input type="radio"
+                       name="survey_day"
+                       value="Monday"
+                       required>
+                Monday
+            </div>
+
+            <div class="checkbox-row">
+                <input type="radio"
+                       name="survey_day"
+                       value="Tuesday">
+                Tuesday
+            </div>
+
+            <div class="checkbox-row">
+                <input type="radio"
+                       name="survey_day"
+                       value="Wednesday">
+                Wednesday
+            </div>
+
+            <div class="checkbox-row">
+                <input type="radio"
+                       name="survey_day"
+                       value="Thursday">
+                Thursday
+            </div>
+
+            <div class="checkbox-row">
+                <input type="radio"
+                       name="survey_day"
+                       value="Friday">
+                Friday
+            </div>
+
+            <hr>
+
+            <b>Buffer Days</b>
+
+            <div class="checkbox-row">
+                <input type="radio"
+                       name="survey_day"
+                       value="Saturday">
+                Saturday
+            </div>
+
+            <div class="checkbox-row">
+                <input type="radio"
+                       name="survey_day"
+                       value="Sunday">
+                Sunday
+            </div>
+
+            <button class="btn">
+                CONTINUE
+            </button>
+
+        </form>
+
+    </div>
+
+</div>
+
+</body>
+</html>

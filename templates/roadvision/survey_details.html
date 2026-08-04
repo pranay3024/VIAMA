@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+
+<title>Survey Details</title>
+
+<link rel="stylesheet"
+href="{{ url_for('static',
+filename='css/mobile.css') }}">
+
+</head>
+
+<body>
+
+<div class="mobile-header">
+
+SURVEY DETAILS
+
+</div>
+
+<div class="container">
+
+<div class="card">
+
+<h2>{{ survey.stretch_code }}</h2>
+
+<div class="section-badge">
+📌 Strech_no: {{ survey.section_no }}
+</div>
+
+<p>
+<b>Captain:</b>
+{{ survey.captain_name }}
+</p>
+
+<p>
+<b>State:</b>
+{{ survey.state }}
+</p>
+
+<p>
+<b>Survey Day:</b>
+{{ survey.survey_day }}
+</p>
+
+<p>
+<b>Survey Type:</b>
+{{ survey.survey_type }}
+</p>
+
+<p>
+<b>Status:</b>
+{{ survey.status }}
+</p>
+
+<p>
+<b>Started:</b>
+{{ display_start_time.strftime('%d %b %Y %I:%M %p')
+if display_start_time else '-' }}
+</p>
+
+<hr>
+
+<h3>📹 Video Upload Counts</h3>
+
+<table
+style="
+width:100%;
+border-collapse:collapse;
+margin-top:15px;
+">
+
+<tr>
+<th style="text-align:left;">LHS</th>
+<th style="text-align:left;">Count</th>
+</tr>
+
+<tr>
+<td>Intersection Road</td>
+<td>{{ survey.ir_lhs_count or 0 }}</td>
+</tr>
+
+<tr>
+<td>Main Carriageway</td>
+<td>{{ survey.mcw_lhs_count or 0 }}</td>
+</tr>
+
+<tr>
+<td>Service Road</td>
+<td>{{ survey.service_lhs_count or 0 }}</td>
+</tr>
+
+<tr>
+<td>Slip Road</td>
+<td>{{ survey.slip_lhs_count or 0 }}</td>
+</tr>
+
+<tr>
+<td colspan="2"><hr></td>
+</tr>
+
+<tr>
+<th style="text-align:left;">RHS</th>
+<th style="text-align:left;">Count</th>
+</tr>
+
+<tr>
+<td>Intersection Road</td>
+<td>{{ survey.ir_rhs_count or 0 }}</td>
+</tr>
+
+<tr>
+<td>Main Carriageway</td>
+<td>{{ survey.mcw_rhs_count or 0 }}</td>
+</tr>
+
+<tr>
+<td>Service Road</td>
+<td>{{ survey.service_rhs_count or 0 }}</td>
+</tr>
+
+<tr>
+<td>Slip Road</td>
+<td>{{ survey.slip_rhs_count or 0 }}</td>
+</tr>
+
+</table>
+
+<hr>
+
+<h3>📄 Defect Report</h3>
+
+<form
+method="POST"
+action="/roadvision/upload-defect-report/{{ survey.id }}"
+enctype="multipart/form-data">
+
+    <input
+        type="file"
+        name="defect_report"
+        accept=".xlsx,.xls">
+
+    <button type="submit">
+        Upload
+    </button>
+
+</form>
+
+{% if survey.defect_report_file %}
+    ✅ Uploaded
+    <br>
+    <a href="{{ survey.defect_report_file }}" target="_blank">
+        View Defect Report
+    </a>
+{% else %}
+    ❌ Not Uploaded
+{% endif %}
+
+
+<hr>
+
+<h3>📹 Raw Video Excel</h3>
+
+<form
+method="POST"
+action="/roadvision/upload-raw-video/{{ survey.id }}"
+enctype="multipart/form-data">
+
+    <input
+        type="file"
+        name="raw_video_excel"
+        accept=".xlsx,.xls">
+
+    <button type="submit">
+        Upload
+    </button>
+
+</form>
+
+{% if survey.raw_video_excel_file %}
+    ✅ Uploaded
+    <br>
+    <a href="{{ survey.raw_video_excel_file }}" target="_blank">
+        View Raw Video Excel
+    </a>
+{% else %}
+    ❌ Not Uploaded
+{% endif %}
+
+<hr>
+
+</div>
+
+</div>
+
+</body>
+
+</html>

@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+
+<title>Video Upload Counts</title>
+
+<link
+rel="stylesheet"
+href="{{ url_for('static',
+filename='css/captain.css') }}">
+
+</head>
+
+<body>
+
+<div class="dashboard-content">
+
+<div class="card">
+
+<h2>
+
+📹 Video Upload Counts
+
+</h2>
+
+<p>
+
+Section No :
+<b>{{ survey.section_no }}</b>
+
+</p>
+
+<form method="POST">
+
+<h3>LHS</h3>
+
+<label>Intersection Road</label>
+
+<input
+type="number"
+name="ir_lhs_count"
+min="0"
+required>
+
+<br><br>
+
+<label>Main Carriageway</label>
+
+<input
+type="number"
+name="mcw_lhs_count"
+min="0"
+required>
+
+<br><br>
+
+<label>Service Road</label>
+
+<input
+type="number"
+name="service_lhs_count"
+min="0"
+required>
+
+<br><br>
+
+<label>Slip Road</label>
+
+<input
+type="number"
+name="slip_lhs_count"
+min="0"
+required>
+
+<hr>
+
+<h3>RHS</h3>
+
+<label>Intersection Road</label>
+
+<input
+type="number"
+name="ir_rhs_count"
+min="0"
+required>
+
+<br><br>
+
+<label>Main Carriageway</label>
+
+<input
+type="number"
+name="mcw_rhs_count"
+min="0"
+required>
+
+<br><br>
+
+<label>Service Road</label>
+
+<input
+type="number"
+name="service_rhs_count"
+min="0"
+required>
+
+<br><br>
+
+<label>Slip Road</label>
+
+<input
+type="number"
+name="slip_rhs_count"
+min="0"
+required>
+
+<br><br>
+
+<button
+type="submit"
+class="search-btn">
+
+Submit
+
+</button>
+
+</form>
+
+</div>
+
+</div>
+
+</body>
+
+</html>

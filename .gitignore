@@ -1,0 +1,29 @@
+# Secrets - these are currently sitting in this directory in plaintext.
+# Add them here BEFORE the first commit; once they are in git history,
+# removing the file is not enough and every credential must be rotated.
+.env
+.env.*
+!.env.example
+client_secret.json
+token_drive.pickle
+token_gmail.pickle
+*.pickle
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+
+# Abandoned scaffold - contains a second venv from another machine
+viama_portal/
+
+# Local artefacts
+*.db
+*.sqlite3
+*.log
+.vercel
+.DS_Store
+Thumbs.db

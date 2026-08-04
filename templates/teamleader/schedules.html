@@ -1,0 +1,196 @@
+<link rel="stylesheet"
+href="{{ url_for('static',
+filename='css/admin.css') }}">
+
+<div class="top-navbar">
+
+    <div class="welcome-text">
+        <h2>📅 Schedule Management</h2>
+        <p>Weekly Survey Planning Dashboard</p>
+    </div>
+
+    <a
+    href="/teamleader"
+    class="view-btn">
+
+    ← Dashboard
+
+    </a>
+
+</div>
+
+<div class="stats">
+
+<div class="stat-card">
+<h3>Monday</h3>
+<h1>{{ monday_count }}</h1>
+</div>
+
+<div class="stat-card">
+<h3>Tuesday</h3>
+<h1>{{ tuesday_count }}</h1>
+</div>
+
+<div class="stat-card">
+<h3>Wednesday</h3>
+<h1>{{ wednesday_count }}</h1>
+</div>
+
+<div class="stat-card">
+<h3>Thursday</h3>
+<h1>{{ thursday_count }}</h1>
+</div>
+
+<div class="stat-card">
+<h3>Friday</h3>
+<h1>{{ friday_count }}</h1>
+</div>
+
+<div class="stat-card">
+<h3>Total</h3>
+<h1>{{ schedules|length }}</h1>
+</div>
+
+</div>
+
+<div class="filter-bar">
+
+<a href="/teamleader/schedules"
+class="filter-btn">
+All
+</a>
+
+<a href="/teamleader/schedules?day=Monday"
+class="filter-btn">
+Monday
+</a>
+
+<a href="/teamleader/schedules?day=Tuesday"
+class="filter-btn">
+Tuesday
+</a>
+
+<a href="/teamleader/schedules?day=Wednesday"
+class="filter-btn">
+Wednesday
+</a>
+
+<a href="/teamleader/schedules?day=Thursday"
+class="filter-btn">
+Thursday
+</a>
+
+<a href="/teamleader/schedules?day=Friday"
+class="filter-btn">
+Friday
+</a>
+
+</div>
+
+<form
+method="GET"
+class="advanced-filter">
+
+<select name="state">
+
+<option value="">
+All States
+</option>
+
+{% for state in states %}
+
+<option value="{{ state[0] }}">
+{{ state[0] }}
+</option>
+
+{% endfor %}
+
+</select>
+
+<button
+type="submit"
+class="search-btn">
+
+Apply Filter
+
+</button>
+
+</form>
+
+<div class="table-wrapper">
+
+<h2 style="
+padding:20px;
+margin:0;
+color:#ff7a00;">
+📋 Scheduled Surveys
+</h2>
+
+<table class="survey-table">
+
+<thead>
+
+<tr>
+<th>Section</th>
+<th>Stretch</th>
+<th>State</th>
+<th>Captain</th>
+<th>Survey Day</th>
+<th>Status</th>
+</tr>
+
+</thead>
+
+<tbody>
+
+{% for schedule in schedules %}
+
+<tr>
+
+<td>
+{{ schedule.section_no }}
+</td>
+
+<td>
+{{ schedule.stretch_code[:90] }}...
+</td>
+
+<td>
+{{ schedule.state }}
+</td>
+
+<td>
+{{ schedule.main_person }}
+</td>
+
+<td>
+{{ schedule.survey_day }}
+</td>
+
+<td>
+
+{% if schedule.survey_enabled %}
+
+<span class="enabled">
+✅ Enabled
+</span>
+
+{% else %}
+
+<span class="disabled">
+❌ Disabled
+</span>
+
+{% endif %}
+
+</td>
+
+</tr>
+
+{% endfor %}
+
+</tbody>
+
+</table>
+
+</div>

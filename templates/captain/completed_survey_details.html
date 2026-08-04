@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+
+<title>Survey Details</title>
+
+<meta name="viewport"
+content="width=device-width, initial-scale=1.0">
+
+<link rel="stylesheet"
+href="{{ url_for('static',
+filename='css/mobile.css') }}">
+
+</head>
+
+<body>
+
+<div class="mobile-header">
+
+SURVEY DETAILS
+
+</div>
+
+<div class="container">
+
+<div class="card">
+
+<h3>
+{{ survey.stretch_code }}
+</h3>
+
+<p>
+📅 {{ survey.survey_day }}
+</p>
+
+<p>
+📝 {{ survey.survey_type }}
+</p>
+
+<p>
+📍 {{ survey.state }}
+</p>
+
+<p>
+✅ Completed
+</p>
+
+{% if survey.resurvey_requested %}
+
+<div class="status-ongoing">
+
+⏳ Re-Survey Request Sent
+
+</div>
+
+{% else %}
+
+<form
+action="/request-resurvey/{{ survey.id }}"
+method="POST">
+
+<button
+type="submit"
+class="main-btn">
+
+🔄 Request Re-Survey
+
+</button>
+
+</form>
+
+{% endif %}
+
+<br>
+
+<p>
+⏰
+{{ survey.end_time.strftime(
+'%d %b %Y %I:%M %p'
+) if survey.end_time else '-' }}
+</p>
+
+</div>
+
+{% if survey.dashcam_photo %}
+
+<div class="card">
+
+<h3>Dashcam Photo</h3>
+
+<img
+src="{{ survey.dashcam_photo }}"
+style="
+width:100%;
+border-radius:12px;">
+
+</div>
+
+{% endif %}
+
+</div>
+
+</body>
+
+</html>

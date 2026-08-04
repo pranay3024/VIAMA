@@ -1,0 +1,1021 @@
+    <link rel="stylesheet"
+    href="{{ url_for('static',
+    filename='css/admin.css') }}">
+
+
+    <div class="top-navbar">
+
+        <div class="nav-left">
+
+            <img
+            src="{{ url_for('static',
+            filename='images/viama_logo.png') }}"
+            class="logo-img">
+
+            <div class="welcome-text">
+
+                <h2>Welcome Admin</h2>
+
+                <p>
+                    Survey Monitoring & Operations Center
+                </p>
+
+            </div>
+
+        </div>
+
+        <div style="display:flex;gap:15px;align-items:center;">
+
+    <a
+    href="/admin/schedules"
+    class="logout-btn">
+
+    📅 Schedules
+
+    </a>
+
+    <a
+href="/reports"
+class="logout-btn">
+
+📊 Reports
+
+</a>
+
+<a
+href="/admin/gmail-drafts"
+class="logout-btn">
+
+📧 Gmail Drafts
+
+</a>
+
+    <a
+    href="/admin/missed"
+    class="logout-btn">
+
+    🔴 Missed Surveys
+
+    </a>
+
+    <a
+    href="/logout"
+    class="logout-btn">
+
+    Logout
+
+    </a>
+
+</div>
+
+    </div>
+
+
+    <div class="dashboard-content">
+
+        
+
+    <div class="stats">
+
+    <div class="stat-card">
+    <h3>👮 Captains</h3>
+    <h1>{{ total_captains }}</h1>
+    </div>
+
+    <div class="stat-card">
+    <h3>🟡 Ongoing</h3>
+    <h1>{{ ongoing }}</h1>
+    </div>
+
+    <div class="stat-card">
+    <h3>✅ Completed</h3>
+    <h1>{{ completed }}</h1>
+    </div>
+
+    <div class="stat-card">
+    <h3>❌ Missed</h3>
+    <h1>{{ missed }}</h1>
+    </div>
+
+
+
+    </div>
+
+  <div class="stats">
+
+    <div class="stat-card">
+
+        <h3>Team 1</h3>
+
+        {% for state, km in team1_states.items() %}
+        <div style="display:flex;justify-content:space-between;margin:6px 0;">
+            <span>{{ state }}</span>
+            <b>{{ "%.2f"|format(km) }} KM</b>
+        </div>
+        {% endfor %}
+
+        <hr>
+
+        <h2>{{ "%.2f"|format(krish_km) }} KM</h2>
+
+    </div>
+
+
+    <div class="stat-card">
+
+        <h3>Team 2</h3>
+
+        {% for state, km in team2_states.items() %}
+        <div style="display:flex;justify-content:space-between;margin:6px 0;">
+            <span>{{ state }}</span>
+            <b>{{ "%.2f"|format(km) }} KM</b>
+        </div>
+        {% endfor %}
+
+        <hr>
+
+        <h2>{{ "%.2f"|format(godbole_km) }} KM</h2>
+
+    </div>
+
+
+    <div class="stat-card">
+
+        <h3>Team 3</h3>
+
+        {% for state, km in team3_states.items() %}
+        <div style="display:flex;justify-content:space-between;margin:6px 0;">
+            <span>{{ state }}</span>
+            <b>{{ "%.2f"|format(km) }} KM</b>
+        </div>
+        {% endfor %}
+
+        <hr>
+
+        <h2>{{ "%.2f"|format(aspizo_km) }} KM</h2>
+
+    </div>
+
+
+    <div class="stat-card">
+
+        <h3>🛣 Total KM</h3>
+
+        <h1>{{ "%.2f"|format(total_km) }} KM</h1>
+
+    </div>
+
+</div>
+
+
+
+    {% if resurvey_requests %}
+
+    <div class="missed-section">
+
+    <h2>
+    🔄 Re-Survey Requests
+    </h2>
+
+    <div class="missed-scroll">
+
+    {% for survey in resurvey_requests %}
+
+    <div class="missed-card">
+
+    <p>
+    👤 {{ survey.captain_name }}
+    </p>
+
+    <p>
+    🛣 {{ survey.stretch_code }}
+    </p>
+
+    <p>
+    📌 Section No:
+    <b>{{ survey.section_no }}</b>
+    </p>
+
+    <p>
+
+    {% if survey.is_resurvey %}
+
+    🔄 Cycle {{ survey.cycle_no }}_Resurvey
+
+    {% else %}
+
+    🔄 Cycle {{ survey.cycle_no }}
+
+    {% endif %}
+
+    </p>
+
+    <a
+    href="/approve-resurvey/{{ survey.id }}"
+    class="view-btn">
+
+    ✅ Approve
+
+    </a>
+
+    </div>
+
+    {% endfor %}
+
+    </div>
+
+    </div>
+
+    {% endif %}
+
+    {% if alerts %}
+
+
+    <div class="missed-section">
+
+    <h2>
+    🚨 Missed Survey Alerts ({{ missed }})
+    </h2>
+
+    <div class="missed-scroll">
+
+    {% for alert in alerts %}
+
+    <div class="missed-card">
+
+    <p>👤 {{ alert.captain }}</p>
+    <p>⚠ {{ alert.message }}</p>
+
+    <p>
+    📌 Strech_No:
+    <b>{{ alert.section_no }}</b>
+    </p>
+
+    <p>
+    🛣 {{ alert.stretch }}
+    </p>
+
+    <p>📍 {{ alert.state }}</p>
+
+    <p>
+    📝 {{ alert.reason or "No reason provided" }}
+    </p>
+
+    <a
+    href="/acknowledge-alert/{{ alert.assignment_id }}"
+    class="view-btn">
+
+    ✓ Mark Reviewed
+
+    </a>
+
+    </div>
+
+    {% endfor %}
+
+    </div>
+
+    </div>
+
+    {% endif %}
+
+
+
+
+    <form method="GET" class="advanced-filter">
+
+    <select name="state">
+
+    <option value="">
+    States
+    </option>
+
+    {% for state in states %}
+
+    <option value="{{ state[0] }}">
+    {{ state[0] }}
+    </option>
+
+    {% endfor %}
+
+    </select>
+
+    <select name="captain_name">
+
+    <option value="">
+    Captains
+    </option>
+
+    {% for captain in captains %}
+
+    <option value="{{ captain.name }}">
+    {{ captain.name }}
+    </option>
+
+    {% endfor %}
+
+    </select>
+
+    <!-- Week -->
+
+<select name="week" id="weekFilter">
+
+    <option value="">
+        Weeks
+    </option>
+
+    {% for week in weeks %}
+
+    <option
+        value="{{ week }}"
+        {% if request.args.get("week") == week|string %}
+        selected
+        {% endif %}
+    >
+        Week {{ week }}
+    </option>
+
+    {% endfor %}
+
+</select>
+
+<!-- Cycle -->
+
+<select name="cycle">
+
+    <option value="">
+        Cycles
+    </option>
+
+    {% for cycle in cycles %}
+
+    <option
+        value="{{ cycle[0] }}"
+        {% if request.args.get("cycle") == cycle[0]|string %}
+        selected
+        {% endif %}
+    >
+        Cycle {{ cycle[0] }}
+    </option>
+
+    {% endfor %}
+
+</select>
+
+<!-- DAY FILTER -->
+
+<select name="day">
+
+    <option value="">
+        Day
+    </option>
+
+    <option value="Monday"
+    {% if request.args.get("day")=="Monday" %}selected{% endif %}>
+    Monday
+    </option>
+
+    <option value="Tuesday"
+    {% if request.args.get("day")=="Tuesday" %}selected{% endif %}>
+    Tuesday
+    </option>
+
+    <option value="Wednesday"
+    {% if request.args.get("day")=="Wednesday" %}selected{% endif %}>
+    Wednesday
+    </option>
+
+    <option value="Thursday"
+    {% if request.args.get("day")=="Thursday" %}selected{% endif %}>
+    Thursday
+    </option>
+
+    <option value="Friday"
+    {% if request.args.get("day")=="Friday" %}selected{% endif %}>
+    Friday
+    </option>
+
+</select>
+
+<select name="status">
+
+    <option value="">
+    Status
+    </option>
+
+    <option value="ongoing"
+    {% if request.args.get("status")=="ongoing" %}
+    selected
+    {% endif %}>
+    Ongoing
+    </option>
+
+    <option value="completed"
+    {% if request.args.get("status")=="completed" %}
+    selected
+    {% endif %}>
+    Completed
+    </option>
+
+    <option value="video_uploaded_pending_form"
+{% if request.args.get("status")=="video_uploaded_pending_form" %}
+selected
+{% endif %}>
+Video Uploaded - Form Pending
+</option>
+
+    <option value="video_pending"
+    {% if request.args.get("status")=="video_pending" %}
+    selected
+    {% endif %}>
+    Video Pending
+    </option>
+
+    <option value="groundwork_completed"
+    {% if request.args.get('status') == 'groundwork_completed' %}selected{% endif %}>
+    Groundwork Completed - Video Pending
+</option>
+
+
+
+
+    </select>
+
+    <div style="display:flex;align-items:center;gap:10px;">
+
+<input
+type="date"
+name="from_date"
+value="{{ request.args.get('from_date','') }}"
+class="date-filter">
+
+<input
+type="date"
+name="to_date"
+value="{{ request.args.get('to_date','') }}"
+class="date-filter">
+
+<button
+type="button"
+class="search-btn"
+onclick="clearFilters()">
+
+✕ Clear
+
+</button>
+
+</div>
+
+    <button
+    type="submit"
+    class="search-btn">
+
+    Apply Filters
+
+    </button>
+
+    <a
+href="/admin/extract-list?{{ request.query_string.decode() }}"
+target="_blank"
+class="search-btn"
+style="
+display:flex;
+align-items:center;
+justify-content:center;
+text-decoration:none;
+margin-left:10px;
+">
+
+📋 Extract List
+
+</a>
+
+
+
+    </form>
+    
+
+    <div class="table-wrapper">
+
+    <table class="survey-table">
+
+    <thead>
+
+    <tr>
+
+<th>UPC<br>Code</th>
+
+<th style="min-width:80px;">Section</th>
+
+<th style="min-width:100px;">Cycle</th>
+
+<th>Actual<br>Survey<br>Day</th>
+
+<th style="min-width:170px;">Start<br>Time</th>
+
+<th style="min-width:170px;">End<br>Time</th>
+
+<th style="min-width:220px;">Captain</th>
+
+<th style="min-width:160px;">Status</th>
+
+<th>Survey<br>Duration</th>
+
+<th>Upload<br>Duration</th>
+
+<th>Survey<br>Form</th>
+
+<th>Raw<br>Video</th>
+
+<th>Defect<br>Report</th>
+
+<th>
+    Road Vision
+    <br>
+    <span style="font-size:12px; color:red; font-weight:bold;">
+        Pending: {{ roadvision_pending }}
+    </span>
+</th>
+<th>RV<br>Remark</th>
+
+<th style="min-width:90px;">Details</th>
+
+    </tr>
+
+
+    </thead>
+
+    <tbody>
+
+    {% for survey in all_surveys %}
+
+    <tr>
+
+    <td>{{ survey.upc_code }}</td>
+
+    <td>{{ survey.section_no }}</td>
+
+    <td>
+
+{% if survey.is_resurvey %}
+
+{{ survey.cycle_no }} (R)
+
+{% else %}
+
+{{ survey.cycle_no }}
+
+{% endif %}
+
+</td>
+
+    <td>{{ survey.scheduled_day }}</td>
+
+    <td style="min-width:140px;line-height:1.4;">
+
+{% if survey.display_start_time %}
+
+{{ survey.display_start_time.strftime('%A') }}<br>
+{{ survey.display_start_time.strftime('%I:%M %p') }}<br>
+
+<small>
+{{ survey.display_start_time.strftime('%d %b %Y') }}
+</small>
+
+{% else %}
+
+-
+
+{% endif %}
+
+</td>
+
+<td style="min-width:140px;line-height:1.4;">
+
+{% if survey.display_end_time %}
+
+{{ survey.display_end_time.strftime('%A') }}<br>
+{{ survey.display_end_time.strftime('%I:%M %p') }}<br>
+
+<small>
+{{ survey.display_end_time.strftime('%d %b %Y') }}
+</small>
+
+{% else %}
+
+-
+
+{% endif %}
+
+</td>
+
+    <td>{{ survey.captain_name }}</td>
+
+    <td>
+
+{% if survey.status == "ongoing" %}
+
+<span class="status-live">
+🟢 Ongoing
+</span>
+
+{% elif survey.status == "groundwork_completed" %}
+
+<span style="
+background:#e7f8eb;
+color:#1d7f42;
+padding:8px 18px;
+border-radius:25px;
+font-weight:600;
+display:inline-flex;
+align-items:center;
+gap:8px;
+">
+    <span style="
+    width:12px;
+    height:12px;
+    border-radius:50%;
+    background:#34c759;
+    display:inline-block;
+    "></span>
+
+    Groundwork Completed<br>Form Pending
+
+</span>
+
+
+{% elif survey.status == "video_uploaded_pending_form" %}
+
+<span style="
+background:#dbeafe;
+color:#1d4ed8;
+padding:8px 18px;
+border-radius:25px;
+font-weight:600;
+display:inline-flex;
+align-items:center;
+gap:8px;
+">
+
+<span style="
+width:12px;
+height:12px;
+border-radius:50%;
+background:#2563eb;
+display:inline-block;
+"></span>
+
+Video Uploaded<br>Form Pending
+
+</span>
+
+{% elif survey.status == "video_pending" %}
+
+<span class="status-pending">
+🟡 Video Pending
+</span>
+
+{% elif survey.status == "completed" %}
+
+<span class="status-completed">
+✅ Completed
+</span>
+
+{% endif %}
+
+{% if survey.pdf_reupload_required %}
+
+<br><br>
+
+<span
+style="
+background:#ffe5e5;
+color:#d32f2f;
+padding:6px 10px;
+border-radius:20px;
+font-weight:600;">
+
+📄 PDF Re-upload Required
+
+</span>
+
+{% endif %}
+ 
+
+    </td>
+
+    <td>
+
+    {% if survey.status in ["ongoing", "groundwork_completed"] %}
+
+    <span
+    class="live-duration"
+    data-start="{{ survey.start_time.timestamp() }}">
+
+    0h 0m
+
+    </span>
+
+    {% elif survey.start_time and survey.end_time %}
+
+    {% set total_mins=((survey.end_time-survey.start_time).total_seconds()/60)|int %}
+
+    {{ total_mins//60 }}h {{ total_mins%60 }}m
+
+    {% else %}
+
+    -
+
+    {% endif %}
+
+    </td>
+
+    
+
+
+    <td>
+
+    {% if survey.upload_duration_minutes>0 %}
+
+    {{ survey.upload_duration_minutes//60 }}h
+    {{ survey.upload_duration_minutes%60 }}m
+
+    {% else %}
+
+    -
+
+    {% endif %}
+
+    </td>
+
+    <td>
+
+{% if survey.survey_form_completed %}
+
+✅ YES
+
+{% if survey.survey_form_completed_at %}
+<br>
+<small>
+{{ survey.survey_form_completed_at.strftime('%d %b %Y') }}<br>
+{{ survey.survey_form_completed_at.strftime('%I:%M %p') }}
+</small>
+{% endif %}
+
+{% else %}
+
+❌ NO
+
+{% endif %}
+
+    </td>
+
+    <td>
+
+{% if survey.task1_completed %}
+
+✅ YES
+
+{% if survey.task1_completed_at %}
+<br>
+<small>
+{{ survey.task1_completed_at.strftime('%d %b %Y') }}<br>
+{{ survey.task1_completed_at.strftime('%I:%M %p') }}
+</small>
+{% endif %}
+
+{% else %}
+
+❌ NO
+
+{% endif %}
+
+    </td>
+
+    <td>
+
+{% if survey.task2_completed %}
+
+✅ YES
+
+{% if survey.task2_completed_at %}
+<br>
+<small>
+{{ survey.task2_completed_at.strftime('%d %b %Y') }}<br>
+{{ survey.task2_completed_at.strftime('%I:%M %p') }}
+</small>
+{% endif %}
+
+{% else %}
+
+❌ NO
+
+{% endif %}
+
+    </td>
+
+    <!-- ROADVISION -->
+
+<td>
+
+{% if survey.roadvision_completed %}
+
+<span style="color:green;font-weight:bold;">
+✅ YES
+</span>
+
+{% else %}
+
+<span style="color:red;font-weight:bold;">
+❌ NO
+</span>
+
+{% endif %}
+
+</td>
+
+<!-- RV REMARK -->
+
+<td>
+
+{# Outcome of the automated bucket check. NULL means it has never run, which
+   is not the same as a failure, so nothing is shown in that case. #}
+{% if survey.video_count_matched is not none %}
+
+{% if survey.video_count_matched %}
+
+<span
+title="Automated check: the GCP bucket holds at least the enlisted video count."
+style="color:green;font-weight:bold;">
+✅
+</span>
+
+{% else %}
+
+<span
+title="Automated check: videos missing from the bucket, or the section could not be matched. Open the remark for detail."
+style="color:#c00;font-weight:bold;">
+⚠️
+</span>
+
+{% endif %}
+
+{% endif %}
+
+{% if survey.roadvision_remark %}
+
+<a
+href="/admin/remark/{{ survey.id }}"
+class="view-btn">
+
+View
+
+</a>
+
+{% else %}
+
+-
+
+{% endif %}
+
+</td>
+
+    <td>
+
+    <a
+    href="/admin/survey/{{ survey.id }}"
+    class="view-btn">
+
+    View
+
+    </a>
+
+    </td>
+
+    </tr>
+
+    {% endfor %}
+
+    </tbody>
+
+    </table>
+
+    </div>
+
+    <script>
+
+    function updateLiveDurations(){
+
+        document
+        .querySelectorAll(".live-duration")
+        .forEach(function(el){
+
+            const startTimestamp =
+            parseFloat(
+                el.dataset.start
+            );
+
+            const now =
+            Date.now() / 1000;
+
+            const totalMinutes =
+            Math.floor(
+                (now - startTimestamp) / 60
+            );
+
+            const hrs =
+            Math.floor(
+                totalMinutes / 60
+            );
+
+            const mins =
+            totalMinutes % 60;
+
+            el.innerHTML =
+            hrs + "h " +
+            mins + "m";
+
+            if(totalMinutes > 480){
+
+                el.style.color =
+                "red";
+
+                el.style.fontWeight =
+                "700";
+
+            }
+
+        });
+
+    }
+
+    updateLiveDurations();
+
+    setInterval(
+        updateLiveDurations,
+        60000
+    );
+
+
+  function clearFilters(){
+
+    document.querySelector(".advanced-filter").reset();
+
+    window.location.href = "/admin";
+
+}
+
+    // ===============================
+// COLUMN RESIZE
+// ===============================
+
+document.querySelectorAll(".survey-table th").forEach(function(th){
+
+    const resizer = document.createElement("div");
+
+    resizer.className = "column-resizer";
+
+    th.appendChild(resizer);
+
+    let startX, startWidth;
+
+    resizer.addEventListener("mousedown", function(e){
+
+        startX = e.pageX;
+
+        startWidth = th.offsetWidth;
+
+        document.onmousemove = function(e){
+
+            th.style.width =
+                (startWidth + e.pageX - startX) + "px";
+
+            th.style.minWidth =
+                (startWidth + e.pageX - startX) + "px";
+
+        };
+
+        document.onmouseup = function(){
+
+            document.onmousemove = null;
+            document.onmouseup = null;
+
+        };
+
+    });
+
+});
+
+setInterval(function () {
+    window.location.reload();
+}, 300000);
+
+document.addEventListener("visibilitychange", function () {
+    if (!document.hidden) {
+        window.location.reload();
+    }
+});
+
+    </script>
+
+    </div>

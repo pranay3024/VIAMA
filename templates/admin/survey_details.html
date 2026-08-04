@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+
+<title>Survey Details</title>
+
+<link rel="stylesheet"
+href="{{ url_for('static',
+filename='css/mobile.css') }}">
+
+</head>
+
+<body>
+
+<div class="mobile-header">
+
+SURVEY DETAILS
+
+</div>
+
+<div class="container">
+
+<div class="card">
+
+<h2>{{ survey.stretch_code }}</h2>
+
+<div class="section-badge">
+📌 Strech_no: {{ survey.section_no }}
+</div>
+
+<p>
+<b>Captain:</b>
+{{ survey.captain_name }}
+</p>
+
+<p>
+<b>State:</b>
+{{ survey.state }}
+</p>
+
+<p>
+<b>Survey Day:</b>
+{{ survey.survey_day }}
+</p>
+
+<p>
+<b>Survey Type:</b>
+{{ survey.survey_type }}
+</p>
+
+<p>
+<b>Status:</b>
+{{ survey.status }}
+</p>
+
+<p>
+<b>Started:</b>
+{{ display_start_time.strftime('%d %b %Y %I:%M %p')
+if display_start_time else '-' }}
+</p>
+
+<hr>
+
+<h3>📹 Video Upload Counts</h3>
+
+<table
+style="
+width:100%;
+border-collapse:collapse;
+margin-top:15px;
+">
+
+<tr>
+<th style="text-align:left;">LHS</th>
+<th style="text-align:left;">Count</th>
+</tr>
+
+<tr>
+<td>Intersection Road</td>
+<td>{{ survey.ir_lhs_count or 0 }}</td>
+</tr>
+
+<tr>
+<td>Main Carriageway</td>
+<td>{{ survey.mcw_lhs_count or 0 }}</td>
+</tr>
+
+<tr>
+<td>Service Road</td>
+<td>{{ survey.service_lhs_count or 0 }}</td>
+</tr>
+
+<tr>
+<td>Slip Road</td>
+<td>{{ survey.slip_lhs_count or 0 }}</td>
+</tr>
+
+<tr>
+<td colspan="2"><hr></td>
+</tr>
+
+<tr>
+<th style="text-align:left;">RHS</th>
+<th style="text-align:left;">Count</th>
+</tr>
+
+<tr>
+<td>Intersection Road</td>
+<td>{{ survey.ir_rhs_count or 0 }}</td>
+</tr>
+
+<tr>
+<td>Main Carriageway</td>
+<td>{{ survey.mcw_rhs_count or 0 }}</td>
+</tr>
+
+<tr>
+<td>Service Road</td>
+<td>{{ survey.service_rhs_count or 0 }}</td>
+</tr>
+
+<tr>
+<td>Slip Road</td>
+<td>{{ survey.slip_rhs_count or 0 }}</td>
+</tr>
+
+</table>
+
+<hr>
+
+<h3>Dashcam Photo</h3>
+
+{% if survey.dashcam_photo %}
+
+<img
+src="{{ survey.dashcam_photo }}"
+style="width:100%;border-radius:12px;">
+
+{% else %}
+
+<p>⚠ No Dashcam Photo Available</p>
+
+{% endif %}
+
+<hr>
+
+<h3>
+📄 Duly Signed & Stamped Survey Form
+</h3>
+
+{% if survey.end_survey_pdf %}
+
+<a
+href="{{ survey.end_survey_pdf }}"
+target="_blank"
+class="view-btn">
+
+📄 View Survey PDF
+
+</a>
+
+<br><br>
+
+{% if survey.pdf_reupload_required %}
+
+<div
+style="
+background:#fff3cd;
+padding:12px;
+border-radius:10px;
+border:1px solid #ffc107;
+margin-top:10px;">
+
+<b>⏳ Waiting for captain to upload corrected PDF</b>
+
+<br><br>
+
+<b>Reason:</b>
+
+{{ survey.pdf_reupload_reason }}
+
+</div>
+
+{% else %}
+
+<button
+class="main-btn"
+onclick="openPdfModal()"
+style="background:#dc3545;">
+
+❌ Request PDF Re-upload
+
+</button>
+
+{% endif %}
+
+{% if survey.pdf_reupload_count > 0 %}
+
+<p style="margin-top:12px;color:#666;">
+
+Re-upload Count:
+<b>{{ survey.pdf_reupload_count }}</b>
+
+</p>
+
+{% endif %}
+
+{% else %}
+
+⚠ No Survey PDF Available
+
+{% endif %}
+
+<hr>
+
+<h3>📊 Defect Report</h3>
+
+{% if survey.defect_report_file %}
+
+<a
+href="{{ survey.defect_report_file }}"
+target="_blank"
+class="view-btn">
+
+📊 View Defect Report
+
+</a>
+
+{% else %}
+
+<p>⚠ No Defect Report Uploaded</p>
+
+{% endif %}
+
+<hr>
+
+<h3>📹 Raw Video Excel</h3>
+
+{% if survey.raw_video_excel_file %}
+
+<a
+href="{{ survey.raw_video_excel_file }}"
+target="_blank"
+class="view-btn">
+
+📹 View Raw Video Excel
+
+</a>
+
+{% else %}
+
+<p>⚠ No Raw Video Excel Uploaded</p>
+
+{% endif %}
+
+<hr>
+
+
+
+</div>
+
+</div>
+
+
+
+
+<div
+id="pdfModal"
+style="display:none;
+position:fixed;
+top:0;
+left:0;
+width:100%;
+height:100%;
+background:rgba(0,0,0,.55);
+z-index:9999;">
+
+<div
+style="
+background:white;
+width:90%;
+max-width:450px;
+margin:120px auto;
+padding:20px;
+border-radius:12px;">
+
+<h3>Request PDF Re-upload</h3>
+
+<form
+method="POST"
+action="/request-pdf-reupload/{{ survey.id }}">
+
+<textarea
+name="reason"
+required
+placeholder="Enter reason..."
+style="
+width:100%;
+height:120px;
+padding:10px;
+border-radius:8px;"></textarea>
+
+<br><br>
+
+<button
+type="submit"
+class="main-btn">
+
+Send Request
+
+</button>
+
+<button
+type="button"
+class="main-btn secondary-btn"
+onclick="closePdfModal()">
+
+Cancel
+
+</button>
+
+</form>
+
+</div>
+
+</div>
+
+<script>
+
+function openPdfModal(){
+
+document.getElementById(
+"pdfModal"
+).style.display="block";
+
+}
+
+function closePdfModal(){
+
+document.getElementById(
+"pdfModal"
+).style.display="none";
+
+}
+
+</script>
+
+</body>
+
+</html>

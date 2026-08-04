@@ -1,0 +1,180 @@
+
+<!DOCTYPE html>
+<html>
+
+<head>
+
+    <title>Re-Survey</title>
+
+    <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0">
+
+    <link
+    rel="stylesheet"
+    href="{{ url_for('static', filename='css/mobile.css') }}">
+
+    <link
+    href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css"
+    rel="stylesheet" />
+
+</head>
+
+<body>
+
+<div class="mobile-header">
+
+    <div class="logo-title">
+        VIAMA SURVEILLANCE
+    </div>
+
+</div>
+
+<div class="container">
+
+    <div class="card">
+
+        <div class="captain-card">
+
+            <div class="captain-name">
+                👤 {{ user.name }}
+            </div>
+
+            <div class="captain-state">
+                {{ assignments|length }} Assigned Stretches
+            </div>
+
+            <div class="captain-status">
+                Ready For Re-Survey
+            </div>
+
+        </div>
+
+        <h2>
+            🔄 Select Stretch for Re-Survey
+        </h2>
+
+        {% if session.get("success_message") %}
+
+        <div class="success-box">
+            {{ session.pop("success_message") }}
+        </div>
+
+        {% endif %}
+
+        <form
+        id="resurveyForm">
+
+            <div class="form-group">
+
+                <label>
+                    Assigned Stretch
+                </label>
+
+                <select
+                id="stretchSelect"
+                required>
+
+                    <option value=""></option>
+
+                    {% for assignment in assignments %}
+
+                    <option
+                    value="{{ assignment.id }}">
+
+                        {{ assignment.section_no }}
+                        |
+                        {{ assignment.stretch_code }}
+                        |
+                        {{ assignment.survey_day }}
+                        |
+                        {{ assignment.survey_type }}
+
+                    </option>
+
+                    {% endfor %}
+
+                </select>
+
+            </div>
+
+            <button
+            type="submit"
+            class="main-btn">
+
+                🔄 START RE-SURVEY
+
+            </button>
+
+            <div class="action-buttons">
+
+                <button
+                type="button"
+                class="main-btn secondary-btn"
+                onclick="window.location.href='/captain-home'">
+
+                    ⬅ BACK TO DASHBOARD
+
+                </button>
+
+            </div>
+
+        </form>
+
+    </div>
+
+</div>
+
+<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+
+<script>
+
+$(document).ready(function(){
+
+    $('#stretchSelect').select2({
+
+        placeholder: "Select Assigned Stretch",
+
+        width: '100%',
+
+        allowClear: true
+
+    });
+
+});
+
+document
+.getElementById("resurveyForm")
+.addEventListener("submit", function(e){
+
+    e.preventDefault();
+
+    const assignmentId =
+    document.getElementById(
+        "stretchSelect"
+    ).value;
+
+    if(!assignmentId){
+
+        alert(
+            "Please select a stretch."
+        );
+
+        return;
+
+    }
+
+    window.location.href =
+    "/captain/resurvey/start/" +
+    assignmentId;
+
+});
+
+</script>
+
+</body>
+
+</html>
+

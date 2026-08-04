@@ -79,7 +79,12 @@ margin-bottom:25px;
 function copyList(){
 
     const text =
-    document.getElementById("extractList").innerText;
+document.getElementById("extractList")
+.innerText
+.split("\n")
+.map(line => line.trim())
+.filter(line => line !== "")
+.join("\n");
 
     navigator.clipboard.writeText(text);
 

@@ -42,10 +42,27 @@ body{
 <body>
 
 <button
-class="copy-btn"
-onclick="copyList()">
+id="copyBtn"
+onclick="copyList()"
+style="
+display:inline-flex;
+align-items:center;
+gap:10px;
+padding:12px 24px;
+background:linear-gradient(135deg,#ff8a00,#ff6200);
+color:#fff;
+border:none;
+border-radius:12px;
+font-size:16px;
+font-weight:600;
+font-family:Calibri,sans-serif;
+cursor:pointer;
+box-shadow:0 8px 18px rgba(255,122,0,.30);
+transition:all .25s ease;
+margin-bottom:25px;
+">
 
-📋 Copy
+📋 Copy List
 
 </button>
 
@@ -66,7 +83,22 @@ function copyList(){
 
     navigator.clipboard.writeText(text);
 
-    alert("Copied successfully!");
+    const btn =
+    document.getElementById("copyBtn");
+
+    btn.innerHTML = "✅ Copied!";
+
+    btn.style.background =
+    "linear-gradient(135deg,#28a745,#1e8e3e)";
+
+    setTimeout(function(){
+
+        btn.innerHTML = "📋 Copy List";
+
+        btn.style.background =
+        "linear-gradient(135deg,#ff8a00,#ff6200)";
+
+    },1500);
 
 }
 

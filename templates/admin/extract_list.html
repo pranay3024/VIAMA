@@ -16,15 +16,61 @@ body{
 
 }
 
+.copy-btn{
+
+    padding:10px 20px;
+    background:#ff7a00;
+    color:white;
+    border:none;
+    border-radius:6px;
+    cursor:pointer;
+    font-size:16px;
+    margin-bottom:20px;
+
+}
+
+.copy-btn:hover{
+
+    background:#e66d00;
+
+}
+
 </style>
 
 </head>
 
 <body>
 
+<button
+class="copy-btn"
+onclick="copyList()">
+
+📋 Copy
+
+</button>
+
+<div id="extractList">
+
 {% for survey in surveys -%}
 {{ survey.section_no }}_Cycle{{ survey.cycle_no }}<br>
 {%- endfor %}
+
+</div>
+
+<script>
+
+function copyList(){
+
+    const text =
+    document.getElementById("extractList").innerText;
+
+    navigator.clipboard.writeText(text);
+
+    alert("Copied successfully!");
+
+}
+
+</script>
 
 </body>
 

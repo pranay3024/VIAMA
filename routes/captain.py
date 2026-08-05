@@ -1122,9 +1122,10 @@ def backup_home():
     Survey.captain_email == user.email,
 
     Survey.status.in_([
-        "ongoing",
-        "groundwork_completed"
-    ])
+    "ongoing",
+    "groundwork_completed",
+    "video_uploaded_pending_form"
+])
 
     ).first()
 
@@ -1136,10 +1137,19 @@ def backup_home():
     state=user.state
     ).count()
 
-    pending_count = Survey.query.filter_by(
-    captain_email=user.email,
-    status="video_pending"
-    ).count()
+    pending_count = Survey.query.filter(
+
+    Survey.captain_email == user.email,
+
+    Survey.status.in_([
+        "ongoing",
+        "groundwork_completed",
+        "video_uploaded_pending_form",
+        "video_pending"
+    ])
+
+).count()
+
 
     completed_count = Survey.query.filter_by(
     captain_email=user.email,
@@ -1228,11 +1238,29 @@ def backup_pending_uploads():
 
     user = User.query.get(session["user_id"])
 
-    surveys = Survey.query.filter_by(
-        captain_email=user.email,
-        status="video_pending"
-    ).order_by(
-        Survey.id.desc()
+    surveys = exclude_deleted(
+
+        Survey.query.filter(
+
+            Survey.captain_email == user.email,
+
+            db.or_(
+
+                Survey.status.in_([
+                    "ongoing",
+                    "groundwork_completed",
+                    "video_uploaded_pending_form",
+                    "video_pending"
+                ]),
+
+                Survey.pdf_reupload_required == True
+
+            )
+
+        ),
+
+        Survey
+
     ).all()
 
     return render_template(

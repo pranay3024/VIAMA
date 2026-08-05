@@ -218,7 +218,7 @@ for your kind reference and download.
 </p>
 
 <p>
-Excel file attached herewith for your reference. Stretch No. {survey.section_no} Cycle {survey.cycle_no}"
+Excel file attached herewith for your reference. Stretch No. {survey.section_no} Cycle {survey.cycle_no}
 </p>
 
 </div>

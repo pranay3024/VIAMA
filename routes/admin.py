@@ -296,7 +296,7 @@ def admin_dashboard():
 
     all_surveys = query.order_by(
 
-    case(
+     case(
 
         (
             Survey.status == "ongoing",
@@ -309,8 +309,13 @@ def admin_dashboard():
         ),
 
         (
-            Survey.status == "video_pending",
+            Survey.status == "video_uploaded_pending_form",
             3
+        ),
+
+        (
+            Survey.status == "video_pending",
+            4
         ),
 
         (
@@ -322,7 +327,7 @@ def admin_dashboard():
                     Survey.survey_form_completed == False
                 )
             ),
-            4
+            5
         ),
 
         (
@@ -332,10 +337,10 @@ def admin_dashboard():
                 Survey.task2_completed == True,
                 Survey.survey_form_completed == True
             ),
-            5
+            6
         ),
 
-        else_=6
+        else_=7
 
     ),
 

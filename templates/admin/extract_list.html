@@ -9,29 +9,67 @@
 
 body{
 
-    font-family:Calibri;
+    font-family:Calibri,sans-serif;
     font-size:18px;
     padding:30px;
-    white-space:pre-line;
+    background:#f8f9fb;
+    margin:0;
+
+}
+
+#extractList{
+
+    white-space:pre-wrap;
+    line-height:1.5;
+    color:#222;
+
+}
+
+.status{
+
+    font-size:20px;
+    font-weight:700;
+    color:#ff6200;
+    margin:20px 0 8px 0;
+
+}
+
+.status:first-child{
+
+    margin-top:0;
+
+}
+
+.item{
+
+    margin:2px 0;
+    padding-left:8px;
 
 }
 
 .copy-btn{
 
-    padding:10px 20px;
-    background:#ff7a00;
-    color:white;
+    display:inline-flex;
+    align-items:center;
+    gap:10px;
+    padding:12px 24px;
+    background:linear-gradient(135deg,#ff8a00,#ff6200);
+    color:#fff;
     border:none;
-    border-radius:6px;
-    cursor:pointer;
+    border-radius:12px;
     font-size:16px;
-    margin-bottom:20px;
+    font-weight:600;
+    font-family:Calibri,sans-serif;
+    cursor:pointer;
+    box-shadow:0 8px 18px rgba(255,122,0,.30);
+    transition:.25s;
+    margin-bottom:25px;
 
 }
 
 .copy-btn:hover{
 
-    background:#e66d00;
+    transform:translateY(-2px);
 
 }
 
@@ -43,24 +81,8 @@ body{
 
 <button
 id="copyBtn"
-onclick="copyList()"
-style="
-display:inline-flex;
-align-items:center;
-gap:10px;
-padding:12px 24px;
-background:linear-gradient(135deg,#ff8a00,#ff6200);
-color:#fff;
-border:none;
-border-radius:12px;
-font-size:16px;
-font-weight:600;
-font-family:Calibri,sans-serif;
-cursor:pointer;
-box-shadow:0 8px 18px rgba(255,122,0,.30);
-transition:all .25s ease;
-margin-bottom:25px;
-">
+class="copy-btn"
+onclick="copyList()">
 
 📋 Copy List
 
@@ -74,6 +96,8 @@ margin-bottom:25px;
 
 {% if survey.status != current_status %}
 {% set current_status = survey.status %}
+
+<div class="status">
 
 {% if survey.status == "ongoing" %}
 *Ongoing*
@@ -89,9 +113,13 @@ margin-bottom:25px;
 *{{ survey.status }}*
 {% endif %}
 
+</div>
+
 {% endif %}
 
+<div class="item">
 {{ survey.section_no }}_Cycle{{ survey.cycle_no }}
+</div>
 
 {% endfor %}
 

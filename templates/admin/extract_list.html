@@ -68,27 +68,33 @@ onclick="copyList()">
 
 </button>
 
-<pre id="extractList">{% set current_status = None -%}
-{% for survey in surveys -%}
-{% if survey.status != current_status -%}
-{% set current_status = survey.status -%}
-{% if survey.status == "ongoing" -%}
+<pre id="extractList">
+{% set ns = namespace(current_status=None) %}
+
+{% for survey in surveys %}
+
+{% if survey.status != ns.current_status %}
+{% set ns.current_status = survey.status %}
+
+{% if survey.status == "ongoing" %}
 *Ongoing*
-{% elif survey.status == "completed" -%}
+{% elif survey.status == "completed" %}
 *Completed*
-{% elif survey.status == "video_uploaded_pending_form" -%}
+{% elif survey.status == "video_uploaded_pending_form" %}
 *Video Uploaded - Form Pending*
-{% elif survey.status == "video_pending" -%}
+{% elif survey.status == "video_pending" %}
 *Video Pending*
-{% elif survey.status == "groundwork_completed" -%}
+{% elif survey.status == "groundwork_completed" %}
 *Groundwork Completed - Video and Form Pending*
-{% else -%}
+{% else %}
 *{{ survey.status }}*
 {% endif %}
 
-{% endif -%}
+{% endif %}
 {{ survey.section_no }}_Cycle{{ survey.cycle_no }}
-{% endfor -%}</pre>
+
+{% endfor %}
+</pre>
 
 <script>
 

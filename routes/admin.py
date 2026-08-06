@@ -1394,6 +1394,7 @@ def email_draft(email_type):
     query = Survey.query.filter(
         Survey.status.in_([
             "ongoing",
+            "video_uploaded_pending_form",
             "groundwork_completed",
             "video_pending",
             "completed"

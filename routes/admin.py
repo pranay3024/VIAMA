@@ -691,17 +691,95 @@ def admin_missed():
     if session.get("role") != "admin":
         return redirect("/")
 
-    missed_surveys = SurveyAssignment.query.filter_by(
+    team = request.args.get("team")
+    day = request.args.get("day")
+
+    query = SurveyAssignment.query.filter_by(
         status="missed"
-    ).order_by(
+    )
+
+    if team:
+        query = query.filter(
+            SurveyAssignment.main_person == team
+        )
+
+    if day:
+        query = query.filter(
+            SurveyAssignment.survey_day == day
+        )
+
+    missed_surveys = query.order_by(
         SurveyAssignment.survey_day,
         SurveyAssignment.section_no
     ).all()
 
+    teams = [
+        t[0]
+        for t in db.session.query(
+            SurveyAssignment.main_person
+        ).distinct().order_by(
+            SurveyAssignment.main_person
+        ).all()
+    ]
+
     return render_template(
         "admin/missed.html",
-        missed_surveys=missed_surveys
+        missed_surveys=missed_surveys,
+        teams=teams
     )
+
+
+@admin_bp.route("/admin/missed/extract")
+def missed_extract():
+
+    if session.get("role") != "admin":
+        return redirect("/")
+
+    team = request.args.get("team")
+    day = request.args.get("day")
+
+    query = SurveyAssignment.query.filter_by(
+        status="missed"
+    )
+
+    if team:
+        query = query.filter(
+            SurveyAssignment.main_person == team
+        )
+
+    if day:
+        query = query.filter(
+            SurveyAssignment.survey_day == day
+        )
+
+    missed_surveys = query.order_by(
+    SurveyAssignment.section_no
+).all()
+
+    missed_list = []
+
+    for assignment in missed_surveys:
+
+     latest_survey = Survey.query.filter_by(
+        section_no=assignment.section_no
+    ).order_by(
+        Survey.cycle_no.desc()
+    ).first()
+
+    if latest_survey:
+        next_cycle = latest_survey.cycle_no + 1
+    else:
+        next_cycle = 1
+
+    missed_list.append({
+        "section_no": assignment.section_no,
+        "cycle_no": next_cycle
+    })
+
+    return render_template(
+     "admin/missed_extract.html",
+      missed_list=missed_list
+)
 
 @admin_bp.route("/admin/survey/<int:survey_id>")
 def survey_details_admin(survey_id):

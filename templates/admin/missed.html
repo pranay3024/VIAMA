@@ -35,6 +35,91 @@ class="logout-btn">
 
 <div class="dashboard-content">
 
+<!-- FILTERS -->
+
+<form method="GET" style="
+display:flex;
+gap:12px;
+align-items:center;
+flex-wrap:wrap;
+margin-bottom:20px;
+">
+
+<select
+name="team"
+style="padding:10px 14px;border-radius:8px;">
+
+<option value="">
+All Teams
+</option>
+
+{% for team in teams %}
+
+<option
+value="{{ team }}"
+{% if request.args.get("team")==team %}
+selected
+{% endif %}>
+
+{{ team }}
+
+</option>
+
+{% endfor %}
+
+</select>
+
+<select
+name="day"
+style="padding:10px 14px;border-radius:8px;">
+
+<option value="">
+All Days
+</option>
+
+{% for d in
+["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"] %}
+
+<option
+value="{{ d }}"
+{% if request.args.get("day")==d %}
+selected
+{% endif %}>
+
+{{ d }}
+
+</option>
+
+{% endfor %}
+
+</select>
+
+<button
+type="submit"
+class="btn btn-primary">
+
+Apply
+
+</button>
+
+<a
+href="/admin/missed"
+class="btn btn-secondary">
+
+Clear
+
+</a>
+
+<a
+href="/admin/missed/extract?team={{ request.args.get('team','') }}&day={{ request.args.get('day','') }}"
+class="btn btn-success">
+
+📋 Extract List
+
+</a>
+
+</form>
+
 <div class="table-wrapper">
 
 <table class="survey-table">
@@ -69,8 +154,6 @@ class="logout-btn">
 <td>{{ assignment.main_person }}</td>
 
 <td>{{ assignment.state }}</td>
-
-
 
 <td>
 

@@ -753,33 +753,33 @@ def missed_extract():
         )
 
     missed_surveys = query.order_by(
-    SurveyAssignment.section_no
-).all()
+        SurveyAssignment.section_no
+    ).all()
 
     missed_list = []
 
     for assignment in missed_surveys:
 
-     latest_survey = Survey.query.filter_by(
-        section_no=assignment.section_no
-    ).order_by(
-        Survey.cycle_no.desc()
-    ).first()
+        latest_survey = Survey.query.filter_by(
+            section_no=assignment.section_no
+        ).order_by(
+            Survey.cycle_no.desc()
+        ).first()
 
-    if latest_survey:
-        next_cycle = latest_survey.cycle_no + 1
-    else:
-        next_cycle = 1
+        if latest_survey:
+            next_cycle = latest_survey.cycle_no + 1
+        else:
+            next_cycle = 1
 
-    missed_list.append({
-        "section_no": assignment.section_no,
-        "cycle_no": next_cycle
-    })
+        missed_list.append({
+            "section_no": assignment.section_no,
+            "cycle_no": next_cycle
+        })
 
     return render_template(
-     "admin/missed_extract.html",
-      missed_list=missed_list
-)
+        "admin/missed_extract.html",
+        missed_list=missed_list
+    )
 
 @admin_bp.route("/admin/survey/<int:survey_id>")
 def survey_details_admin(survey_id):

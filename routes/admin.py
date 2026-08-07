@@ -1462,10 +1462,6 @@ def email_draft(email_type):
         status="missed"
     )
 
-    if selected_week:
-        missed_query = missed_query.filter(
-            SurveyAssignment.survey_day == start.strftime("%A")
-        )
 
     if upc_code:
         missed_query = missed_query.filter(

@@ -129,25 +129,24 @@ class="logout-btn">
 method="GET"
 class="filter-bar">
 
-<select name="team">
+<select name="agency" style="padding:10px 14px;border-radius:8px;">
 
-<option value="">
-All Teams
-</option>
+    <option value="">Teams</option>
 
-{% for team in teams %}
+    <option value="krish"
+    {% if request.args.get('agency') == 'krish' %}selected{% endif %}>
+        North-East
+    </option>
 
-<option
-value="{{ team }}"
-{% if request.args.get("team")==team %}
-selected
-{% endif %}>
+    <option value="godbole"
+    {% if request.args.get('agency') == 'godbole' %}selected{% endif %}>
+        Odisha
+    </option>
 
-{{ team }}
-
-</option>
-
-{% endfor %}
+    <option value="aspizo"
+    {% if request.args.get('agency') == 'aspizo' %}selected{% endif %}>
+        UP-Jharkhand
+    </option>
 
 </select>
 
@@ -191,7 +190,7 @@ Clear
 </a>
 
 <a
-href="/admin/missed/extract?team={{ request.args.get('team','') }}&day={{ request.args.get('day','') }}"
+href="/admin/missed/extract?agency={{ request.args.get('agency','') }}&day={{ request.args.get('day','') }}"
 class="btn btn-success"
 target="_blank">
 

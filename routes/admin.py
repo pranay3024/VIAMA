@@ -691,17 +691,27 @@ def admin_missed():
     if session.get("role") != "admin":
         return redirect("/")
 
-    team = request.args.get("team")
+    agency = request.args.get("agency")
     day = request.args.get("day")
 
     query = SurveyAssignment.query.filter_by(
         status="missed"
     )
 
-    if team:
-        query = query.filter(
-            SurveyAssignment.main_person == team
-        )
+    if agency == "krish":
+     query = query.filter(
+        SurveyAssignment.agency == "krish"
+    )
+
+    elif agency == "godbole":
+     query = query.filter(
+        SurveyAssignment.agency == "godbole"
+    )
+
+    elif agency == "aspizo":
+     query = query.filter(
+        SurveyAssignment.agency == "aspizo"
+    )
 
     if day:
         query = query.filter(
@@ -713,20 +723,11 @@ def admin_missed():
         SurveyAssignment.section_no
     ).all()
 
-    teams = [
-        t[0]
-        for t in db.session.query(
-            SurveyAssignment.main_person
-        ).distinct().order_by(
-            SurveyAssignment.main_person
-        ).all()
-    ]
 
     return render_template(
-        "admin/missed.html",
-        missed_surveys=missed_surveys,
-        teams=teams
-    )
+    "admin/missed.html",
+    missed_surveys=missed_surveys
+)
 
 
 @admin_bp.route("/admin/missed/extract")
@@ -735,17 +736,27 @@ def missed_extract():
     if session.get("role") != "admin":
         return redirect("/")
 
-    team = request.args.get("team")
+    agency = request.args.get("agency")
     day = request.args.get("day")
 
     query = SurveyAssignment.query.filter_by(
         status="missed"
     )
 
-    if team:
-        query = query.filter(
-            SurveyAssignment.main_person == team
-        )
+    if agency == "krish":
+     query = query.filter(
+        SurveyAssignment.agency == "krish"
+    )
+
+    elif agency == "godbole":
+     query = query.filter(
+        SurveyAssignment.agency == "godbole"
+    )
+
+    elif agency == "aspizo":
+     query = query.filter(
+        SurveyAssignment.agency == "aspizo"
+    )
 
     if day:
         query = query.filter(

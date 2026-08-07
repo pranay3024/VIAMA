@@ -58,6 +58,7 @@ def regional_dashboard():
     ongoing = query.filter(
     Survey.status.in_([
         "ongoing",
+        "video_uploaded_pending_form",
         "groundwork_completed"
     ])
 ).count()
@@ -141,14 +142,15 @@ def regional_dashboard():
     all_surveys = filtered_query.order_by(
 
         case(
-            {
-                "ongoing": 1,
-                "groundwork_completed": 2,
-                "video_pending": 3,
-                "completed": 4
-            },
+    {
+        "ongoing": 1,
+        "video_uploaded_pending_form": 2,
+        "groundwork_completed": 3,
+        "video_pending": 4,
+        "completed": 5
+    },
             value=Survey.status,
-            else_=5
+            else_=6
         ),
 
         Survey.start_time.desc()
@@ -260,11 +262,12 @@ def regional_dashboard():
                     Survey.section_no == assignment.section_no,
                     Survey.start_time >= week_start,
                     Survey.status.in_([
-                        "ongoing",
-                        "groundwork_completed",
-                        "video_pending",
-                        "completed"
-                    ])
+    "ongoing",
+    "video_uploaded_pending_form",
+    "groundwork_completed",
+    "video_pending",
+    "completed"
+])
                 ).first()
 
                 if survey_exists:
@@ -508,9 +511,14 @@ def regional_survey_details(survey_id):
         )
 
     elif (
-        survey.video_pending_start_time
-        and survey.video_upload_time
-    ):
+    survey.status in [
+        "video_uploaded_pending_form",
+        "groundwork_completed",
+        "completed",
+    ]
+    and survey.video_pending_start_time
+    and survey.video_upload_time
+):
 
         survey.upload_duration_minutes = int(
             (

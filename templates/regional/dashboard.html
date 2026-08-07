@@ -409,6 +409,31 @@ text-overflow:ellipsis;">
 🟢 Ongoing
 </span>
 
+{% elif survey.status == "video_uploaded_pending_form" %}
+
+<span style="
+background:#fff8e1;
+color:#d97706;
+padding:8px 18px;
+border-radius:25px;
+font-weight:600;
+display:inline-flex;
+align-items:center;
+gap:8px;
+">
+
+<span style="
+width:12px;
+height:12px;
+border-radius:50%;
+background:#f59e0b;
+display:inline-block;
+"></span>
+
+Video Uploaded<br>Form Pending
+
+</span>
+
 {% elif survey.status == "groundwork_completed" %}
 
 <span style="
@@ -472,7 +497,11 @@ font-weight:600;">
 
     <td>
 
-    {% if survey.status in ["ongoing", "groundwork_completed"] %}
+    {% if survey.status in [
+    "ongoing",
+    "video_uploaded_pending_form",
+    "groundwork_completed"
+] %}
 
     <span
     class="live-duration"

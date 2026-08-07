@@ -194,61 +194,39 @@ class="search-btn">
 
 {% if request.method == "POST" and surveys %}
 
-<hr style="margin:30px 0;">
+<div class="form-group">
 
-<label>
+    <label>Section</label>
 
-Section
+    <select
+        name="survey_id"
+        required
+        style="margin-top:10px;">
+        
+        <option value="">Select Section</option>
 
-</label>
+        {% for survey in surveys %}
+        <option
+            value="{{ survey.missed_id if survey.is_missed else survey.id }}"
+            {% if selected_section == (survey.missed_id if survey.is_missed else survey.id)|string %}
+            selected
+            {% endif %}
+        >
+            {% if survey.is_missed %}🔴 MISSED |{% endif %}
+            {{ survey.section_no }}
+            | Cycle {{ survey.cycle_no }}
+            | {{ survey.upc_code }}
+            | {{ survey.stretch_code }}
+        </option>
+        {% endfor %}
 
-<select
-name="survey_id"
-required>
+    </select>
 
-<option value="">
-Select Section
-</option>
+</div>
 
-{% for survey in surveys %}
+<div class="form-group">
 
-<option
-value="{{ survey.id }}"
-
-{% if selected_section==survey.id|string %}
-
-selected
-
-{% endif %}>
-
-{{ survey.section_no }}
-
-|
-
-Cycle {{ survey.cycle_no }}
-
-|
-
-{{ survey.upc_code }}
-
-|
-
-{{ survey.stretch_code }}
-
-
-</option>
-
-{% endfor %}
-
-</select>
-
-<br><br>
-
-<label>
-
-Survey Start Date
-
-</label>
+<label>Survey Start Date</label>
 
 <input
 type="date"
@@ -256,13 +234,11 @@ name="start_date"
 value="{{ start_date }}"
 required>
 
-<br><br>
+</div>
 
-<label>
+<div class="form-group">
 
-Survey End Date
-
-</label>
+<label>Survey End Date</label>
 
 <input
 type="date"
@@ -270,13 +246,13 @@ name="end_date"
 value="{{ end_date }}"
 required>
 
-<br><br>
+</div>
 
 <button
 type="submit"
 name="action"
 value="generate"
-class="search-btn">
+class="btn-primary">
 
 Generate Draft
 

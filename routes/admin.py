@@ -1366,8 +1366,6 @@ def gmail_drafts():
         "admin/gmail_drafts.html"
     )
 
-
-
 @admin_bp.route(
     "/admin/gmail-drafts/<email_type>",
     methods=["GET", "POST"]
@@ -1381,10 +1379,9 @@ def email_draft(email_type):
         return redirect("/")
 
     if email_type not in ["defect", "raw", "discrepancy"]:
-         return redirect("/admin/gmail-drafts")
+        return redirect("/admin/gmail-drafts")
 
     project_start = datetime(2026, 6, 22)
-
     today = datetime.utcnow()
 
     total_weeks = (
@@ -1393,14 +1390,14 @@ def email_draft(email_type):
 
     weeks = list(range(1, total_weeks + 1))
 
-    cycles = db.session.query(
-    Survey.cycle_no
-).distinct().order_by(
-    Survey.cycle_no
-).all()
+    cycles = (
+        db.session.query(Survey.cycle_no)
+        .distinct()
+        .order_by(Survey.cycle_no)
+        .all()
+    )
 
     surveys = []
-
     no_records = False
 
     selected_week = request.form.get("week") or request.args.get("week", "")
@@ -1414,9 +1411,9 @@ def email_draft(email_type):
     subject = None
     email_html = None
 
-    # ------------------------------------
+    # --------------------------------------------------
     # LOAD SURVEYS
-    # ------------------------------------
+    # --------------------------------------------------
 
     query = Survey.query.filter(
         Survey.status.in_([
@@ -1424,44 +1421,94 @@ def email_draft(email_type):
             "video_uploaded_pending_form",
             "groundwork_completed",
             "video_pending",
-            "completed"
+            "completed",
         ])
     )
 
     if selected_week:
-       week_no = int(selected_week)
-       start = project_start + timedelta(days=(week_no - 1) * 7)
-       end = start + timedelta(days=7)
+        week_no = int(selected_week)
 
-       query = query.filter(
-        Survey.start_time >= start,
-        Survey.start_time < end
-       )
+        start = project_start + timedelta(days=(week_no - 1) * 7)
+        end = start + timedelta(days=7)
+
+        query = query.filter(
+            Survey.start_time >= start,
+            Survey.start_time < end,
+        )
 
     if upc_code:
-         query = query.filter(
-          Survey.upc_code.ilike(f"%{upc_code}%")
-         )
+        query = query.filter(
+            Survey.upc_code.ilike(f"%{upc_code}%")
+        )
 
     if cycle_no:
-            query = query.filter(
+        query = query.filter(
             Survey.cycle_no == int(cycle_no)
+        )
+
+    surveys = (
+        query.order_by(
+            Survey.section_no,
+            Survey.cycle_no,
+        )
+        .all()
+    )
+
+    # --------------------------------------------------
+    # ADD MISSED SURVEYS
+    # --------------------------------------------------
+
+    missed_query = SurveyAssignment.query.filter_by(
+        status="missed"
+    )
+
+    if selected_week:
+        missed_query = missed_query.filter(
+            SurveyAssignment.survey_day == start.strftime("%A")
+        )
+
+    if upc_code:
+        missed_query = missed_query.filter(
+            SurveyAssignment.upc_code.ilike(f"%{upc_code}%")
+        )
+
+    missed_assignments = missed_query.all()
+
+    for assignment in missed_assignments:
+
+        latest = (
+            Survey.query.filter_by(
+                section_no=assignment.section_no
             )
+            .order_by(Survey.cycle_no.desc())
+            .first()
+        )
 
-    surveys = query.order_by(
-        Survey.cycle_no,
-        Survey.section_no
-    ).all()
+        assignment.missed_id = f"missed-{assignment.id}"
+        assignment.cycle_no = (
+            latest.cycle_no + 1 if latest else 1
+        )
+        assignment.is_missed = True
 
+        surveys.append(assignment)
 
-    if request.method == "POST" and request.form.get("action") != "generate":
+    surveys.sort(
+        key=lambda x: (
+            str(x.section_no),
+            int(x.cycle_no),
+        )
+    )
 
-     if not surveys:
-        no_records = True
+    if (
+        request.method == "POST"
+        and request.form.get("action") != "generate"
+    ):
+        if not surveys:
+            no_records = True
 
-    # ------------------------------------
+    # --------------------------------------------------
     # GENERATE EMAIL
-    # ------------------------------------
+    # --------------------------------------------------
 
     if (
         request.method == "POST"
@@ -1469,24 +1516,54 @@ def email_draft(email_type):
         and selected_section
     ):
 
-        survey = Survey.query.get_or_404(
-            safe_int(selected_section, minimum=1) or 0
-        )
+        is_missed = False
 
-        # -------------------------------
+        if selected_section.startswith("missed-"):
+
+            is_missed = True
+
+            assignment_id = int(
+                selected_section.replace("missed-", "")
+            )
+
+            assignment = SurveyAssignment.query.get_or_404(
+                assignment_id
+            )
+
+            survey = (
+                Survey.query.filter_by(
+                    section_no=assignment.section_no
+                )
+                .order_by(Survey.cycle_no.desc())
+                .first_or_404()
+            )
+
+        else:
+
+            survey = Survey.query.get_or_404(
+                safe_int(selected_section, minimum=1) or 0
+            )
+
+        original_cycle = survey.cycle_no
+
+        if is_missed:
+            survey.cycle_no = original_cycle + 1
+
+        # --------------------------------------------------
         # Validation
-        # -------------------------------
+        # --------------------------------------------------
 
+        # Your validation code here
 
-        # -------------------------------
+        # --------------------------------------------------
         # Build Email
-        # -------------------------------
+        # --------------------------------------------------
 
         subject = build_subject(
-        survey,
-        email_type,
-        end_date
-)
+            survey,
+            email_type,
+            end_date,
+        )
 
         subject = " ".join(str(subject).split())
 
@@ -1494,102 +1571,101 @@ def email_draft(email_type):
             survey,
             email_type,
             start_date,
-            end_date
+            end_date,
         )
 
-        # -------------------------------
+        # --------------------------------------------------
         # Attachment
-        # -------------------------------
+        # --------------------------------------------------
 
         if email_type == "defect":
 
-         attachment_url = survey.defect_report_file
+            attachment_url = survey.defect_report_file
 
-         attachment_name = (
-        f"{survey.upc_code}_Cycle-{survey.cycle_no}_Defect_Report.xlsx"
-    )
+            attachment_name = (
+                f"{survey.upc_code}_Cycle-{survey.cycle_no}_Defect_Report.xlsx"
+            )
 
         elif email_type == "raw":
 
-         attachment_url = survey.raw_video_excel_file
+            attachment_url = survey.raw_video_excel_file
 
-         attachment_name = (
-        f"{survey.upc_code}_Cycle-{survey.cycle_no}_Raw_Data.xlsx"
-    )
+            attachment_name = (
+                f"{survey.upc_code}_Cycle-{survey.cycle_no}_Raw_Data.xlsx"
+            )
 
         elif email_type == "discrepancy":
 
-         attachment_url = ""
-
-         attachment_name = ""
-      
+            attachment_url = ""
+            attachment_name = ""
 
         attachment_bytes = None
 
         if attachment_url:
-          attachment_bytes = download_file_from_drive(
-            attachment_url
-    )
-        # -------------------------------
+            attachment_bytes = download_file_from_drive(
+                attachment_url
+            )
+
+        # --------------------------------------------------
         # Create Gmail Draft
-        # -------------------------------
+        # --------------------------------------------------
+
         cc_email = get_cc_email(survey.ro)
 
         draft_id = create_gmail_draft(
-         subject=subject,
-         html_body=email_html,
-         attachment_bytes=attachment_bytes,
-         attachment_filename=attachment_name,
-         cc_email=cc_email
-)
+            subject=subject,
+            html_body=email_html,
+            attachment_bytes=attachment_bytes,
+            attachment_filename=attachment_name,
+            cc_email=cc_email,
+        )
 
-        # -------------------------------
+        if is_missed:
+            survey.cycle_no = original_cycle
+
+        # --------------------------------------------------
         # Open Gmail Draft
-        # -------------------------------
+        # --------------------------------------------------
 
         from flask import flash
 
         flash(
-    f"{survey.section_no}_Cycle{survey.cycle_no} Gmail draft created successfully.\n"
-    f"The draft has been created in adordashcam@gmail.com. "
-    f"Please open Gmail → Drafts and send the email.",
-    "success"
-)
+            (
+                f"{survey.section_no}_Cycle{survey.cycle_no} "
+                f"Gmail draft created successfully.\n"
+                f"The draft has been created in "
+                f"adordashcam@gmail.com. "
+                f"Please open Gmail → Drafts and send the email."
+            ),
+            "success",
+        )
 
-  
         return redirect(
-               url_for(
-              "admin.email_draft",
-               email_type=email_type,
-               week=selected_week
-    )
-)
+            url_for(
+                "admin.email_draft",
+                email_type=email_type,
+                week=selected_week,
+            )
+        )
 
     return render_template(
-
         "admin/email_draft.html",
-
         email_type=email_type,
-
         weeks=weeks,
         cycles=cycles,
-
         surveys=surveys,
         no_records=no_records,
-
         selected_week=selected_week,
         selected_section=selected_section,
-
         upc_code=upc_code,
         cycle_no=cycle_no,
-
         start_date=start_date,
         end_date=end_date,
-
         subject=subject,
-        email_html=email_html
-
+        email_html=email_html,
     )
+
+
 @admin_bp.route("/admin/remark/<int:survey_id>")
 def admin_view_remark(survey_id):
 

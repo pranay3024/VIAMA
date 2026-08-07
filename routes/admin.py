@@ -728,10 +728,29 @@ def admin_missed():
         )
 
     missed_surveys = query.order_by(
-        SurveyAssignment.survey_day,
-        SurveyAssignment.section_no
-    ).all()
+    SurveyAssignment.survey_day,
+    SurveyAssignment.section_no
+).all()
 
+# ---------------------------------------
+# Calculate Next Cycle Number
+# ---------------------------------------
+
+    for assignment in missed_surveys:
+
+     latest = (
+        Survey.query.filter_by(
+            section_no=assignment.section_no
+        )
+        .order_by(Survey.cycle_no.desc())
+        .first()
+    )
+
+    assignment.next_cycle = (
+        latest.cycle_no + 1
+        if latest
+        else 1
+    )
 
     return render_template(
     "admin/missed.html",

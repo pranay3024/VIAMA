@@ -207,17 +207,16 @@ class="search-btn">
 
         {% for survey in surveys %}
         <option
-            value="{{ survey.missed_id if survey.is_missed else survey.id }}"
-            {% if selected_section == (survey.missed_id if survey.is_missed else survey.id)|string %}
-            selected
-            {% endif %}
-        >
-            {% if survey.is_missed %}🔴 MISSED |{% endif %}
-            {{ survey.section_no }}
-            | Cycle {{ survey.cycle_no }}
-            | {{ survey.upc_code }}
-            | {{ survey.stretch_code }}
-        </option>
+    value="{{ survey.missed_id if survey.is_missed else survey.id }}"
+    {% if selected_section == (survey.missed_id if survey.is_missed else survey.id)|string %}
+    selected
+    {% endif %}
+>
+    {{ survey.section_no }}
+    | Cycle {{ survey.cycle_no }}
+    | {{ survey.upc_code }}
+    | {{ survey.stretch_code }}
+</option>
         {% endfor %}
 
     </select>

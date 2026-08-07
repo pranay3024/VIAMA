@@ -22,7 +22,8 @@ from flask import (
     request,
     redirect,
     session,
-    url_for
+    url_for,
+    flash,
 )
 
 from google_drive import (
@@ -1636,7 +1637,7 @@ def email_draft(email_type):
         # Open Gmail Draft
         # --------------------------------------------------
 
-        from flask import flash
+
 
         flash(
             (

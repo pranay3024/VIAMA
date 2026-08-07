@@ -746,7 +746,7 @@ def admin_missed():
         .first()
     )
 
-    assignment.next_cycle = (
+     assignment.next_cycle = (
         latest.cycle_no + 1
         if latest
         else 1

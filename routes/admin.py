@@ -1534,7 +1534,7 @@ def email_draft(email_type):
              .first()
 )
 
-        if survey is None:
+            if survey is None:
                flash(
                f"No previous survey found for Section {assignment.section_no}. "
                "A Gmail draft cannot be generated.",

@@ -1462,11 +1462,6 @@ def email_draft(email_type):
         status="missed"
     )
 
-    if selected_week:
-        missed_query = missed_query.filter(
-            SurveyAssignment.survey_day == start.strftime("%A")
-       )
-
     if upc_code:
         missed_query = missed_query.filter(
             SurveyAssignment.upc_code.ilike(f"%{upc_code}%")
@@ -1531,12 +1526,26 @@ def email_draft(email_type):
             )
 
             survey = (
-                Survey.query.filter_by(
-                    section_no=assignment.section_no
-                )
-                .order_by(Survey.cycle_no.desc())
-                .first_or_404()
-            )
+             Survey.query.filter_by(
+             section_no=assignment.section_no
+    )
+             .order_by(Survey.cycle_no.desc())
+             .first()
+)
+
+        if survey is None:
+               flash(
+               f"No previous survey found for Section {assignment.section_no}. "
+               "A Gmail draft cannot be generated.",
+               "error",
+    )
+               return redirect(
+               url_for(
+            "admin.email_draft",
+            email_type=email_type,
+            week=selected_week,
+        )
+    )
 
         else:
 

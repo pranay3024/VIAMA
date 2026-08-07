@@ -700,17 +700,25 @@ def admin_missed():
 
     if agency == "krish":
      query = query.filter(
-        SurveyAssignment.agency == "krish"
+        SurveyAssignment.state.in_([
+            "ASSAM",
+            "BIHAR",
+            "MEGHALAYA",
+            "WEST BENGAL"
+        ])
     )
 
     elif agency == "godbole":
      query = query.filter(
-        SurveyAssignment.agency == "godbole"
+        SurveyAssignment.state == "ODISHA"
     )
 
     elif agency == "aspizo":
      query = query.filter(
-        SurveyAssignment.agency == "aspizo"
+        SurveyAssignment.state.in_([
+            "UTTAR PRADESH",
+            "JHARKHAND"
+        ])
     )
 
     if day:
@@ -745,17 +753,25 @@ def missed_extract():
 
     if agency == "krish":
      query = query.filter(
-        SurveyAssignment.agency == "krish"
+        SurveyAssignment.state.in_([
+            "ASSAM",
+            "BIHAR",
+            "MEGHALAYA",
+            "WEST BENGAL"
+        ])
     )
 
     elif agency == "godbole":
      query = query.filter(
-        SurveyAssignment.agency == "godbole"
+        SurveyAssignment.state == "ODISHA"
     )
 
     elif agency == "aspizo":
      query = query.filter(
-        SurveyAssignment.agency == "aspizo"
+        SurveyAssignment.state.in_([
+            "UTTAR PRADESH",
+            "JHARKHAND"
+        ])
     )
 
     if day:

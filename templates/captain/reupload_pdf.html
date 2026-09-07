@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+
+<title>Re-upload Survey PDF</title>
+
+<meta
+name="viewport"
+content="width=device-width, initial-scale=1.0">
+
+<link
+rel="stylesheet"
+href="{{ url_for('static',
+filename='css/mobile.css') }}">
+
+</head>
+
+<body>
+
+<div class="mobile-header">
+
+PDF RE-UPLOAD
+
+</div>
+
+<div class="container">
+
+<div class="card">
+
+<h2>
+
+⚠ PDF Re-upload Required
+
+</h2>
+
+<p>
+
+<b>Reason:</b>
+
+</p>
+
+<p style="color:red;">
+
+{{ survey.pdf_reupload_reason }}
+
+</p>
+
+<form
+method="POST"
+enctype="multipart/form-data">
+
+<label
+for="survey_pdf"
+class="upload-card">
+
+📄 Choose Correct PDF
+
+</label>
+
+<input
+type="file"
+id="survey_pdf"
+name="survey_pdf"
+accept="application/pdf"
+required
+hidden>
+
+<p
+id="filename"
+style="margin-top:15px;"></p>
+
+<button
+type="submit"
+class="main-btn"
+id="uploadBtn"
+disabled>
+
+UPLOAD PDF
+
+</button>
+
+</form>
+
+</div>
+
+</div>
+
+<script>
+
+const input =
+document.getElementById(
+"survey_pdf"
+);
+
+const btn =
+document.getElementById(
+"uploadBtn"
+);
+
+const file =
+document.getElementById(
+"filename"
+);
+
+input.addEventListener(
+"change",
+function(){
+
+if(this.files.length){
+
+file.innerHTML =
+this.files[0].name;
+
+btn.disabled = false;
+
+}
+
+});
+
+</script>
+
+</body>
+
+</html>

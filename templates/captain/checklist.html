@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+
+    <title>Pre Survey Checklist</title>
+
+    <meta name="viewport"
+          content="width=device-width, initial-scale=1.0">
+
+    <link rel="stylesheet"
+href="{{ url_for('static',
+filename='css/mobile.css') }}">
+
+</head>
+
+<body>
+
+<div class="mobile-header">
+
+    PRE SURVEY CHECKLIST
+
+</div>
+
+<div class="container">
+
+<form method="POST"
+      enctype="multipart/form-data">
+
+<div class="card">
+
+    <h2>CHECKLIST</h2>
+
+    <div class="progress-bar">
+
+        <div
+            id="progress_fill"
+            class="progress-fill">
+        </div>
+
+    </div>
+
+    <div id="progress_text">
+
+        0 / 20 Completed
+
+    </div>
+
+    <br>
+
+<label class="check-item">
+<input type="checkbox" required>
+Placement of the dashcam inside the vehicle : Center of the windshield
+</label>
+
+<label class="check-item">
+<input type="checkbox" required>
+Firmly fixed on the windshield
+</label>
+
+<label class="check-item">
+<input type="checkbox" required>
+Dashcam power is ON and properly connected to vehicle power
+</label>
+
+<label class="check-item">
+<input type="checkbox" required>
+SD card inserted in the dashcam and formatted
+</label>
+
+<label class="check-item">
+<input type="checkbox" required>
+GPS of the dashcam is working properly
+</label>
+
+<label class="check-item">
+<input type="checkbox" required>
+Dashcam camera lens is clean
+</label>
+
+<label class="check-item">
+<input type="checkbox" required>
+Resolution should be 1080p
+</label>
+
+<label class="check-item">
+<input type="checkbox" required>
+Loop recording setup : 5 minutes
+</label>
+
+<label class="check-item">
+<input type="checkbox" required>
+Dashcam camera alignment : 0 degrees
+</label>
+
+<label class="check-item">
+<input type="checkbox" required>
+No bonnet should be visible in the dashcam camera sight
+</label>
+
+<label class="check-item">
+<input type="checkbox" required>
+Road should be visible in 70-80% of the frame
+</label>
+
+<label class="check-item">
+<input type="checkbox" required>
+Sky should be maximum 20-25% of the frame
+</label>
+
+<label class="check-item">
+<input type="checkbox" required>
+Date and time of dashcam are correct
+</label>
+
+<label class="check-item">
+<input type="checkbox" required>
+Powerbank is fully charged
+</label>
+
+<label class="check-item">
+<input type="checkbox" required>
+Good streetlights / good car headlights available during night survey
+</label>
+
+<label class="check-item">
+<input type="checkbox" required>
+No heavy rain, fog, or poor visibility conditions
+</label>
+
+<label class="check-item">
+<input type="checkbox" required>
+Record a test clip
+</label>
+
+<label class="check-item">
+<input type="checkbox" required>
+Check the test clip on phone preview using the app
+</label>
+
+<label class="check-item">
+<input type="checkbox" required>
+Upload test clip
+</label>
+
+<label class="check-item">
+<input type="checkbox" required>
+Wait for GO confirmation from RoadVision team
+</label>
+
+</div>
+
+
+
+<div class="card">
+
+    <h2>Upload Dashcam Photo</h2>
+
+    <label for="camera_photo" class="upload-card">
+📸 Take Photo
+</label>
+
+<input
+type="file"
+id="camera_photo"
+name="dashcam_photo"
+accept="image/*"
+capture="environment"
+hidden>
+
+<br><br>
+
+<label for="gallery_photo" class="upload-card">
+🖼 Choose From Gallery
+</label>
+
+<input
+type="file"
+id="gallery_photo"
+name="gallery_photo"
+accept="image/*"
+hidden>
+
+    <br><br>
+
+    <img
+        id="dashcam_preview"
+        class="preview-image">
+
+</div>
+
+<button
+    type="submit"
+    id="start_btn"
+    class="main-btn"
+    disabled>
+
+    COMPLETE ALL CHECKLIST ITEMS
+
+</button>
+
+</form>
+
+</div>
+
+
+
+<script>
+
+const checks =
+document.querySelectorAll(
+    'input[type="checkbox"]'
+);
+
+function checkSurveyReady(){
+
+    const allChecked =
+    [...checks].every(
+        check => check.checked
+    );
+
+    const dashcamUploaded =
+    document.getElementById(
+        "dashcam_preview"
+    ).style.display === "block";
+
+    const startBtn =
+    document.getElementById(
+        "start_btn"
+    );
+
+    if(
+        allChecked &&
+        dashcamUploaded
+    ){
+
+        startBtn.disabled =
+        false;
+
+        startBtn.innerHTML =
+        "🚀 START SURVEY";
+
+    }
+    else{
+
+        startBtn.disabled =
+        true;
+
+        startBtn.innerHTML =
+        "COMPLETE ALL CHECKLIST ITEMS";
+
+    }
+
+}
+
+function handlePhotoUpload(e){
+
+    const file = e.target.files[0];
+
+    if(!file) return;
+
+    // 10 MB limit (change if you want)
+    if(file.size > 10 * 1024 * 1024){
+
+        alert("Image size is too large. Please take another photo or choose a smaller image (max 10 MB).");
+
+        e.target.value = "";
+
+        return;
+    }
+
+    const preview =
+    document.getElementById("dashcam_preview");
+
+    preview.src =
+    URL.createObjectURL(file);
+
+    preview.style.display =
+    "block";
+
+    checkSurveyReady();
+
+}
+document
+.getElementById("camera_photo")
+.addEventListener(
+    "change",
+    handlePhotoUpload
+);
+
+document
+.getElementById("gallery_photo")
+.addEventListener(
+    "change",
+    handlePhotoUpload
+);
+
+function updateProgress(){
+
+    let completed = 0;
+
+    checks.forEach(
+        check => {
+
+            if(check.checked){
+
+                completed++;
+
+            }
+
+        }
+    );
+
+    const percent =
+    (completed /
+    checks.length) * 100;
+
+    document
+    .getElementById(
+        "progress_fill"
+    )
+    .style.width =
+    percent + "%";
+
+    document
+    .getElementById(
+        "progress_text"
+    )
+    .innerHTML =
+    completed +
+    " / " +
+    checks.length +
+    " Completed";
+
+    checkSurveyReady();
+
+}
+
+checks.forEach(
+    check => {
+
+        check.addEventListener(
+            "change",
+            updateProgress
+        );
+
+    }
+);
+
+</script>
+
+<script src="https://cdn.jsdelivr.net/npm/browser-image-compression@2.0.2/dist/browser-image-compression.js"></script>
+</body>
+</html>
+
+</body>
+
+</html>

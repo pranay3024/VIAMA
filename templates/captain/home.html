@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <title>Captain Dashboard</title>
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0">
+
+    <link
+        rel="stylesheet"
+        href="{{ url_for('static', filename='css/mobile.css') }}">
+
+    <style>
+
+        /* ================================
+           PAGE
+        ================================= */
+
+        body {
+            margin: 0;
+            background: #f5f7fa;
+            font-family: Arial, Helvetica, sans-serif;
+            color: #172033;
+        }
+
+        .logo-title {
+            text-align: center;
+            font-size: 22px;
+            font-weight: 900;
+            letter-spacing: 1.2px;
+            padding: 22px 10px 10px;
+            color: #172033;
+        }
+
+        .card {
+            width: min(92%, 520px);
+            margin: 0 auto 30px;
+        }
+
+
+        /* ================================
+           CAPTAIN PROFILE CARD
+        ================================= */
+
+        .captain-card {
+            background: #ffffff;
+            border-radius: 18px;
+            padding: 20px;
+            margin-bottom: 20px;
+            border: 1px solid #e8ebf0;
+            box-shadow: 0 5px 18px rgba(20, 30, 50, 0.07);
+        }
+
+        .captain-name {
+            font-size: 20px;
+            font-weight: 800;
+            color: #172033;
+            margin-bottom: 8px;
+        }
+
+        .captain-state {
+            font-size: 14px;
+            color: #687386;
+            margin-bottom: 12px;
+        }
+
+        .captain-status {
+            display: inline-block;
+            background: #e9f8ef;
+            color: #19734a;
+            padding: 7px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 800;
+        }
+
+        h2 {
+            font-size: 21px;
+            margin: 18px 0;
+            color: #172033;
+        }
+
+
+        /* ================================
+           ONGOING SURVEYS
+        ================================= */
+
+        .ongoing-title {
+            font-size: 16px;
+            font-weight: 900;
+            margin: 0 0 14px;
+            color: #172033;
+        }
+
+        .ongoing-survey-card {
+            background: #ffffff;
+            border: 1px solid #e5e9ef;
+            border-radius: 16px;
+            padding: 18px;
+            margin-bottom: 14px;
+            box-shadow: 0 4px 14px rgba(20, 30, 50, 0.06);
+        }
+
+        .ongoing-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 12px;
+            margin-bottom: 10px;
+        }
+
+        .ongoing-section {
+            font-size: 16px;
+            font-weight: 800;
+            color: #172033;
+        }
+
+        .ongoing-cycle {
+            font-size: 12px;
+            font-weight: 800;
+            color: #586477;
+            background: #f1f3f6;
+            padding: 6px 9px;
+            border-radius: 8px;
+            white-space: nowrap;
+        }
+
+        .ongoing-stretch {
+            font-size: 14px;
+            color: #566174;
+            line-height: 1.5;
+            margin-bottom: 13px;
+            word-break: break-word;
+        }
+
+        .ongoing-status {
+            display: inline-flex;
+            align-items: center;
+            padding: 7px 11px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 800;
+            margin-bottom: 15px;
+        }
+
+        .status-ongoing {
+            background: #fff5d6;
+            color: #986800;
+        }
+
+        .status-groundwork {
+            background: #e7f8ef;
+            color: #19734a;
+        }
+
+        .status-video-pending {
+            background: #fff0dc;
+            color: #b45309;
+        }
+
+        .status-form-pending {
+            background: #e8f1ff;
+            color: #2459a6;
+        }
+
+        .ongoing-continue-btn {
+    display: block;
+    width: 100%;
+    box-sizing: border-box;
+    text-align: center;
+    text-decoration: none;
+    padding: 10px 16px;
+    border-radius: 11px;
+    font-size: 14px;
+    font-weight: 800;
+}
+
+
+        /* ================================
+           MAIN BUTTONS
+        ================================= */
+
+        .main-btn {
+            display: block;
+            width: 100%;
+            box-sizing: border-box;
+            border: none;
+            border-radius: 12px;
+            padding: 15px 16px;
+            margin-top: 13px;
+            background: #ff8500;
+            color: #ffffff;
+            font-size: 15px;
+            font-weight: 800;
+            text-align: center;
+            text-decoration: none;
+            cursor: pointer;
+            transition: 0.2s ease;
+        }
+
+        .main-btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 5px 14px rgba(255, 133, 0, 0.20);
+        }
+
+        .secondary-btn {
+            background: #ffffff;
+            color: #253047;
+            border: 1px solid #dfe4eb;
+        }
+
+        .secondary-btn:hover {
+            background: #f7f8fa;
+            box-shadow: none;
+        }
+
+        .count-text {
+            display: block;
+            font-size: 12px;
+            font-weight: 600;
+            margin-top: 4px;
+            opacity: 0.85;
+        }
+
+
+        /* ================================
+           SECTION SPACING
+        ================================= */
+
+        .dashboard-actions {
+            margin-top: 20px;
+        }
+
+        .warning-btn {
+            background: #fff4f3;
+            color: #b42318;
+            border: 1px solid #f3cbc7;
+        }
+
+        .warning-btn:hover {
+            background: #fff0ef;
+            box-shadow: none;
+        }
+
+
+        /* ================================
+           MOBILE
+        ================================= */
+
+        @media (max-width: 480px) {
+
+            .logo-title {
+                font-size: 19px;
+                padding-top: 18px;
+            }
+
+            .card {
+                width: 92%;
+            }
+
+            .captain-card {
+                padding: 17px;
+            }
+
+            .captain-name {
+                font-size: 18px;
+            }
+
+            h2 {
+                font-size: 19px;
+            }
+
+            .ongoing-survey-card {
+                padding: 16px;
+            }
+
+            .ongoing-section {
+                font-size: 15px;
+            }
+
+            .ongoing-stretch {
+                font-size: 13px;
+            }
+
+        }
+
+
+        .ongoing-survey-card .ongoing-continue-btn {
+    display: block !important;
+    width: 100% !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+
+    box-sizing: border-box !important;
+
+    padding: 10px 16px !important;
+    margin: 0 !important;
+
+    border-radius: 11px !important;
+
+    font-size: 14px !important;
+    line-height: 1.2 !important;
+    font-weight: 800 !important;
+
+    text-align: center !important;
+    text-decoration: none !important;
+}
+
+    </style>
+
+</head>
+
+
+<body>
+
+
+    <!-- =================================
+         LOGO / BRAND
+    ================================== -->
+
+    <div class="logo-title">
+        VIAMA SURVEILLANCE
+    </div>
+
+
+    <div class="card">
+
+
+        <!-- =================================
+             CAPTAIN INFORMATION
+        ================================== -->
+
+        <div class="captain-card">
+
+            <div class="captain-name">
+                👤 {{ user.name }}
+            </div>
+
+            <div class="captain-state">
+                {{ assigned_count }} Active Assignments
+            </div>
+
+            <div class="captain-status">
+                Ready For Survey
+            </div>
+
+        </div>
+
+
+        <h2>
+            Captain Dashboard
+        </h2>
+
+
+        <!-- =================================
+             ONGOING SURVEYS
+        ================================== -->
+
+        {% if ongoing_surveys %}
+
+            <h3 class="ongoing-title">
+                🟡 ONGOING SURVEYS
+            </h3>
+
+
+            {% for survey in ongoing_surveys %}
+
+                <div class="ongoing-survey-card">
+
+
+                    <div class="ongoing-top">
+
+                        <div class="ongoing-section">
+                            Section {{ survey.section_no }}
+                        </div>
+
+                        <div class="ongoing-cycle">
+                            Cycle {{ survey.cycle_no }}
+                        </div>
+
+                    </div>
+
+
+                    <div class="ongoing-stretch">
+                        {{ survey.stretch_code }}
+                    </div>
+
+
+                    {% if survey.status == "ongoing" %}
+
+                        <div class="ongoing-status status-ongoing">
+                            🟡 Survey Ongoing
+                        </div>
+
+                    {% elif survey.status == "groundwork_completed" %}
+
+                        <div class="ongoing-status status-groundwork">
+                            🟢 Groundwork Completed
+                        </div>
+
+                    {% elif survey.status == "video_pending" %}
+
+                        <div class="ongoing-status status-video-pending">
+                            🟠 Video Pending
+                        </div>
+
+                    {% elif survey.status == "video_uploaded_pending_form" %}
+
+                        <div class="ongoing-status status-form-pending">
+                            🔵 Video Uploaded · Form Pending
+                        </div>
+
+                    {% endif %}
+
+
+                    {% if survey.status == "video_pending" %}
+
+    <button
+        type="button"
+        class="main-btn ongoing-continue-btn"
+        onclick="alert('Form is already uploaded. Please upload the video.')">
+
+        CONTINUE
+
+    </button>
+
+{% else %}
+
+    <a
+        href="{{ url_for(
+            'captain.continue_survey',
+            survey_id=survey.id
+        ) }}"
+        class="main-btn ongoing-continue-btn">
+
+        CONTINUE
+
+    </a>
+
+{% endif %}
+
+
+                </div>
+
+            {% endfor %}
+
+        {% endif %}
+
+
+        <!-- =================================
+             DASHBOARD ACTIONS
+        ================================== -->
+
+        <div class="dashboard-actions">
+
+
+            <!-- START SURVEY -->
+
+            <button
+                class="main-btn"
+                onclick="window.location.href='/select-stretch'">
+
+                START SURVEY
+
+                <span class="count-text">
+                    {{ assigned_count }} Available
+                </span>
+
+            </button>
+
+
+            <!-- RE-SURVEY -->
+
+            <a
+                href="/resurvey"
+                class="main-btn secondary-btn dashboard-link">
+
+                🔄 RE-SURVEY
+
+            </a>
+
+
+
+<!-- PENDING UPLOADS -->
+
+<a
+    href="/pending-uploads"
+    class="main-btn secondary-btn dashboard-link">
+
+    PENDING UPLOADS
+
+    <span class="count-text">
+        {{ pending_count }} Surveys
+    </span>
+
+    <span class="pdf-reupload-count">
+        📄 PDF RE-UPLOAD REQUIRED
+        <br>
+        {{ pdf_reupload_count }} Surveys
+    </span>
+
+</a>
+
+<style>
+    .pdf-reupload-count {
+    display: block;
+    margin-top: 10px;
+    color: #e53935;
+    font-size: 14px;
+    font-weight: 800;
+    line-height: 1.5;
+}
+</style>
+
+
+            <!-- COMPLETED SURVEYS -->
+
+            <a
+                href="/completed-surveys"
+                class="main-btn secondary-btn dashboard-link">
+
+                COMPLETED SURVEYS
+
+            </a>
+
+
+            <!-- CHANGE PASSWORD -->
+
+            <a
+                href="/change-password"
+                class="main-btn secondary-btn dashboard-link">
+
+                CHANGE PASSWORD
+
+            </a>
+
+
+            <!-- LOGOUT -->
+
+            <button
+                class="main-btn secondary-btn"
+                onclick="window.location.href='/logout'">
+
+                LOGOUT
+
+            </button>
+
+
+        </div>
+
+
+    </div>
+
+
+</body>
+
+</html>

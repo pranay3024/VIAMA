@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+
+    <title>Backup Dashboard</title>
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0">
+
+    <link
+        rel="stylesheet"
+        href="{{ url_for('static', filename='css/mobile.css') }}">
+
+</head>
+
+<body>
+
+<div class="mobile-header">
+
+    <div class="logo-title">
+        VIAMA SURVEILLANCE
+    </div>
+
+</div>
+
+<div class="container">
+
+    <div class="card">
+
+        <div class="captain-card">
+
+            <div class="captain-name">
+                👤 {{ user.name }}
+            </div>
+
+            <div class="captain-state">
+                 {{ assigned_count }} Available Surveys
+            </div>
+
+            <div class="captain-status">
+                 Ready For Survey
+            </div>
+
+        </div>
+
+        <h2>Backup Dashboard</h2>
+
+        {% if ongoing %}
+
+<a
+href="/continue-survey"
+class="main-btn dashboard-link">
+
+🟡 CONTINUE ONGOING SURVEY
+
+<span class="count-text">
+Section {{ ongoing.section_no }}
+</span>
+
+</a>
+
+{% endif %}
+
+        <button
+            class="main-btn"
+            onclick="window.location.href='/backup-select-survey'">
+
+             START SURVEY
+
+            <span class="count-text">
+                {{ assigned_count }} Available
+            </span>
+
+        </button>
+
+        <a
+            href="/backup-pending-uploads"
+            class="main-btn secondary-btn dashboard-link">
+
+             PENDING UPLOADS
+
+            <span class="count-text">
+                {{ pending_count }} Surveys
+            </span>
+
+        </a>
+
+        <a
+href="/backup-completed-surveys"
+class="main-btn secondary-btn dashboard-link">
+
+ COMPLETED SURVEYS
+
+<span class="count-text">
+{{ completed_count }} Surveys
+</span>
+
+</a>
+
+
+<a
+href="/change-password"
+class="main-btn secondary-btn dashboard-link">
+
+ CHANGE PASSWORD
+
+</a>
+
+        <button
+            class="main-btn secondary-btn"
+            onclick="window.location.href='/logout'">
+
+            LOGOUT
+
+        </button>
+
+    </div>
+
+</div>
+
+</body>
+
+</html>

@@ -1,0 +1,1134 @@
+<link rel="stylesheet"
+href="{{ url_for('static',
+filename='css/regional.css') }}">
+
+<div class="top-navbar">
+
+    <div class="nav-left">
+
+        <img
+        src="{{ url_for('static',
+        filename='images/viama_logo.png') }}"
+        class="logo-img">
+
+        <div class="welcome-text">
+
+            <h2>Welcome Regional Admin</h2>
+
+            <p>
+                Survey Monitoring & Operations Center
+            </p>
+
+        </div>
+
+    </div>
+
+    <style>
+
+        /* ================================
+   PDF RE-UPLOAD ALERT
+================================ */
+
+.pdf-reupload-alert {
+    width: 100%;
+    max-width: 245px;
+    margin-top: 10px;
+
+    background: #fff8e6;
+    border: 1px solid #f6c453;
+    border-radius: 10px;
+
+    padding: 11px 12px;
+
+    box-sizing: border-box;
+}
+
+/* Title */
+
+.pdf-alert-title {
+    color: #dc2626;
+    font-size: 13px;
+    font-weight: 800;
+
+    margin-bottom: 7px;
+
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+/* Waiting status */
+
+.pdf-alert-status {
+    font-size: 12px;
+    font-weight: 600;
+    color: #333;
+
+    margin-bottom: 9px;
+}
+
+/* Admin comment box */
+
+.pdf-admin-comment {
+    background: #ffffff;
+
+    border: 1px solid #e2e2e2;
+    border-radius: 7px;
+
+    padding: 8px 9px;
+}
+
+/* Comment heading */
+
+.pdf-comment-label {
+    color: #dc2626;
+
+    font-size: 12px;
+    font-weight: 800;
+
+    margin-bottom: 5px;
+}
+
+/* Comment text */
+
+.pdf-comment-text {
+    color: #222;
+
+    font-size: 12px;
+    font-weight: 600;
+
+    line-height: 1.4;
+
+    word-break: break-word;
+}
+    </style>
+
+<a href="/regional/schedules" class="view-btn">
+    📅 Schedules
+</a>
+
+<button
+    class="view-btn"
+    onclick="openPasswordModal()">
+
+    🔒 Change Password
+
+</button>
+
+    <a
+    href="/logout"
+    class="logout-btn">
+
+    Logout
+
+    </a>
+
+</div>
+
+
+<div class="dashboard-content">
+
+    
+
+<div class="stats">
+
+<div class="stat-card">
+<h3>👮 Captains</h3>
+<h1>{{ total_captains }}</h1>
+</div>
+
+<div class="stat-card">
+<h3>🟡 Ongoing</h3>
+<h1>{{ ongoing }}</h1>
+</div>
+
+<div class="stat-card">
+<h3>✅ Completed</h3>
+<h1>{{ completed }}</h1>
+</div>
+
+<div class="stat-card"
+     onclick="window.location.href='/regional/missed'"
+     style="cursor:pointer;">
+
+    <h3>🚨 Missed</h3>
+    <h1>{{ missed }}</h1>
+
+</div>
+
+
+
+</div   >
+
+
+
+{% if resurvey_requests %}
+
+<div class="missed-section">
+
+<h2>
+🔄 Re-Survey Requests
+</h2>
+
+<div class="missed-scroll">
+
+{% for survey in resurvey_requests %}
+
+<div class="missed-card">
+
+<p>
+👤 {{ survey.captain_name }}
+</p>
+
+<p>
+🛣 {{ survey.stretch_code }}
+</p>
+
+<p>
+📌 Section No:
+<b>{{ survey.section_no }}</b>
+</p>
+
+<p>
+
+{% if survey.is_resurvey %}
+
+🔄 Cycle {{ survey.cycle_no }}_Resurvey
+
+{% else %}
+
+🔄 Cycle {{ survey.cycle_no }}
+
+{% endif %}
+
+</p>
+
+<a
+href="/approve-resurvey/{{ survey.id }}"
+class="view-btn">
+
+✅ Approve
+
+</a>
+
+</div>
+
+{% endfor %}
+
+</div>
+
+</div>
+
+{% endif %}
+
+{% if alerts %}
+
+
+<div class="missed-section">
+
+<h2>
+🚨 Missed Survey Alerts ({{ missed }})
+</h2>
+
+<div class="missed-scroll">
+
+{% for alert in alerts %}
+
+<div class="missed-card">
+
+<p>👤 {{ alert.captain }}</p>
+<p>⚠ {{ alert.message }}</p>
+
+<p>
+📌 Strech_No:
+<b>{{ alert.section_no }}</b>
+</p>
+
+<p>
+🛣 {{ alert.stretch }}
+</p>
+
+<p>📍 {{ alert.state }}</p>
+
+<p>
+📝 {{ alert.reason or "No reason provided" }}
+</p>
+
+<a
+href="/acknowledge-alert/{{ alert.assignment_id }}"
+class="view-btn">
+
+✓ Mark Reviewed
+
+</a>
+
+</div>
+
+{% endfor %}
+
+</div>
+
+</div>
+
+{% endif %}
+
+
+
+
+<form method="GET" class="advanced-filter">
+
+<select name="state">
+
+<option value="">All States</option>
+
+{% for state in states %}
+
+<option
+value="{{ state[0] }}"
+{% if request.args.get('state') == state[0] %}selected{% endif %}>
+
+{{ state[0] }}
+
+</option>
+
+{% endfor %}
+
+</select>
+
+
+<select name="captain_name">
+
+<option value="">All Captains</option>
+
+{% for captain in captains %}
+
+<option
+value="{{ captain.name }}"
+{% if request.args.get('captain_name') == captain.name %}selected{% endif %}>
+
+{{ captain.name }}
+
+</option>
+
+{% endfor %}
+
+</select>
+
+
+<select name="week">
+
+<option value="">All Weeks</option>
+
+{% for w in weeks %}
+
+<option
+value="{{ w }}"
+{% if request.args.get('week') == w|string %}selected{% endif %}>
+
+Week {{ w }}
+
+</option>
+
+{% endfor %}
+
+</select>
+
+
+<select name="cycle">
+
+<option value="">All Cycles</option>
+
+{% for c in cycles %}
+
+<option
+value="{{ c.cycle_no }}"
+{% if request.args.get('cycle') == c.cycle_no|string %}selected{% endif %}>
+
+Cycle {{ c.cycle_no }}
+
+</option>
+
+{% endfor %}
+
+</select>
+
+
+<input
+type="date"
+name="from_date"
+value="{{ request.args.get('from_date','') }}">
+
+
+<input
+type="date"
+name="to_date"
+value="{{ request.args.get('to_date','') }}">
+
+
+<button
+type="submit"
+class="search-btn">
+
+Generate
+
+</button>
+
+</form>
+
+<div class="table-wrapper">
+
+<table class="survey-table">
+
+<thead>
+
+<th>S.No.</th>
+
+<th style="width:140px;">UPC Code</th>
+
+<th style="width:60px;">Section</th>
+
+<th style="width:60px;">Cycle</th>
+
+<th style="width:80px;">Section length</th>
+
+<th style="width:120px;">Start Time</th>
+
+<th style="width:120px;">End Time</th>
+
+<th>Video<br>Upload Time</th>
+
+<th style="width:160px;">Captain</th>
+
+<th style="width:180px;">Status</th>
+
+<th style="width:90px;">Survey Duration</th>
+
+<th style="width:90px;">Upload Duration</th>
+
+<th style="width:80px;">View</th>
+
+
+
+</thead>
+<tbody>
+
+    {% for survey in all_surveys %}
+
+    <tr>
+    
+    <td>{{ loop.index }}</td>
+
+    <td>{{ survey.upc_code }}</td>
+
+    <td>{{ survey.section_no }}</td>
+
+    <td>
+
+{% if survey.is_resurvey %}
+
+{{ survey.cycle_no }} (R)
+
+{% else %}
+
+{{ survey.cycle_no }}
+
+{% endif %}
+
+</td>
+
+    <td>{{ survey.section_length }}</td>
+
+    <td style="width:120px;line-height:1.4;">
+
+{% if survey.display_start_time %}
+
+{{ survey.display_start_time.strftime('%A') }}<br>
+{{ survey.display_start_time.strftime('%I:%M %p') }}<br>
+
+<small>
+{{ survey.display_start_time.strftime('%d %b %Y') }}
+</small>
+
+{% else %}
+
+-
+
+{% endif %}
+
+</td>
+
+<td style="min-width:140px;line-height:1.4;">
+
+{% if survey.display_end_time %}
+
+{{ survey.display_end_time.strftime('%A') }}<br>
+{{ survey.display_end_time.strftime('%I:%M %p') }}<br>
+
+<small>
+{{ survey.display_end_time.strftime('%d %b %Y') }}
+</small>
+
+{% else %}
+
+-
+
+{% endif %}
+
+</td>
+
+<td>
+
+{% if survey.video_upload_time %}
+
+    <small style="font-size: 15px; line-height: 1.3;">
+        {{ (survey.video_upload_time + timedelta(hours=5, minutes=30)).strftime('%d %b %Y') }}<br>
+        {{ (survey.video_upload_time + timedelta(hours=5, minutes=30)).strftime('%I:%M %p') }}
+    </small>
+
+{% else %}
+
+    -
+
+{% endif %}
+
+</td>
+
+    <td style="max-width:160px;
+white-space:nowrap;
+overflow:hidden;
+text-overflow:ellipsis;">
+    {{ survey.captain_name }}
+</td>
+
+<td style="min-width:220px; text-align:center; vertical-align:middle;">
+
+    {% set s_status = (survey.status|string|trim|lower) %}
+    {% set c_status = (survey.captain_status|string|trim|lower) %}
+
+    {# =========================
+       CANCELLED
+       ========================= #}
+    {% if s_status == "cancelled" %}
+
+        <div style="
+            display:flex;
+            flex-direction:column;
+            align-items:center;
+            justify-content:center;
+            gap:7px;
+        ">
+
+            <span style="
+                background:linear-gradient(135deg,#fee2e2,#fecaca);
+                color:#b91c1c;
+                padding:9px 18px;
+                border-radius:25px;
+                font-weight:700;
+                display:inline-flex;
+                align-items:center;
+                justify-content:center;
+                gap:8px;
+                min-width:150px;
+                border:1px solid #fca5a5;
+                box-shadow:0 2px 6px rgba(185,28,28,0.15);
+            ">
+                ❌ CANCELLED
+            </span>
+
+            {% if survey.captain_status_reason %}
+
+                <button
+                    type="button"
+                    onclick="showCaptainReason(this)"
+                    data-reason="{{ survey.captain_status_reason|e }}"
+                    style="
+                        border:none;
+                        background:#f3f4f6;
+                        color:#374151;
+                        padding:5px 11px;
+                        border-radius:12px;
+                        font-size:11px;
+                        font-weight:600;
+                        cursor:pointer;
+                        box-shadow:0 1px 3px rgba(0,0,0,.08);
+                    "
+                >
+                    👁 View Reason
+                </button>
+
+            {% endif %}
+
+        </div>
+
+
+    {# =========================
+       RESCHEDULED
+       ========================= #}
+    {% elif s_status == "rescheduled" %}
+
+        <div style="
+            display:flex;
+            flex-direction:column;
+            align-items:center;
+            justify-content:center;
+            gap:7px;
+        ">
+
+            <span style="
+                background:linear-gradient(135deg,#fef3c7,#fde68a);
+                color:#92400e;
+                padding:9px 18px;
+                border-radius:25px;
+                font-weight:700;
+                display:inline-flex;
+                align-items:center;
+                justify-content:center;
+                gap:8px;
+                min-width:150px;
+                border:1px solid #fbbf24;
+                box-shadow:0 2px 6px rgba(146,64,14,0.15);
+            ">
+                🔄 RESCHEDULED
+            </span>
+
+            {% if survey.captain_status_reason %}
+
+                <button
+                    type="button"
+                    onclick="showCaptainReason(this)"
+                    data-reason="{{ survey.captain_status_reason|e }}"
+                    style="
+                        border:none;
+                        background:#f3f4f6;
+                        color:#374151;
+                        padding:5px 11px;
+                        border-radius:12px;
+                        font-size:11px;
+                        font-weight:600;
+                        cursor:pointer;
+                        box-shadow:0 1px 3px rgba(0,0,0,.08);
+                    "
+                >
+                    👁 View Reason
+                </button>
+
+            {% endif %}
+
+        </div>
+
+
+    {# =========================
+       ONGOING
+       ========================= #}
+    {% elif s_status == "ongoing" %}
+
+        <span class="status-live">
+            🟢 Ongoing
+        </span>
+
+
+    {# =========================
+       VIDEO UPLOADED / FORM PENDING
+       ========================= #}
+    {% elif s_status == "video_uploaded_pending_form" %}
+
+        <span style="
+            background:#fff8e1;
+            color:#d97706;
+            padding:9px 18px;
+            border-radius:25px;
+            font-weight:700;
+            display:inline-flex;
+            align-items:center;
+            justify-content:center;
+            gap:8px;
+            min-width:170px;
+            border:1px solid #fcd34d;
+            box-shadow:0 2px 6px rgba(217,119,6,0.12);
+        ">
+
+            <span style="
+                width:10px;
+                height:10px;
+                border-radius:50%;
+                background:#f59e0b;
+                display:inline-block;
+            "></span>
+
+            Video Uploaded<br>
+            Form Pending
+
+        </span>
+
+
+    {# =========================
+       GROUNDWORK COMPLETED
+       ========================= #}
+    {% elif s_status == "groundwork_completed" %}
+
+        <span style="
+            background:#e7f8eb;
+            color:#1d7f42;
+            padding:10px 18px;
+            border-radius:16px;
+            font-weight:700;
+            display:inline-flex;
+            flex-direction:column;
+            align-items:center;
+            justify-content:center;
+            gap:3px;
+            min-width:190px;
+            border:1px solid #a7dfba;
+            box-shadow:0 2px 6px rgba(29,127,66,0.12);
+            line-height:1.25;
+        ">
+
+            <span style="
+                width:10px;
+                height:10px;
+                border-radius:50%;
+                background:#34c759;
+                display:block;
+                margin-bottom:2px;
+            "></span>
+
+            <span>Groundwork Completed</span>
+
+            <span style="font-weight:600;">
+                Form and Video Pending
+            </span>
+
+        </span>
+
+
+    {# =========================
+       VIDEO PENDING
+       ========================= #}
+    {% elif s_status == "video_pending" %}
+
+        <span style="
+            background:#fff8e1;
+            color:#a16207;
+            padding:9px 18px;
+            border-radius:25px;
+            font-weight:700;
+            display:inline-flex;
+            align-items:center;
+            justify-content:center;
+            gap:8px;
+            min-width:150px;
+            border:1px solid #fcd34d;
+        ">
+            🟡 Video Pending
+        </span>
+
+
+    {# =========================
+       COMPLETED
+       ========================= #}
+    {% elif s_status == "completed" %}
+
+        <span style="
+            background:#dcfce7;
+            color:#15803d;
+            padding:9px 18px;
+            border-radius:25px;
+            font-weight:700;
+            display:inline-flex;
+            align-items:center;
+            justify-content:center;
+            gap:8px;
+            min-width:150px;
+            border:1px solid #86efac;
+            box-shadow:0 2px 6px rgba(21,128,61,0.12);
+        ">
+            ✅ Completed
+        </span>
+
+
+    {# =========================
+       PENDING
+       ========================= #}
+    {% elif s_status == "pending" %}
+
+        <span style="
+            background:#f3f4f6;
+            color:#6b7280;
+            padding:9px 18px;
+            border-radius:25px;
+            font-weight:700;
+            display:inline-flex;
+            align-items:center;
+            justify-content:center;
+            gap:8px;
+            min-width:150px;
+            border:1px solid #d1d5db;
+        ">
+            ⏳ Pending
+        </span>
+
+
+    {# =========================
+       FALLBACK
+       ========================= #}
+    {% else %}
+
+        <span style="
+            background:#f3f4f6;
+            color:#4b5563;
+            padding:9px 18px;
+            border-radius:25px;
+            font-weight:700;
+            display:inline-flex;
+            align-items:center;
+            justify-content:center;
+            min-width:150px;
+            border:1px solid #d1d5db;
+        ">
+            {{ s_status or c_status or "UNKNOWN" }}
+        </span>
+
+    {% endif %}
+
+
+    {# =========================
+       PDF RE-UPLOAD ALERT
+       ========================= #}
+
+    {% if survey.pdf_reupload_required %}
+
+        <div class="pdf-reupload-alert">
+
+            <div class="pdf-alert-title">
+                ⚠ PDF RE-UPLOAD REQUIRED
+            </div>
+
+            <div class="pdf-alert-status">
+                Waiting for Captain to upload corrected PDF
+            </div>
+
+            <div class="pdf-admin-comment">
+
+                <div class="pdf-comment-label">
+                    Changes needed on survey form
+                </div>
+
+                <div class="pdf-comment-text">
+                    {{ survey.pdf_reupload_reason or "No comment provided by admin." }}
+                </div>
+
+            </div>
+
+        </div>
+
+    {% endif %}
+
+</td>
+
+<td>
+
+    {% if survey.status in ["ongoing", "groundwork_completed"] %}
+
+    <span
+        class="live-duration"
+        data-start="{{ survey.start_time.strftime('%Y-%m-%dT%H:%M:%S') }}">
+        0h 0m
+    </span>
+
+    {% elif survey.start_time and survey.end_time %}
+
+    {% set total_mins = (
+        (survey.end_time - survey.start_time).total_seconds() / 60
+    )|int %}
+
+    {{ total_mins // 60 }}h {{ total_mins % 60 }}m
+
+    {% else %}
+
+    -
+
+    {% endif %}
+
+</td>
+
+
+
+    <td>
+
+    {% if survey.upload_duration_minutes>0 %}
+
+    {{ survey.upload_duration_minutes//60 }}h
+    {{ survey.upload_duration_minutes%60 }}m
+
+    {% else %}
+
+    -
+
+    {% endif %}
+
+    </td>
+
+    <td style="text-align:center;">
+
+    <a 
+    href="{{ url_for('admin.survey_details_admin', survey_id=survey.id) }}" 
+    class="view-btn"
+>
+    View 
+</a>
+
+</td>
+
+    
+
+    {% endfor %}
+
+    </tbody>
+
+</table>
+
+</div>
+
+<script>
+
+function updateLiveDurations() {
+
+    document
+    .querySelectorAll(".live-duration")
+    .forEach(function(el) {
+
+        const startString = el.dataset.start;
+
+        if (!startString) {
+            return;
+        }
+
+        // Database timestamp is treated as IST
+        const start = new Date(
+            startString + "+05:30"
+        );
+
+        const now = new Date();
+
+        let diffMs = now - start;
+
+        // Never show negative duration
+        if (diffMs < 0) {
+            diffMs = 0;
+        }
+
+        const totalMinutes = Math.floor(
+            diffMs / 60000
+        );
+
+        const hrs = Math.floor(
+            totalMinutes / 60
+        );
+
+        const mins = totalMinutes % 60;
+
+        el.innerHTML =
+            hrs + "h " +
+            mins + "m";
+
+        // Red after 8 hours
+        if (totalMinutes > 480) {
+
+            el.style.color = "red";
+            el.style.fontWeight = "700";
+
+        } else {
+
+            el.style.color = "";
+            el.style.fontWeight = "";
+
+        }
+
+    });
+
+}
+
+
+// Run immediately
+updateLiveDurations();
+
+
+// Update every minute
+setInterval(
+    updateLiveDurations,
+    60000
+);
+
+
+// Refresh dashboard every 5 minutes
+setInterval(function () {
+    window.location.reload();
+}, 300000);
+
+
+// Refresh when user comes back to the tab
+document.addEventListener("visibilitychange", function () {
+
+    if (!document.hidden) {
+        window.location.reload();
+    }
+
+});
+
+</script>
+
+<!-- PASSWORD MODAL -->
+
+<div
+id="passwordModal"
+class="password-modal">
+
+<div class="password-card">
+
+<h2>Security Settings</h2>
+
+<p>
+Update your account credentials.
+Please ensure your future password is unique.
+</p>
+
+<form
+action="/regional/change-password"
+method="POST">
+
+<label>
+Current Password
+</label>
+
+<input
+type="password"
+name="current_password"
+placeholder="Enter current password"
+required>
+
+<label>
+New Password
+</label>
+
+<input
+type="password"
+name="new_password"
+placeholder="Enter new password"
+required>
+
+<label>
+Confirm New Password
+</label>
+
+<input
+type="password"
+name="confirm_password"
+placeholder="Repeat new password"
+required>
+
+<div class="password-buttons">
+
+<button
+type="submit"
+class="confirm-btn">
+
+Confirm Password Change
+
+</button>
+
+<button
+type="button"
+class="cancel-btn"
+onclick="closePasswordModal()">
+
+Cancel
+
+</button>
+
+</div>
+
+</form>
+
+</div>
+
+</div>
+
+<script>
+
+function updateLiveDurations() {
+
+    document
+        .querySelectorAll(".live-duration")
+        .forEach(function(el) {
+
+            const startString = el.dataset.start;
+
+            if (!startString) {
+                el.innerHTML = "-";
+                return;
+            }
+
+            // Convert ISO IST datetime into timestamp
+            const startTime = new Date(startString).getTime();
+
+            // Current time
+            const now = Date.now();
+
+            // Difference in minutes
+            const totalMinutes = Math.floor(
+                (now - startTime) / 60000
+            );
+
+            // Safety: never show negative duration
+            if (totalMinutes < 0) {
+                el.innerHTML = "0h 0m";
+                return;
+            }
+
+            const hrs = Math.floor(
+                totalMinutes / 60
+            );
+
+            const mins = totalMinutes % 60;
+
+            el.innerHTML =
+                hrs + "h " +
+                mins + "m";
+
+            // Red after 8 hours
+            if (totalMinutes > 480) {
+
+                el.style.color = "red";
+                el.style.fontWeight = "700";
+
+            }
+
+        });
+
+}
+
+// Run immediately
+updateLiveDurations();
+
+// Update every minute
+setInterval(
+    updateLiveDurations,
+    60000
+);
+
+</script>
+
+<script>
+function showCaptainReason(button) {
+
+    const reason = button.getAttribute("data-reason");
+
+    if (!reason) {
+        return;
+    }
+
+    alert(reason);
+}
+</script>
+
+</div>

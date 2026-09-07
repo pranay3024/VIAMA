@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html>
+<head>
+
+    <title>Viama Surveillance Portal</title>
+
+    <meta name="viewport"
+          content="width=device-width, initial-scale=1.0">
+
+    <link rel="stylesheet"
+          href="{{ url_for('static',
+          filename='css/login.css') }}">
+
+</head>
+
+<body>
+
+<div class="login-container">
+
+    <img src="{{ url_for('static',
+         filename='images/viama_logo.png') }}"
+         class="logo">
+
+    <div class="title">
+        Surveillance Portal
+    </div>
+
+    <div class="subtitle">
+        Dashcam Survey Management System
+    </div>
+
+    <form method="POST">
+
+        <label>Email or Username</label>
+
+<input
+    type="text"
+    name="login"
+    placeholder="Enter Email or Username"
+    required>
+
+        <label>Password</label>
+
+        <input
+            type="password"
+            name="password"
+            placeholder="Enter Password"
+            required>
+
+        <button type="submit">
+            LOGIN
+        </button>
+
+    </form>
+
+    <div class="footer">
+        Viama Infratech Pvt Ltd
+    </div>
+
+</div>
+
+</body>
+</html>
+

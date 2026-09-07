@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+
+<title>RoadVision Remark</title>
+
+<link rel="stylesheet"
+href="{{ url_for('static',
+filename='css/admin.css') }}">
+
+</head>
+
+<body>
+
+<div class="top-navbar">
+
+<div class="nav-left">
+
+<h2>RoadVision Remark</h2>
+
+</div>
+
+<a
+href="/admin"
+class="logout-btn">
+
+⬅ Back
+
+</a>
+
+</div>
+
+<div class="dashboard-content">
+
+<div class="card">
+
+<h2>{{ survey.upc_code }}</h2>
+
+<p>
+
+<b>Section :</b>
+
+{{ survey.section_no }}
+
+</p>
+
+<p>
+
+<b>Captain :</b>
+
+{{ survey.captain_name }}
+
+</p>
+
+<hr>
+
+<h3>Remark</h3>
+
+{# video_count_checked_at is only ever written by the automated sync, so its
+   absence on a survey that has a remark means a person wrote it by hand. #}
+{% if survey.video_count_checked_at %}
+
+<p style="color:#555;">
+
+{% if survey.video_count_matched %}
+<b style="color:green;">✅ Automated check passed</b>
+{% else %}
+<b style="color:#c00;">⚠️ Automated check found a problem</b>
+{% endif %}
+
+&mdash; last checked
+{{ survey.video_count_checked_at.strftime('%d %b %Y, %H:%M') }} UTC
+
+</p>
+
+{% elif survey.roadvision_remark %}
+
+<p style="color:#555;">
+✍️ Written by hand &mdash; the automated check leaves this remark alone.
+</p>
+
+{% endif %}
+
+<div
+style="
+background:#f8f9fa;
+padding:20px;
+border-radius:10px;
+line-height:1.8;
+white-space:pre-wrap;
+">
+
+{{ survey.roadvision_remark }}
+
+</div>
+
+</div>
+
+</div>
+
+</body>
+
+</html>

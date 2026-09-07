@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+
+<title>Extract List</title>
+
+<style>
+
+body{
+
+    font-family:Calibri,sans-serif;
+    font-size:18px;
+    padding:30px;
+    background:#f8f9fb;
+    margin:0;
+
+}
+
+.copy-btn{
+
+    display:inline-flex;
+    align-items:center;
+    gap:10px;
+    padding:12px 24px;
+    background:linear-gradient(135deg,#ff8a00,#ff6200);
+    color:#fff;
+    border:none;
+    border-radius:12px;
+    font-size:16px;
+    font-weight:600;
+    font-family:Calibri,sans-serif;
+    cursor:pointer;
+    box-shadow:0 8px 18px rgba(255,122,0,.30);
+    transition:.25s;
+    margin-bottom:25px;
+
+}
+
+.copy-btn:hover{
+
+    transform:translateY(-2px);
+
+}
+
+#extractList{
+
+    font-family:Calibri,sans-serif;
+    font-size:18px;
+    white-space:pre-line;
+    line-height:1.1;
+    margin:0;
+    padding:0;
+
+}
+
+</style>
+
+</head>
+
+<body>
+
+<button
+id="copyBtn"
+class="copy-btn"
+onclick="copyList()">
+
+📋 Copy List
+
+</button>
+
+<pre id="extractList">*Survey not started on portal*
+
+{% for item in missed_list %}
+{{ item.section_no }}_Cycle{{ item.cycle_no }}
+{% endfor %}
+</pre>
+<script>
+
+function copyList(){
+
+    const text =
+document.getElementById("extractList")
+.innerText
+.split("\n")
+.map(line => line.trim())
+.filter(line => line !== "")
+.join("\n");
+
+    navigator.clipboard.writeText(text);
+
+    const btn =
+    document.getElementById("copyBtn");
+
+    btn.innerHTML = "✅ Copied!";
+
+    btn.style.background =
+    "linear-gradient(135deg,#28a745,#1e8e3e)";
+
+    setTimeout(function(){
+
+        btn.innerHTML = "📋 Copy List";
+
+        btn.style.background =
+        "linear-gradient(135deg,#ff8a00,#ff6200)";
+
+    },1500);
+
+}
+
+</script>
+
+</body>
+
+</html>

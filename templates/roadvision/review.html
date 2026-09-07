@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+
+<title>RoadVision Review</title>
+
+<link rel="stylesheet"
+href="{{ url_for('static',
+filename='css/admin.css') }}">
+
+</head>
+
+<body>
+
+<div class="top-navbar">
+
+<div class="nav-left">
+
+<img
+src="{{ url_for('static',
+filename='images/viama_logo.png') }}"
+class="logo-img">
+
+<div class="welcome-text">
+
+<h2>RoadVision Review</h2>
+
+<p>
+
+Review Survey & Submit Remark
+
+</p>
+
+</div>
+
+</div>
+
+<a
+href="/roadvision"
+class="logout-btn">
+
+⬅ Dashboard
+
+</a>
+
+</div>
+
+<div class="dashboard-content">
+
+<div class="card">
+
+<h2>
+
+Survey Details
+
+</h2>
+
+<table class="report-table">
+
+<tr>
+
+<td><b>Section No</b></td>
+
+<td>{{ survey.section_no }}</td>
+
+<tr>
+
+<td><b>Cycle</b></td>
+
+<td>
+
+{% if survey.is_resurvey %}
+
+{{ survey.cycle_no }} (Resurvey)
+
+{% else %}
+
+{{ survey.cycle_no }}
+
+{% endif %}
+
+</td>
+
+</tr>
+
+</tr>
+
+<tr>
+
+<td><b>Captain</b></td>
+
+<td>{{ survey.captain_name }}</td>
+
+</tr>
+
+<tr>
+
+<td><b>State</b></td>
+
+<td>{{ survey.state }}</td>
+
+</tr>
+
+<tr>
+
+<td><b>Stretch</b></td>
+
+<td>{{ survey.stretch_code }}</td>
+
+</tr>
+
+<tr>
+
+<td><b>Status</b></td>
+
+<td>{{ survey.status }}</td>
+
+</tr>
+
+<tr>
+
+<td><b>Survey Date</b></td>
+
+<td>
+
+{% if survey.start_time %}
+
+{{ survey.start_time.strftime("%d-%m-%Y") }}
+
+{% else %}
+
+-
+
+{% endif %}
+
+</td>
+
+</tr>
+
+</table>
+
+<br>
+
+{% if error %}
+
+<div
+style="
+background:#ffe5e5;
+color:#c0392b;
+padding:12px;
+border-radius:8px;
+margin-bottom:20px;">
+
+{{ error }}
+
+</div>
+
+{% endif %}
+
+<form
+method="POST"
+onsubmit="return confirm('Are you sure you want to submit this RoadVision review? This action cannot be undone.');">
+
+<label>
+
+<b>RoadVision Remark</b>
+
+</label>
+
+<textarea
+
+name="remark"
+
+rows="6"
+
+required
+
+style="
+width:100%;
+padding:12px;
+margin-top:10px;
+border-radius:8px;
+font-size:15px;"
+
+placeholder="Enter review remark..."></textarea>
+
+<br><br>
+
+<button
+type="submit"
+class="search-btn">
+
+✅ Mark as Acknowledged
+
+</button>
+
+<a
+
+href="/roadvision"
+
+class="logout-btn"
+
+style="margin-left:10px;">
+
+Cancel
+
+</a>
+
+</form>
+
+</div>
+
+</div>
+
+</body>
+
+</html>

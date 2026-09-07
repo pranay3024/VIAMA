@@ -1,0 +1,95 @@
+<link rel="stylesheet"
+href="{{ url_for('static',
+filename='css/admin.css') }}">
+
+<div class="top-navbar">
+
+<div class="nav-left">
+
+<img
+src="{{ url_for('static',
+filename='images/viama_logo.png') }}"
+class="logo-img">
+
+<div class="welcome-text">
+
+<h2>Missed Surveys</h2>
+
+<p>
+Surveys not started within scheduled time
+</p>
+
+</div>
+
+</div>
+
+<a
+href="/admin"
+class="logout-btn">
+
+⬅ Dashboard
+
+</a>
+
+</div>
+
+<div class="dashboard-content">
+
+<div class="table-wrapper">
+
+<table class="survey-table">
+
+<thead>
+
+<tr>
+
+<th>Section</th>
+<th>UPC code</th>
+<th>Scheduled Day</th>
+<th>Captain</th>
+<th>State</th>
+<th>Status</th>
+
+</tr>
+
+</thead>
+
+<tbody>
+
+{% for assignment in missed_surveys %}
+
+<tr>
+
+<td>{{ assignment.section_no }}</td>
+
+<td>{{ assignment.upc_code }}</td>
+
+<td>{{ assignment.survey_day }}</td>
+
+<td>{{ assignment.main_person }}</td>
+
+<td>{{ assignment.state }}</td>
+
+
+
+<td>
+
+<span class="status-missed">
+
+🔴 Missed
+
+</span>
+
+</td>
+
+</tr>
+
+{% endfor %}
+
+</tbody>
+
+</table>
+
+</div>
+
+</div>

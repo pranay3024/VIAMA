@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+
+<title>
+
+{% if email_type=="defect" %}
+
+Defect Report Draft
+
+{% elif email_type=="discrepancy" %}
+
+Discrepancy - Final Survey Report
+
+{% else %}
+
+Raw Data & Survey Form
+
+{% endif %}
+
+</title>
+
+<link
+rel="stylesheet"
+href="{{ url_for('static',
+filename='css/admin.css') }}">
+
+</head>
+
+<body>
+
+<div class="top-navbar">
+
+<div class="nav-left">
+
+<img
+src="{{ url_for('static',
+filename='images/viama_logo.png') }}"
+class="logo-img">
+
+<div class="welcome-text">
+
+<h2>
+
+{% if email_type == "defect" %}
+
+📄 Defect Report Draft
+
+{% elif email_type == "discrepancy" %}
+
+📋 Discrepancy - Final Survey Report
+
+{% elif email_type == "cancelled" %}
+
+❌ Cancelled Survey Form
+
+{% else %}
+
+📁 Raw Data & Survey Form
+
+{% endif %}
+
+</h2>
+
+<p>
+
+Generate Gmail Draft
+
+</p>
+
+</div>
+
+</div>
+
+<a
+href="/admin/gmail-drafts"
+class="logout-btn">
+
+⬅ Back
+
+</a>
+
+</div>
+
+<div class="dashboard-content">
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+        {% for category, message in messages %}
+            <div style="
+                background:#d4edda;
+                color:#155724;
+                border:1px solid #c3e6cb;
+                padding:15px;
+                border-radius:8px;
+                margin-bottom:20px;
+                font-weight:bold;
+            ">
+                {{ message }}
+            </div>
+        {% endfor %}
+    {% endif %}
+{% endwith %}
+
+<div class="card">
+
+<form method="POST">
+
+<label>Week</label>
+
+<select name="week" required>
+
+<option value="">Select Week</option>
+
+{% for w in weeks %}
+<option value="{{ w }}"
+    {% if selected_week|string == w|string %}
+        selected
+    {% endif %}>
+    Week {{ w }}
+</option>
+{% endfor %}
+
+</select>
+
+<br><br>
+
+<label>UPC Code</label>
+
+<input
+type="text"
+name="upc_code"
+value="{{ upc_code }}"
+placeholder="Enter UPC Code">
+
+<br><br>
+
+<label>Cycle Number</label>
+
+<select name="cycle_no">
+
+<option value="">Select Cycle</option>
+
+{% for c in cycles %}
+
+<option
+value="{{ c.cycle_no }}"
+
+{% if cycle_no==c.cycle_no|string %}
+
+selected
+
+{% endif %}>
+
+Cycle {{ c.cycle_no }}
+
+</option>
+
+{% endfor %}
+
+</select>
+
+<br><br>
+
+<button
+type="submit"
+class="search-btn">
+
+🔍 Search Surveys
+
+</button>
+
+{% if no_records %}
+
+<div style="
+    margin-top:20px;
+    padding:15px;
+    background:#fff3cd;
+    color:#856404;
+    border:1px solid #ffeeba;
+    border-radius:8px;
+    font-weight:bold;
+">
+
+⚠️ No records found for the selected filters.
+
+</div>
+
+{% endif %}
+
+{% if request.method == "POST" and surveys %}
+
+<div class="form-group">
+
+    <label>Section</label>
+
+  <select
+    name="survey_id"
+    required
+    style="margin-top:10px;">
+
+    <option value="">Select Section</option>
+
+    {% for survey in surveys %}
+
+    <option
+        value="{% if survey.missed_id %}{{ survey.missed_id }}{% else %}{{ survey.id }}{% endif %}"
+        {% if selected_section == (survey.missed_id if survey.missed_id else survey.id)|string %}
+        selected
+        {% endif %}
+    >
+
+        {{ survey.section_no }}
+        | Cycle {{ survey.cycle_no }}
+        | {{ survey.upc_code }}
+        | {{ survey.stretch_code }}
+
+        {% if survey.missed_id and survey.__class__.__name__ == "MissedSurveyHistory" %}
+            | Missed {{ survey.missed_date }}
+        {% endif %}
+
+    </option>
+
+    {% endfor %}
+
+</select>
+
+</div>
+
+<div class="form-group">
+
+<label>Survey Start Date</label>
+
+<input
+type="date"
+name="start_date"
+value="{{ start_date }}">
+
+<small
+id="dateExtractionStatus"
+style="display:block;margin-top:6px;color:#666;">
+Select a survey to extract dates from its survey form.
+</small>
+
+</div>
+
+<div class="form-group">
+
+<label>Survey End Date</label>
+
+<input
+type="date"
+name="end_date"
+value="{{ end_date }}">
+
+</div>
+
+<input
+    type="hidden"
+    name="week"
+    value="{{ selected_week }}">
+
+<button
+    type="submit"
+    name="action"
+    value="generate"
+    class="btn-primary">
+
+Generate Draft
+
+</button>
+
+{% endif %}
+
+</form>
+
+</div>
+
+{% if subject %}
+
+<div class="card" style="margin-top:30px;">
+
+<h2>
+
+📧 Generated Subject
+
+</h2>
+
+<input
+type="text"
+id="subject"
+value="{{ subject }}"
+readonly
+style="
+width:100%;
+padding:12px;
+font-size:15px;
+margin-bottom:15px;
+">
+
+<button
+type="button"
+class="search-btn"
+onclick="copySubject()">
+
+📋 Copy Subject
+
+</button>
+
+</div>
+
+<div class="card" style="margin-top:25px;">
+
+<h2>
+
+📄 Gmail Preview
+
+</h2>
+
+<div
+id="emailPreview"
+class="email-preview">
+
+{{ email_html|safe }}
+
+</div>
+
+<br>
+
+<button
+type="button"
+class="search-btn"
+onclick="copyEmail()">
+
+📋 Copy Email
+
+</button>
+
+&nbsp;
+
+<a
+id="gmailLink"
+target="_blank"
+class="search-btn"
+style="
+text-decoration:none;
+display:inline-block;
+">
+
+📧 Open Gmail
+
+</a>
+
+</div>
+
+{% endif %}
+
+</div>
+
+<script>
+
+const surveySelect = document.querySelector('select[name="survey_id"]');
+const startDateInput = document.querySelector('input[name="start_date"]');
+const endDateInput = document.querySelector('input[name="end_date"]');
+
+if (surveySelect && startDateInput && endDateInput) {
+    const dateExtractionStatus = document.getElementById("dateExtractionStatus");
+
+    surveySelect.addEventListener("change", async function () {
+        startDateInput.value = "";
+        endDateInput.value = "";
+
+        if (!this.value || this.value.startsWith("missed-") || this.value.startsWith("history-")) {
+            if (dateExtractionStatus) {
+                dateExtractionStatus.textContent = "Dates are unavailable for this survey type.";
+            }
+            return;
+        }
+
+        if (dateExtractionStatus) {
+            dateExtractionStatus.textContent = "Extracting dates from the survey form...";
+            dateExtractionStatus.style.color = "#856404";
+        }
+        console.log("[GEMINI SURVEY DATES] requesting database survey", this.value);
+
+        try {
+            const response = await fetch(
+                `/admin/gmail-drafts/survey-dates/${encodeURIComponent(this.value)}`
+            );
+            if (!response.ok) {
+                console.error("[GEMINI SURVEY DATES] request failed", response.status);
+                if (dateExtractionStatus) {
+                    dateExtractionStatus.textContent = "Date extraction request failed. Enter dates manually.";
+                    dateExtractionStatus.style.color = "#b00020";
+                }
+                return;
+            }
+
+            const dates = await response.json();
+            startDateInput.value = dates.start_date || "";
+            endDateInput.value = dates.end_date || "";
+            console.log("[GEMINI SURVEY DATES] received dates", dates);
+            if (dateExtractionStatus) {
+                const extracted = dates.start_date && dates.end_date;
+                dateExtractionStatus.textContent = extracted
+                    ? "Dates extracted from the survey form."
+                    : "No clearly visible dates found. Enter dates manually if available.";
+                dateExtractionStatus.style.color = extracted ? "#155724" : "#856404";
+            }
+        } catch (error) {
+            console.error("[GEMINI SURVEY DATES] request error", error);
+            if (dateExtractionStatus) {
+                dateExtractionStatus.textContent = "Date extraction failed. Enter dates manually.";
+                dateExtractionStatus.style.color = "#b00020";
+            }
+        }
+    });
+}
+
+</script>
+
+<script>
+
+function copySubject(){
+
+navigator.clipboard.writeText(
+document.getElementById("subject").value
+);
+
+alert("Subject copied successfully.");
+
+}
+
+async function copyEmail(){
+
+const html=document.getElementById("emailPreview").innerHTML;
+const text=document.getElementById("emailPreview").innerText;
+
+await navigator.clipboard.write([
+
+new ClipboardItem({
+
+"text/html":new Blob([html],{type:"text/html"}),
+
+"text/plain":new Blob([text],{type:"text/plain"})
+
+})
+
+]);
+
+alert("Email copied successfully.");
+
+}
+
+window.onload=function(){
+
+const subject=document.getElementById("subject");
+const preview=document.getElementById("emailPreview");
+const gmail=document.getElementById("gmailLink");
+
+if(subject && preview && gmail){
+
+gmail.href=
+
+"https://mail.google.com/mail/?view=cm&fs=1"
+
++
+
+"&su="
+
++
+
+encodeURIComponent(subject.value)
+
++
+
+"&body="
+
++
+
+encodeURIComponent(preview.innerText);
+
+}
+
+}
+
+</script>
+
+</body>
+
+</html>

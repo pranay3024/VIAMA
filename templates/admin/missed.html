@@ -1,0 +1,336 @@
+    <link rel="stylesheet"
+    href="{{ url_for('static',
+    filename='css/admin.css') }}">
+
+    <style>
+
+    .filter-bar{
+
+        display:flex;
+        gap:12px;
+        align-items:center;
+        flex-wrap:wrap;
+        margin-bottom:20px;
+
+    }
+
+    .filter-bar select{
+
+        padding:10px 14px;
+        border:1px solid #d9d9d9;
+        border-radius:10px;
+        font-size:15px;
+        font-family:Calibri,sans-serif;
+        min-width:170px;
+        background:#fff;
+
+    }
+
+    .btn{
+
+        display:inline-flex;
+        align-items:center;
+        justify-content:center;
+        gap:8px;
+        padding:10px 18px;
+        border:none;
+        border-radius:10px;
+        text-decoration:none;
+        font-family:Calibri,sans-serif;
+        font-size:15px;
+        font-weight:600;
+        cursor:pointer;
+        transition:.25s;
+        box-shadow:0 4px 12px rgba(0,0,0,.12);
+
+    }
+
+    .btn:hover{
+
+        transform:translateY(-2px);
+
+    }
+
+    .btn-primary{
+
+        background:#ff7a00;
+        color:#fff;
+
+    }
+
+    .btn-primary:hover{
+
+        background:#e66d00;
+
+    }
+
+    .btn-secondary{
+
+        background:#6c757d;
+        color:#fff;
+
+    }
+
+    .btn-secondary:hover{
+
+        background:#565e64;
+
+    }
+
+    .btn-success{
+
+        background:#28a745;
+        color:#fff;
+
+    }
+
+    .btn-success:hover{
+
+        background:#218838;
+
+    }
+
+    </style>
+
+    <div class="top-navbar">
+
+    <div class="nav-left">
+
+    <img
+    src="{{ url_for('static',
+    filename='images/viama_logo.png') }}"
+    class="logo-img">
+
+    <div class="welcome-text">
+
+    <h2>Missed Surveys</h2>
+
+    <p>
+    Surveys not started within scheduled time
+    </p>
+
+    </div>
+
+    </div>
+
+    <a
+    href="/admin"
+    class="logout-btn">
+
+    ⬅ Dashboard
+
+    </a>
+
+    </div>
+
+    <div class="dashboard-content">
+
+    <form
+    method="GET"
+    class="filter-bar">
+
+    <select name="agency" style="padding:10px 14px;border-radius:8px;">
+
+        <option value="">Teams</option>
+
+        <option value="krish"
+        {% if request.args.get('agency') == 'krish' %}selected{% endif %}>
+            North-East
+        </option>
+
+        <option value="godbole"
+        {% if request.args.get('agency') == 'godbole' %}selected{% endif %}>
+            Odisha
+        </option>
+
+        <option value="aspizo"
+        {% if request.args.get('agency') == 'aspizo' %}selected{% endif %}>
+            UP-Jharkhand
+        </option>
+
+    </select>
+
+    <select name="day">
+
+    <option value="">
+    All Days
+    </option>
+
+    {% for d in
+    ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"] %}
+
+    <option
+    value="{{ d }}"
+    {% if request.args.get("day")==d %}
+    selected
+    {% endif %}>
+
+    {{ d }}
+
+    </option>
+
+    {% endfor %}
+
+    </select>
+
+    <select name="day_from">
+
+    <option value="">From Day</option>
+
+    {% for d in
+    ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"] %}
+
+    <option
+        value="{{ d }}"
+        {% if request.args.get("day_from") == d %}selected{% endif %}>
+        {{ d }}
+    </option>
+
+    {% endfor %}
+
+</select>
+
+
+<select name="day_to">
+
+    <option value="">To Day</option>
+
+    {% for d in
+    ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"] %}
+
+    <option
+        value="{{ d }}"
+        {% if request.args.get("day_to") == d %}selected{% endif %}>
+        {{ d }}
+    </option>
+
+    {% endfor %}
+
+</select>
+
+    <button
+    type="submit"
+    class="btn btn-primary">
+
+    Apply
+
+    </button>
+
+    <a
+    href="/admin/missed"
+    class="btn btn-secondary">
+
+    Clear
+
+    </a>
+
+    <button
+        type="button"
+        class="search-btn"
+        onclick="copyMissedList()">
+        📋 Extract List
+    </button>
+
+    <textarea id="missedExtractData" style="display:none;">{% for item in missed_extract_list %}{{ item }}
+    {% endfor %}</textarea>
+
+<script>
+function copyMissedList() {
+
+    const data = document.getElementById(
+        "missedExtractData"
+    ).value
+    .split("\n")
+    .map(line => line.trim())
+    .filter(line => line);
+
+    // Count missed surveys
+    const count = data.length;
+
+    // Heading + count + list
+    const text =
+        "*Survey not started on portal* - " +
+        count +
+        "\n" +
+        data.join("\n");
+
+    navigator.clipboard.writeText(text)
+        .then(() => {
+            alert("✅ Extract List copied!");
+        })
+        .catch(() => {
+            alert("❌ Failed to copy Extract List.");
+        });
+}
+</script>
+
+    </form>
+
+    <div class="table-wrapper">
+
+    <table class="survey-table">
+
+    <thead>
+
+    <tr>
+
+    <th>Section</th>
+    <th>Cycle</th>
+    <th>UPC code</th>
+    <th>Scheduled Day</th>
+    <th>Missed Date</th>
+    <th>Captain</th>
+    <th>State</th>
+    <th>Status</th>
+
+    </tr>
+
+    </thead>
+
+    <tbody>
+
+    {% for assignment in missed_surveys %}
+
+    <div
+        class="missed-extract-item"
+        data-extract="{{ assignment.section_no }}_Cycle{{ assignment.cycle_no }}"
+        style="display:none;">
+    </div>
+
+    <tr>
+
+    <td>{{ assignment.section_no }}</td>
+    <td>
+        {{ missed_cycle_map.get(assignment.section_no|string, 1) }}
+    </td>
+    <td>{{ assignment.upc_code }}</td>
+
+    <td>{{ assignment.survey_day }}</td>
+
+   <td>Current Week</td>
+
+    <td>{{ assignment.main_person }}</td>
+
+    <td>{{ assignment.state }}</td>
+
+    <td>
+
+    <span class="status-missed">
+
+    🔴 Missed
+
+    </span>
+
+    </td>
+
+    </tr>
+
+    {% endfor %}
+
+    </tbody>
+
+    </table>
+
+    </div>
+
+    </div>

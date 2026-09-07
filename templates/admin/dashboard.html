@@ -1,0 +1,1831 @@
+    <link rel="stylesheet"
+    href="{{ url_for('static',
+    filename='css/admin.css') }}">
+
+
+    <div class="top-navbar">
+
+        <div class="nav-left">
+
+            <img
+            src="{{ url_for('static',
+            filename='images/viama_logo.png') }}"
+            class="logo-img">
+
+            <div class="welcome-text">
+
+                <h2>Welcome Admin</h2>
+
+                <p>
+                    Survey Monitoring & Operations Center
+                </p>
+
+            </div>
+
+        </div>
+
+        <div style="display:flex;gap:15px;align-items:center;">
+
+    <a
+    href="/admin/schedules"
+    class="logout-btn">
+
+    📅 Schedules
+
+    </a>
+
+    <a
+href="/reports"
+class="logout-btn">
+
+📊 Reports
+
+</a>
+
+<a
+href="/admin/gmail-drafts"
+class="logout-btn">
+
+📧 Gmail Drafts
+
+</a>
+
+    <a
+    href="/admin/missed"
+    class="logout-btn">
+
+    🔴 Missed Surveys
+
+    </a>
+
+    <a
+    href="/logout"
+    class="logout-btn">
+
+    Logout
+
+    </a>
+
+</div>
+
+    </div>
+
+
+    <div class="dashboard-content">
+
+        
+
+    <div class="stats">
+
+    <div class="stat-card">
+    <h3>👮 Captains</h3>
+    <h1>{{ total_captains }}</h1>
+    </div>
+
+    <div class="stat-card">
+    <h3>🟡 Ongoing</h3>
+    <h1>{{ ongoing }}</h1>
+    </div>
+
+    <div class="stat-card">
+    <h3>✅ Completed</h3>
+    <h1>{{ completed }}</h1>
+    </div>
+
+    <div class="stat-card">
+    <h3>❌ Missed</h3>
+    <h1>{{ missed }}</h1>
+    </div>
+
+
+
+    </div>
+
+
+
+<!-- ===================================== -->
+<!-- STATE-WISE KM -->
+<!-- ===================================== -->
+
+<div class="card">
+    <div style="
+        display:grid;
+        grid-template-columns:repeat(4, 1fr);
+        gap:16px;
+        margin-top:20px;
+    ">
+
+        {% set display_states = [
+            "ASSAM",
+            "BIHAR",
+            "WEST BENGAL",
+            "MEGHALAYA",
+            "ODISHA",
+            "UTTAR PRADESH",
+            "JHARKHAND"
+        ] %}
+
+        {% for state in display_states %}
+
+        <div style="
+            background:white;
+            border-radius:12px;
+            padding:20px;
+            min-height:125px;
+            box-shadow:0 2px 8px rgba(0,0,0,0.08);
+            display:flex;
+            flex-direction:column;
+            justify-content:space-between;
+        ">
+
+            <!-- STATE NAME -->
+            <div style="
+                font-size:17px;
+                font-weight:700;
+                text-align:center;
+                margin-bottom:15px;
+            ">
+                {{ state }}
+            </div>
+
+            <!-- KM VALUES -->
+            <div style="
+                display:flex;
+                justify-content:space-around;
+                align-items:center;
+                text-align:center;
+            ">
+
+                <!-- CURRENT WEEK -->
+                <div>
+                    <div style="
+                        font-size:12px;
+                        color:#777;
+                        margin-bottom:4px;
+                    ">
+                        Current Week
+                    </div>
+
+                    <div style="
+                        font-size:20px;
+                        font-weight:700;
+                    ">
+                        {{ "%.2f"|format(current_state_km.get(state, 0)) }} KM
+                    </div>
+                </div>
+
+                <!-- DIVIDER -->
+                <div style="
+                    width:1px;
+                    height:45px;
+                    background:#ddd;
+                "></div>
+
+                <!-- OVERALL -->
+                <div>
+                    <div style="
+                        font-size:12px;
+                        color:#777;
+                        margin-bottom:4px;
+                    ">
+                        Overall
+                    </div>
+
+                    <div style="
+                        font-size:20px;
+                        font-weight:700;
+                    ">
+                        {{ "%.2f"|format(overall_state_km.get(state, 0)) }} KM
+                    </div>
+                </div>
+
+            </div>
+
+        </div>
+
+        {% endfor %}
+
+      <div class="state-km-card total-km-card">
+
+    <div class="state-km-title">TOTAL</div>
+
+    <div class="state-km-values">
+
+        <div>
+            <div class="state-km-label">Current Week</div>
+            <div class="state-km-number">
+                {{ "%.2f"|format(total_km) }} KM
+            </div>
+        </div>
+
+        <div class="state-km-divider"></div>
+
+        <div>
+            <div class="state-km-label">Overall</div>
+            <div class="state-km-number">
+                {{ "%.2f"|format(overall_total_km) }} KM
+            </div>
+        </div>
+
+    </div>
+
+</div>
+
+    </div>
+
+</div>
+
+
+<style>
+
+    /* =====================================
+   COMPACT STATUS SUMMARY
+   ===================================== */
+
+
+@media (max-width: 1200px) {
+    .status-summary {
+        grid-template-columns: repeat(4, 1fr);
+    }
+}
+
+@media (max-width: 800px) {
+    .status-summary {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+.state-km-dashboard {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+    width: 100%;
+    margin: 20px 0;
+}
+
+.state-km-dashboard .state-km-card {
+    background: #ffffff;
+    border: 1px solid #eeeeee;
+    border-radius: 14px;
+    padding: 20px;
+    min-height: 110px;
+    box-sizing: border-box;
+
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+
+    text-align: center;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.08);
+}
+
+.state-km-dashboard .state-km-card h3 {
+    margin: 0 0 10px 0;
+    font-size: 17px;
+    font-weight: 600;
+}
+
+.state-km-dashboard .state-km-card b {
+    font-size: 21px;
+    font-weight: 700;
+}
+
+.state-km-dashboard .total-km-card {
+    background: #ff7a00;
+    color: #ffffff;
+    border: 2px solid #e66d00;
+}
+
+.state-km-dashboard .total-km-card h3 {
+    color: #ffffff;
+    font-size: 19px;
+    font-weight: 800;
+    margin-bottom: 10px;
+}
+
+.state-km-dashboard .total-km-card b {
+    color: #ffffff;
+    font-size: 26px;
+    font-weight: 900;
+}
+
+/* Tablet */
+@media (max-width: 1000px) {
+    .state-km-dashboard {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+
+/* Mobile */
+@media (max-width: 600px) {
+    .state-km-dashboard {
+        grid-template-columns: 1fr;
+    }
+}
+
+.state-km-card {
+    background: white;
+    border-radius: 12px;
+    padding: 18px;
+    min-height: 110px;
+    box-shadow: 0 3px 10px rgba(0,0,0,0.08);
+}
+
+.total-km-card {
+    background: #ff7a00;
+    color: white;
+
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    align-items: stretch;
+}
+
+.total-km-card .state-km-title {
+    text-align: center;
+    color: white;
+    font-size: 18px;
+    font-weight: 700;
+}
+
+.total-km-card .state-km-values {
+    display: flex;
+    align-items: center;
+    justify-content: space-around;
+    width: 100%;
+}
+
+.total-km-card .state-km-label {
+    color: white;
+    font-size: 13px;
+    font-weight: 500;
+    text-align: center;
+}
+
+.total-km-card .state-km-number {
+    color: white;
+    font-size: 20px;
+    font-weight: 700;
+    text-align: center;
+}
+
+.total-km-card .state-km-divider {
+    height: 45px;
+    width: 1px;
+    background: rgba(255,255,255,0.5);
+}
+
+</style>
+
+
+
+
+
+
+    {% if resurvey_requests %}
+
+    <div class="missed-section">
+
+    <h2>
+    🔄 Re-Survey Requests
+    </h2>
+
+    <div class="missed-scroll">
+
+    {% for survey in resurvey_requests %}
+
+    <div class="missed-card">
+
+    <p>
+    👤 {{ survey.captain_name }}
+    </p>
+
+    <p>
+    🛣 {{ survey.stretch_code }}
+    </p>
+
+    <p>
+    📌 Section No:
+    <b>{{ survey.section_no }}</b>
+    </p>
+
+    <p>
+
+    {% if survey.is_resurvey %}
+
+    🔄 Cycle {{ survey.cycle_no }}_Resurvey
+
+    {% else %}
+
+    🔄 Cycle {{ survey.cycle_no }}
+
+    {% endif %}
+
+    </p>
+
+    <a
+    href="/approve-resurvey/{{ survey.id }}"
+    class="view-btn">
+
+    ✅ Approve
+
+    </a>
+
+    </div>
+
+    {% endfor %}
+
+    </div>
+
+    </div>
+
+    {% endif %}
+
+
+    <form method="GET" class="advanced-filter">
+
+    <select name="state">
+
+    <option value="">
+    States
+    </option>
+
+    {% for state in states %}
+
+    <option value="{{ state[0] }}">
+    {{ state[0] }}
+    </option>
+
+    {% endfor %}
+
+    </select>
+
+<select name="agency">
+
+<option value="">Teams</option>
+
+<option value="krish"
+{% if request.args.get('agency') == 'krish' %}selected{% endif %}>
+North-East
+</option>
+
+<option value="godbole"
+{% if request.args.get('agency') == 'godbole' %}selected{% endif %}>
+Odisha
+</option>
+
+<option value="aspizo"
+{% if request.args.get('agency') == 'aspizo' %}selected{% endif %}>
+UP-Jharkhand
+</option>
+
+</select>
+
+    <select name="captain_name">
+
+    <option value="">
+    Captains
+    </option>
+
+    {% for captain in captains %}
+
+    <option value="{{ captain.name }}">
+    {{ captain.name }}
+    </option>
+
+    {% endfor %}
+
+    </select>
+
+    
+
+    <!-- Week -->
+
+<select name="week" id="weekFilter">
+
+    <option value="">
+        Weeks
+    </option>
+
+    {% for week in weeks %}
+
+    <option
+        value="{{ week }}"
+        {% if request.args.get("week") == week|string
+        or (not request.args and week == current_week_no) %}
+        selected
+        {% endif %}
+    >
+         {{ week }}
+    </option>
+
+    {% endfor %}
+
+</select>
+
+<!-- Cycle -->
+
+<select name="cycle">
+
+    <option value="">
+        Cycles
+    </option>
+
+    {% for cycle in cycles %}
+
+    <option
+        value="{{ cycle[0] }}"
+        {% if request.args.get("cycle") == cycle[0]|string %}
+        selected
+        {% endif %}
+    >
+        Cycle {{ cycle[0] }}
+    </option>
+
+    {% endfor %}
+
+</select>
+
+<!-- DAY FILTER -->
+
+<select name="day">
+
+    <option value="">
+        Day
+    </option>
+
+    <option value="Monday"
+    {% if request.args.get("day")=="Monday" %}selected{% endif %}>
+    Monday
+    </option>
+
+    <option value="Tuesday"
+    {% if request.args.get("day")=="Tuesday" %}selected{% endif %}>
+    Tuesday
+    </option>
+
+    <option value="Wednesday"
+    {% if request.args.get("day")=="Wednesday" %}selected{% endif %}>
+    Wednesday
+    </option>
+
+    <option value="Thursday"
+    {% if request.args.get("day")=="Thursday" %}selected{% endif %}>
+    Thursday
+    </option>
+
+    <option value="Friday"
+    {% if request.args.get("day")=="Friday" %}selected{% endif %}>
+    Friday
+    </option>
+
+</select>
+
+<select name="status">
+
+    <option value="">
+    Status
+    </option>
+
+    <option value="ongoing"
+    {% if request.args.get("status")=="ongoing" %}
+    selected
+    {% endif %}>
+    Ongoing
+    </option>
+
+    <option value="completed"
+    {% if request.args.get("status")=="completed" %}
+    selected
+    {% endif %}>
+    Completed
+    </option>
+
+    <option value="video_uploaded_pending_form"
+{% if request.args.get("status")=="video_uploaded_pending_form" %}
+selected
+{% endif %}>
+Video Uploaded - Form Pending
+</option>
+
+    <option value="video_pending"
+    {% if request.args.get("status")=="video_pending" %}
+    selected
+    {% endif %}>
+    Video Pending
+    </option>
+
+    <option value="groundwork_completed"
+    {% if request.args.get('status') == 'groundwork_completed' %}selected{% endif %}>
+    Groundwork Completed - Video and Form Pending
+</option>
+
+<option value="pdf_reupload_required"
+    {% if request.args.get("status") == "pdf_reupload_required" %}
+    selected
+    {% endif %}>
+    PDF Re-upload Required
+</option>
+
+<option value="rescheduled"
+    {% if request.args.get("status") == "rescheduled" %}
+    selected
+    {% endif %}>
+    🔄 Rescheduled
+</option>
+
+<option value="cancelled"
+    {% if request.args.get("status") == "cancelled" %}
+    selected
+    {% endif %}>
+    ❌ Cancelled
+</option>
+
+
+
+
+    </select>
+
+    <div style="display:flex;align-items:center;gap:10px;">
+
+<input
+    type="date"
+    name="start_date"
+    value="{{ request.args.get('start_date', '') }}"
+    class="date-filter"
+    title="Start Date">
+
+<input
+    type="date"
+    name="end_date"
+    value="{{ request.args.get('end_date', '') }}"
+    class="date-filter"
+    title="End Date">
+
+<button
+type="button"
+class="search-btn"
+onclick="clearFilters()">
+
+✕ Clear
+
+</button>
+
+</div>
+
+    <button
+    type="submit"
+    class="search-btn">
+
+    Apply Filters
+
+    </button>
+
+    <button
+    type="button"
+    class="search-btn"
+    onclick="copyExtractList()"
+    style="margin-left:10px;">
+
+    📋 Extract List
+
+</button>
+    </form>
+    
+
+    <div class="table-wrapper">
+
+    <table class="survey-table">
+
+    <thead>
+
+    <tr>
+
+<th>S.No.</th>
+
+<th>UPC<br>Code</th>
+
+<th style="min-width:80px;">Section</th>
+
+<th style="min-width:100px;">Cycle</th>
+
+<th>Actual<br>Survey<br>Day</th>
+
+<th style="min-width:170px;">Start<br>Time</th>
+
+<th style="min-width:170px;">End<br>Time</th>
+
+<th style="min-width:140px;">PDF<br>Upload Time</th>
+
+<th>Video<br>Upload Time</th>
+
+<th style="min-width:220px;">Captain</th>
+
+<th style="min-width:160px;">Status</th>
+
+<!-- <th>Survey<br>Duration</th>
+
+<th>Upload<br>Duration</th> -->
+
+<th>Survey<br>Form</th>
+
+<th>Raw<br>Video</th>
+
+<th>Defect<br>Report</th>
+
+<th>
+    Road Vision
+    <br>
+    <span style="font-size:12px; color:red; font-weight:bold;">
+        Pending: {{ roadvision_pending }}
+    </span>
+</th>
+<th>RV<br>Remark</th>
+
+<th style="min-width:90px;">Details</th>
+
+    </tr>
+
+
+    </thead>
+
+    <tbody>
+
+   {% for survey in all_surveys %}
+
+<tr
+    data-extract="{{ survey.section_no }}_Cycle{{ survey.cycle_no }}"
+    data-status="{{ survey.status }}"
+    data-pdf-reupload="{{ 'true' if survey.pdf_reupload_required else 'false' }}">
+
+    <td>{{ loop.index }}</td>
+
+   
+
+    <td>{{ survey.upc_code }}</td>
+
+    <td>{{ survey.section_no }}</td>
+
+    <td>
+
+{% if survey.is_resurvey %}
+
+{{ survey.cycle_no }} (R)
+
+{% else %}
+
+{{ survey.cycle_no }}
+
+{% endif %}
+
+</td>
+
+    <td>{{ survey.scheduled_day }}</td>
+
+    <td style="min-width:140px;line-height:1.4;">
+
+{% if survey.display_start_time %}
+
+{{ survey.display_start_time.strftime('%A') }}<br>
+{{ survey.display_start_time.strftime('%I:%M %p') }}<br>
+
+<small>
+{{ survey.display_start_time.strftime('%d %b %Y') }}
+</small>
+
+{% else %}
+
+-
+
+{% endif %}
+
+</td>
+
+<td style="min-width:140px;line-height:1.4;">
+
+{% if survey.display_end_time %}
+
+{{ survey.display_end_time.strftime('%A') }}<br>
+{{ survey.display_end_time.strftime('%I:%M %p') }}<br>
+
+<small>
+{{ survey.display_end_time.strftime('%d %b %Y') }}
+</small>
+
+{% else %}
+
+-
+
+{% endif %}
+
+</td>
+
+<td style="min-width:140px;line-height:1.4;">
+
+{% if survey.display_pdf_upload_time %}
+
+    <span class="{% if survey.pdf_upload_late %}pdf-upload-late{% endif %}">
+        {{ survey.display_pdf_upload_time.strftime('%d %b %Y') }}
+        <br>
+        {{ survey.display_pdf_upload_time.strftime('%I:%M %p') }}
+    </span>
+
+{% else %}
+
+    <span class="{% if survey.pdf_upload_late %}pdf-upload-late{% endif %}">
+        -
+    </span>
+
+{% endif %}
+
+</td>
+
+<td>
+
+{% if survey.display_video_upload_time %}
+
+    <span class="{% if survey.video_upload_late %}video-upload-late{% endif %}">
+        {{ survey.display_video_upload_time.strftime('%d %b %Y') }}
+        <br>
+        {{ survey.display_video_upload_time.strftime('%I:%M %p') }}
+    </span>
+
+{% else %}
+
+    -
+
+{% endif %}
+
+</td>
+
+    <td>{{ survey.captain_name }}</td>
+
+<td style="
+    min-width:220px;
+    text-align:center;
+    vertical-align:middle;
+">
+
+    {% set s_status = (survey.status|string|trim|lower) %}
+    
+
+    {# =====================================================
+       CANCELLED
+       ===================================================== #}
+
+    {% if s_status == "cancelled" %}
+
+        <div style="
+            display:flex;
+            flex-direction:column;
+            align-items:center;
+            justify-content:center;
+            gap:7px;
+        ">
+
+            <span style="
+                background:linear-gradient(135deg,#fee2e2,#fecaca);
+                color:#b91c1c;
+                padding:9px 18px;
+                border-radius:25px;
+                font-weight:700;
+                display:inline-flex;
+                align-items:center;
+                justify-content:center;
+                gap:7px;
+                min-width:155px;
+                border:1px solid #fca5a5;
+                box-shadow:0 2px 5px rgba(185,28,28,.12);
+            ">
+                 CANCELLED
+            </span>
+
+            {% if survey.captain_status_reason %}
+
+    <button
+        type="button"
+        data-status="CANCELLED SURVEY"
+        data-reason="{{ survey.captain_status_reason|e }}"
+        onclick="showCaptainReason(this)"
+        style="
+            border:none;
+            background:#374151;
+            color:white;
+            padding:5px 12px;
+            border-radius:14px;
+            font-size:11px;
+            font-weight:700;
+            cursor:pointer;
+            box-shadow:0 2px 4px rgba(0,0,0,.15);
+        "
+    >
+        View Reason
+    </button>
+
+{% endif %}
+
+        </div>
+
+
+    {# =====================================================
+       RESCHEDULED
+       ===================================================== #}
+
+    {% elif s_status == "rescheduled" %}
+
+        <div style="
+            display:flex;
+            flex-direction:column;
+            align-items:center;
+            justify-content:center;
+            gap:7px;
+        ">
+
+            <span style="
+                background:linear-gradient(135deg,#fef3c7,#fde68a);
+                color:#92400e;
+                padding:9px 18px;
+                border-radius:25px;
+                font-weight:700;
+                display:inline-flex;
+                align-items:center;
+                justify-content:center;
+                gap:7px;
+                min-width:155px;
+                border:1px solid #fbbf24;
+                box-shadow:0 2px 5px rgba(146,64,14,.12);
+            ">
+                 RESCHEDULED
+            </span>
+
+            {% if survey.captain_status_reason %}
+
+    <button
+        type="button"
+        data-status="RESCHEDULED SURVEY"
+        data-reason="{{ survey.captain_status_reason|e }}"
+        onclick="showCaptainReason(this)"
+        style="
+            border:none;
+            background:#374151;
+            color:white;
+            padding:5px 12px;
+            border-radius:14px;
+            font-size:11px;
+            font-weight:700;
+            cursor:pointer;
+            box-shadow:0 2px 4px rgba(0,0,0,.15);
+        "
+    >
+        View Reason
+    </button>
+
+{% endif %}
+
+        </div>
+
+
+    {# =====================================================
+       ONGOING
+       ===================================================== #}
+
+    {% elif s_status == "ongoing" %}
+
+        <span style="
+            background:linear-gradient(135deg,#dcfce7,#bbf7d0);
+            color:#166534;
+            padding:9px 18px;
+            border-radius:25px;
+            font-weight:700;
+            display:inline-flex;
+            align-items:center;
+            justify-content:center;
+            gap:7px;
+            min-width:155px;
+            border:1px solid #86efac;
+            box-shadow:0 2px 5px rgba(22,101,52,.10);
+        ">
+             ONGOING
+        </span>
+
+
+    {# =====================================================
+       GROUNDWORK COMPLETED
+       ===================================================== #}
+
+    {% elif s_status == "groundwork_completed" %}
+
+        <span style="
+            background:linear-gradient(135deg,#dcfce7,#bbf7d0);
+            color:#166534;
+            padding:9px 18px;
+            border-radius:18px;
+            font-weight:700;
+            display:inline-flex;
+            flex-direction:column;
+            align-items:center;
+            justify-content:center;
+            gap:3px;
+            min-width:190px;
+            border:1px solid #86efac;
+            box-shadow:0 2px 5px rgba(22,101,52,.10);
+            line-height:1.25;
+        ">
+
+
+            <span>Groundwork Completed</span>
+            <span style="font-size:11px;">
+                Form and Video Pending
+            </span>
+
+        </span>
+
+
+    {# =====================================================
+       VIDEO UPLOADED / FORM PENDING
+       ===================================================== #}
+
+    {% elif s_status == "video_uploaded_pending_form" %}
+
+        <span style="
+            background:linear-gradient(135deg,#dbeafe,#bfdbfe);
+            color:#1d4ed8;
+            padding:9px 18px;
+            border-radius:25px;
+            font-weight:700;
+            display:inline-flex;
+            flex-direction:column;
+            align-items:center;
+            justify-content:center;
+            gap:2px;
+            min-width:180px;
+            border:1px solid #93c5fd;
+            box-shadow:0 2px 5px rgba(29,78,216,.10);
+            line-height:1.25;
+        ">
+
+            <span> Video Uploaded</span>
+            <span>Form Pending</span>
+
+        </span>
+
+
+    {# =====================================================
+       VIDEO PENDING
+       ===================================================== #}
+
+    {% elif s_status == "video_pending" %}
+
+        <span style="
+            background:linear-gradient(135deg,#fef3c7,#fde68a);
+            color:#b45309;
+            padding:9px 18px;
+            border-radius:25px;
+            font-weight:700;
+            display:inline-flex;
+            align-items:center;
+            justify-content:center;
+            gap:7px;
+            min-width:155px;
+            border:1px solid #fbbf24;
+            box-shadow:0 2px 5px rgba(180,83,9,.10);
+        ">
+             VIDEO PENDING
+        </span>
+
+
+    {# =====================================================
+       COMPLETED
+       ===================================================== #}
+
+    {% elif s_status == "completed" %}
+
+        <span style="
+            background:linear-gradient(135deg,#dcfce7,#a7f3d0);
+            color:#047857;
+            padding:9px 18px;
+            border-radius:25px;
+            font-weight:700;
+            display:inline-flex;
+            align-items:center;
+            justify-content:center;
+            gap:7px;
+            min-width:155px;
+            border:1px solid #6ee7b7;
+            box-shadow:0 2px 5px rgba(4,120,87,.10);
+        ">
+             COMPLETED
+        </span>
+
+
+    {# =====================================================
+       PENDING
+       ===================================================== #}
+
+    {% elif s_status == "pending" %}
+
+        <span style="
+            background:linear-gradient(135deg,#f3f4f6,#e5e7eb);
+            color:#6b7280;
+            padding:9px 18px;
+            border-radius:25px;
+            font-weight:700;
+            display:inline-flex;
+            align-items:center;
+            justify-content:center;
+            gap:7px;
+            min-width:155px;
+            border:1px solid #d1d5db;
+        ">
+             PENDING
+        </span>
+
+
+    {# =====================================================
+       UNKNOWN
+       ===================================================== #}
+
+    {% else %}
+
+        <span style="
+            background:#f3f4f6;
+            color:#4b5563;
+            padding:9px 18px;
+            border-radius:25px;
+            font-weight:700;
+            display:inline-flex;
+            align-items:center;
+            justify-content:center;
+            min-width:155px;
+            border:1px solid #d1d5db;
+        ">
+            {{ s_status or c_status or "UNKNOWN" }}
+        </span>
+
+    {% endif %}
+
+
+    {# =====================================================
+       PDF RE-UPLOAD
+       ===================================================== #}
+
+    {% if survey.pdf_reupload_required %}
+
+        <div style="
+            margin-top:8px;
+        ">
+
+            <span style="
+                background:#ffe5e5;
+                color:#b91c1c;
+                padding:6px 10px;
+                border-radius:20px;
+                font-weight:600;
+                font-size:11px;
+                display:inline-block;
+                border:1px solid #fca5a5;
+            ">
+                 PDF Re-upload Required
+            </span>
+
+        </div>
+
+    {% endif %}
+
+</td>
+
+    <!-- <td>
+
+    {% if survey.status in ["ongoing", "groundwork_completed"] %}
+
+    <span
+        class="live-duration"
+        data-start="{{ survey.start_time.strftime('%Y-%m-%dT%H:%M:%S') }}">
+        0h 0m
+    </span>
+
+    {% elif survey.start_time and survey.end_time %}
+
+    {% set total_mins = ((survey.end_time - survey.start_time).total_seconds() / 60)|int %}
+
+    {{ total_mins // 60 }}h {{ total_mins % 60 }}m
+
+    {% else %}
+
+    -
+
+    {% endif %}
+
+</td>
+    
+
+
+    <td>
+
+    {% if survey.upload_duration_minutes>0 %}
+
+    {{ survey.upload_duration_minutes//60 }}h
+    {{ survey.upload_duration_minutes%60 }}m
+
+    {% else %}
+
+    -
+
+    {% endif %}
+
+    </td> -->
+
+    <td>
+
+{% if survey.survey_form_completed %}
+
+ YES
+
+{% if survey.survey_form_completed_at %}
+<br>
+<small>
+{{ survey.survey_form_completed_at.strftime('%d %b %Y') }}<br>
+{{ survey.survey_form_completed_at.strftime('%I:%M %p') }}
+</small>
+{% endif %}
+
+{% else %}
+
+ NO
+
+{% endif %}
+
+    </td>
+
+    <td>
+
+{% if survey.task1_completed %}
+
+ YES
+
+{% if survey.task1_completed_at %}
+<br>
+<small>
+{{ survey.task1_completed_at.strftime('%d %b %Y') }}<br>
+{{ survey.task1_completed_at.strftime('%I:%M %p') }}
+</small>
+{% endif %}
+
+{% else %}
+
+ NO
+
+{% endif %}
+
+    </td>
+
+    <td>
+
+{% if survey.task2_completed %}
+
+ YES
+
+{% if survey.task2_completed_at %}
+<br>
+<small>
+{{ survey.task2_completed_at.strftime('%d %b %Y') }}<br>
+{{ survey.task2_completed_at.strftime('%I:%M %p') }}
+</small>
+{% endif %}
+
+{% else %}
+
+ NO
+
+{% endif %}
+
+    </td>
+
+    <!-- ROADVISION -->
+
+<td>
+
+{% if survey.roadvision_completed %}
+
+<span style="color:green;font-weight:bold;">
+ YES
+</span>
+
+{% else %}
+
+<span style="color:red;font-weight:bold;">
+ NO
+</span>
+
+{% endif %}
+
+</td>
+
+<!-- RV REMARK -->
+
+<td>
+
+{# Outcome of the automated bucket check. NULL means it has never run, which
+   is not the same as a failure, so nothing is shown in that case. #}
+{% if survey.video_count_matched is not none %}
+
+{% if survey.video_count_matched %}
+
+<span
+title="Automated check: the GCP bucket holds at least the enlisted video count."
+style="color:green;font-weight:bold;">
+✅
+</span>
+
+{% else %}
+
+<span
+title="Automated check: videos missing from the bucket, or the section could not be matched. Open the remark for detail."
+style="color:#c00;font-weight:bold;">
+⚠️
+</span>
+
+{% endif %}
+
+{% endif %}
+
+{% if survey.roadvision_remark %}
+
+<a
+href="/admin/remark/{{ survey.id }}"
+class="view-btn">
+
+View
+
+</a>
+
+{% else %}
+
+-
+
+{% endif %}
+
+</td>
+
+    <td>
+
+    <a
+    href="/admin/survey/{{ survey.id }}"
+    class="view-btn">
+
+    View
+
+    </a>
+
+    </td>
+
+    </tr>
+
+    {% endfor %}
+
+    </tbody>
+
+    </table>
+
+    </div>
+<script>
+
+function updateLiveDurations() {
+
+    document
+    .querySelectorAll(".live-duration")
+    .forEach(function(el) {
+
+        const startString = el.dataset.start;
+
+        if (!startString) {
+            return;
+        }
+
+        // startString represents IST
+        const start = new Date(
+            startString + "+05:30"
+        );
+
+        const now = new Date();
+
+        let diffMs = now - start;
+
+        // Prevent negative duration
+        if (diffMs < 0) {
+            diffMs = 0;
+        }
+
+        const totalMinutes = Math.floor(
+            diffMs / 60000
+        );
+
+        const hrs = Math.floor(
+            totalMinutes / 60
+        );
+
+        const mins = totalMinutes % 60;
+
+        el.innerHTML =
+            hrs + "h " +
+            mins + "m";
+
+        // Red after 8 hours
+        if (totalMinutes > 480) {
+
+            el.style.color = "red";
+
+            el.style.fontWeight = "700";
+
+        } else {
+
+            el.style.color = "";
+
+            el.style.fontWeight = "";
+
+        }
+
+    });
+
+}
+
+
+// Run immediately
+updateLiveDurations();
+
+
+// Update duration every minute
+setInterval(
+    updateLiveDurations,
+    60000
+);
+
+
+function clearFilters() {
+
+    document
+        .querySelector(".advanced-filter")
+        .reset();
+
+    window.location.href = "/admin";
+
+}
+
+
+// ===============================
+// COLUMN RESIZE
+// ===============================
+
+document
+.querySelectorAll(".survey-table th")
+.forEach(function(th) {
+
+    const resizer = document.createElement("div");
+
+    resizer.className = "column-resizer";
+
+    th.appendChild(resizer);
+
+    let startX, startWidth;
+
+    resizer.addEventListener(
+        "mousedown",
+        function(e) {
+
+            startX = e.pageX;
+
+            startWidth = th.offsetWidth;
+
+            document.onmousemove = function(e) {
+
+                th.style.width =
+                    (startWidth + e.pageX - startX) + "px";
+
+                th.style.minWidth =
+                    (startWidth + e.pageX - startX) + "px";
+
+            };
+
+            document.onmouseup = function() {
+
+                document.onmousemove = null;
+                document.onmouseup = null;
+
+            };
+
+        }
+    );
+
+});
+
+</script>
+
+<script>
+
+function copyExtractList() {
+
+    const rows = Array.from(
+        document.querySelectorAll("tr[data-extract]")
+    );
+
+    // ==========================================
+    // STATUS ORDER
+    // ==========================================
+
+    const statusOrder = {
+        "pdf": 1,
+        "groundwork_completed": 2,
+        "video_uploaded_pending_form": 3,
+        "video_pending": 4,
+        "ongoing": 5,
+        "rescheduled": 6,
+        "cancelled": 7,
+        "completed": 8
+    };
+
+
+    // ==========================================
+    // GET DISPLAY STATUS
+    // ==========================================
+
+    function getDisplayStatus(row) {
+
+        const status = (
+            row.getAttribute("data-status") || ""
+        ).trim().toLowerCase();
+
+        const pdfReupload =
+            row.getAttribute("data-pdf-reupload") === "true";
+
+
+        // PDF Re-upload always gets highest priority
+        if (pdfReupload) {
+            return "pdf";
+        }
+
+        if (status === "groundwork_completed") {
+            return "groundwork_completed";
+        }
+
+        if (status === "video_uploaded_pending_form") {
+            return "video_uploaded_pending_form";
+        }
+
+        if (status === "video_pending") {
+            return "video_pending";
+        }
+
+        if (status === "ongoing") {
+            return "ongoing";
+        }
+
+        if (status === "rescheduled") {
+            return "rescheduled";
+        }
+
+        if (status === "cancelled") {
+            return "cancelled";
+        }
+
+        if (status === "completed") {
+            return "completed";
+        }
+
+        return null;
+    }
+
+
+    // ==========================================
+    // GROUPS
+    // ==========================================
+
+    const groups = {
+
+        pdf: [],
+
+        groundwork_completed: [],
+
+        video_uploaded_pending_form: [],
+
+        video_pending: [],
+
+        ongoing: [],
+
+        rescheduled: [],
+
+        cancelled: [],
+
+        completed: []
+
+    };
+
+
+    // ==========================================
+    // COLLECT ROWS
+    // ==========================================
+
+    rows.forEach(function(row) {
+
+        const extract =
+            row.getAttribute("data-extract");
+
+        if (!extract) {
+            return;
+        }
+
+        const displayStatus =
+            getDisplayStatus(row);
+
+        if (!displayStatus) {
+            return;
+        }
+
+        if (groups[displayStatus]) {
+
+            groups[displayStatus].push(extract);
+
+        }
+
+    });
+
+
+    // ==========================================
+    // HEADINGS
+    // ==========================================
+
+    const headings = {
+
+        pdf:
+            "*PDF Re-upload Required*",
+
+        groundwork_completed:
+            "*Groundwork Completed - Video and Form Pending*",
+
+        video_uploaded_pending_form:
+            "*Video Uploaded - Form Pending*",
+
+        video_pending:
+            "*Video Pending*",
+
+        ongoing:
+            "*Ongoing*",
+
+        rescheduled:
+            "*Rescheduled*",
+
+        cancelled:
+            "*Cancelled*",
+
+        completed:
+            "*Completed*"
+
+    };
+
+
+    // ==========================================
+    // BUILD OUTPUT
+    // ==========================================
+
+    let output = "";
+
+    Object.keys(statusOrder)
+        .sort(function(a, b) {
+
+            return statusOrder[a] - statusOrder[b];
+
+        })
+        .forEach(function(status) {
+
+            const items = groups[status];
+
+            // Skip empty categories
+            if (!items || items.length === 0) {
+                return;
+            }
+
+
+            // ======================================
+            // HEADING + COUNT
+            // ======================================
+
+            output +=
+                headings[status] +
+                " - " +
+                items.length +
+                "\n";
+
+
+            // ======================================
+            // SURVEY LIST
+            // ======================================
+
+            items.forEach(function(item) {
+
+                output += item + "\n";
+
+            });
+
+
+            // Blank line
+            output += "\n";
+
+        });
+
+
+    // ==========================================
+    // SUMMARY
+    // ==========================================
+
+    const summaryLines = [];
+
+    Object.keys(statusOrder)
+        .sort(function(a, b) {
+
+            return statusOrder[a] - statusOrder[b];
+
+        })
+        .forEach(function(status) {
+
+            const items = groups[status];
+
+            // Only show statuses that have surveys
+            if (!items || items.length === 0) {
+                return;
+            }
+
+            summaryLines.push(
+                headings[status] +
+                " - " +
+                items.length
+            );
+
+        });
+
+
+    // ==========================================
+    // ADD SUMMARY AT BOTTOM
+    // ==========================================
+
+    if (summaryLines.length > 0) {
+
+        output += "\n";
+        output += "*Summary*\n\n";
+
+        summaryLines.forEach(function(line) {
+
+            output += line + "\n";
+
+        });
+
+    }
+
+
+    output = output.trim();
+
+
+    // ==========================================
+    // NOTHING FOUND
+    // ==========================================
+
+    if (!output) {
+
+        alert("⚠️ No surveys found.");
+
+        return;
+
+    }
+
+
+    // ==========================================
+    // COPY
+    // ==========================================
+
+    navigator.clipboard.writeText(output)
+
+        .then(function() {
+
+            alert("✅ Extract List copied!");
+
+        })
+
+        .catch(function() {
+
+            alert("❌ Failed to copy Extract List.");
+
+        });
+
+}
+
+</script>
+<script>
+function showCaptainReason(button) {
+
+    const reason = button.getAttribute("data-reason") || "";
+
+    alert(reason.trim() || "No reason provided.");
+}
+</script>
+
+    </div>

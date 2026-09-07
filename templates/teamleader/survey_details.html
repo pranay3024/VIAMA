@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+
+<title>Survey Details</title>
+
+<link rel="stylesheet"
+href="{{ url_for('static',
+filename='css/mobile.css') }}">
+
+</head>
+
+<body>
+
+<div class="mobile-header">
+
+SURVEY DETAILS
+
+</div>
+
+<div class="container">
+
+<div class="card">
+
+<h2>{{ survey.stretch_code }}</h2>
+
+<div class="section-badge">
+📌 Strech_no: {{ survey.section_no }}
+</div>
+
+<p>
+<b>Captain:</b>
+{{ survey.captain_name }}
+</p>
+
+<p>
+<b>State:</b>
+{{ survey.state }}
+</p>
+
+<p>
+<b>Survey Day:</b>
+{{ survey.survey_day }}
+</p>
+
+<p>
+<b>Survey Type:</b>
+{{ survey.survey_type }}
+</p>
+
+<p>
+<b>Status:</b>
+{{ survey.status }}
+</p>
+
+<p>
+<b>Started:</b>
+{{ display_start_time.strftime('%d %b %Y %I:%M %p')
+if display_start_time else '-' }}
+</p>
+
+<hr>
+
+<h3>Dashcam Photo</h3>
+
+{% if survey.dashcam_photo %}
+
+<img
+src="{{ survey.dashcam_photo }}"
+style="width:100%;border-radius:12px;">
+
+{% else %}
+
+<p>⚠ No Dashcam Photo Available</p>
+
+{% endif %}
+
+<hr>
+
+<h3>Photo of Duly Signed & Stamped Survey Form</h3>
+
+{% if survey.end_survey_photo %}
+
+<img
+src="{{ survey.end_survey_photo }}"
+style="width:100%;border-radius:12px;">
+
+{% else %}
+
+<p>⚠ No End Survey Photo Available</p>
+
+{% endif %}
+
+<hr>
+
+
+
+</div>
+
+</div>
+
+</body>
+
+</html>

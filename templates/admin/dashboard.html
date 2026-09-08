@@ -643,6 +643,22 @@ Video Uploaded - Form Pending
     ❌ Cancelled
 </option>
 
+<option value="pdf_delayed"
+    {% if request.args.get("status") == "pdf_delayed" %}
+    selected
+    {% endif %}>
+    PDF Delayed
+</option>
+
+<option value="video_delayed"
+    {% if request.args.get("status") == "video_delayed" %}
+    selected
+    {% endif %}>
+    Video Delayed
+</option>
+
+
+
 
 
 
@@ -826,17 +842,21 @@ onclick="clearFilters()">
 
 {% if survey.display_pdf_upload_time %}
 
-    <span class="{% if survey.pdf_upload_late %}pdf-upload-late{% endif %}">
+    <span class="{% if survey.pdf_upload_late %}video-upload-late{% endif %}">
         {{ survey.display_pdf_upload_time.strftime('%d %b %Y') }}
         <br>
         {{ survey.display_pdf_upload_time.strftime('%I:%M %p') }}
     </span>
 
+{% elif survey.pdf_upload_late %}
+
+    <span style="color:red; font-weight:bold;">
+        Delayed
+    </span>
+
 {% else %}
 
-    <span class="{% if survey.pdf_upload_late %}pdf-upload-late{% endif %}">
-        -
-    </span>
+    -
 
 {% endif %}
 
@@ -850,6 +870,12 @@ onclick="clearFilters()">
         {{ survey.display_video_upload_time.strftime('%d %b %Y') }}
         <br>
         {{ survey.display_video_upload_time.strftime('%I:%M %p') }}
+    </span>
+
+{% elif survey.video_upload_late %}
+
+    <span style="color:red; font-weight:bold;">
+        Delayed
     </span>
 
 {% else %}

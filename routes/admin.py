@@ -238,6 +238,20 @@ def admin_dashboard():
 
     ist_offset = timedelta(hours=5, minutes=30)
     utc_now = datetime.utcnow()
+    now_ist = utc_now + ist_offset
+    today_deadline_ist = datetime.combine(
+        now_ist.date(),
+        datetime.min.time(),
+    ) + timedelta(hours=14)
+    delayed_end_date_ist = (
+        now_ist.date() - timedelta(days=1)
+        if now_ist >= today_deadline_ist
+        else now_ist.date() - timedelta(days=2)
+    )
+    delayed_end_cutoff_utc = datetime.combine(
+        delayed_end_date_ist + timedelta(days=1),
+        datetime.min.time(),
+    ) - ist_offset
 
     status = request.args.get("status")
     pdf_delayed = status == "pdf_delayed"
@@ -294,30 +308,24 @@ def admin_dashboard():
 
      elif status == "pdf_delayed":
 
-        now_ist = utc_now + ist_offset
-
         query = query.filter(
             Survey.end_time.isnot(None),
             Survey.survey_pdf_uploaded_at.is_(None)
         )
 
-        # Only surveys whose NEXT DAY 2 PM deadline has passed
         query = query.filter(
-            Survey.end_time + timedelta(hours=19, minutes=30) < utc_now
+            Survey.end_time < delayed_end_cutoff_utc
         )
 
      elif status == "video_delayed":
-
-        now_ist = utc_now + ist_offset
 
         query = query.filter(
             Survey.end_time.isnot(None),
             Survey.video_upload_time.is_(None)
         )
 
-        # Only surveys whose NEXT DAY 2 PM deadline has passed
         query = query.filter(
-            Survey.end_time + timedelta(hours=19, minutes=30) < utc_now
+            Survey.end_time < delayed_end_cutoff_utc
         )
 
      elif status == "rescheduled":

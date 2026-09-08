@@ -239,19 +239,6 @@ def admin_dashboard():
     ist_offset = timedelta(hours=5, minutes=30)
     utc_now = datetime.utcnow()
     now_ist = utc_now + ist_offset
-    today_deadline_ist = datetime.combine(
-        now_ist.date(),
-        datetime.min.time(),
-    ) + timedelta(hours=14)
-    delayed_end_date_ist = (
-        now_ist.date() - timedelta(days=1)
-        if now_ist >= today_deadline_ist
-        else now_ist.date() - timedelta(days=2)
-    )
-    delayed_end_cutoff_utc = datetime.combine(
-        delayed_end_date_ist + timedelta(days=1),
-        datetime.min.time(),
-    ) - ist_offset
 
     status = request.args.get("status")
     pdf_delayed = status == "pdf_delayed"
@@ -315,19 +302,11 @@ def admin_dashboard():
             Survey.survey_pdf_uploaded_at.is_(None)
         )
 
-        query = query.filter(
-            Survey.end_time < delayed_end_cutoff_utc
-        )
-
      elif status == "video_delayed":
 
         query = query.filter(
             Survey.end_time.isnot(None),
             Survey.video_upload_time.is_(None)
-        )
-
-        query = query.filter(
-            Survey.end_time < delayed_end_cutoff_utc
         )
 
      elif status == "rescheduled":
@@ -726,6 +705,22 @@ def admin_dashboard():
     Survey.start_time.desc()
 
 ).all()
+
+    if status in ("pdf_delayed", "video_delayed"):
+        def deadline_passed(survey):
+            end_time_ist = (
+                survey.end_time + ist_offset
+            ).replace(tzinfo=None)
+            deadline_ist = datetime.combine(
+                end_time_ist.date() + timedelta(days=1),
+                datetime.min.time(),
+            ) + timedelta(hours=14)
+            return now_ist > deadline_ist
+
+        all_surveys = [
+            survey for survey in all_surveys
+            if deadline_passed(survey)
+        ]
 
     # #region agent log
     _dbg("C", "admin.py:after_all_surveys", "main survey list loaded", {

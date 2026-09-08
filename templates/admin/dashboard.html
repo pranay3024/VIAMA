@@ -680,6 +680,20 @@ Video Uploaded - Form Pending
     class="date-filter"
     title="End Date">
 
+<label
+    for="video-upload-date"
+    style="font-size:13px;font-weight:600;color:#555;white-space:nowrap;">
+    Video Upload Date
+</label>
+
+<input
+    type="date"
+    name="video_upload_date"
+    value="{{ request.args.get('video_upload_date', '') }}"
+    class="date-filter"
+    id="video-upload-date"
+    title="Video Upload Date">
+
 <button
 type="button"
 class="search-btn"

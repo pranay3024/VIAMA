@@ -265,6 +265,7 @@ def admin_dashboard():
     agency = request.args.get("agency", "")
     from_date = request.args.get("from_date")
     to_date = request.args.get("to_date")
+    video_upload_date = request.args.get("video_upload_date")
 
     other_filters_applied = any([
      status,
@@ -276,6 +277,7 @@ def admin_dashboard():
      agency,
      from_date,
      to_date,
+    video_upload_date,
 ])
     
 
@@ -450,11 +452,16 @@ def admin_dashboard():
 
     start_dt = safe_date(start_date)
     end_dt = safe_date(end_date)
+    video_upload_dt = safe_date(video_upload_date)
 
     # Date inputs represent the displayed IST calendar date, while timestamps
     # are stored as UTC-naive values in the database.
     start_dt_utc = start_dt - ist_offset if start_dt else None
     end_dt_utc = end_dt - ist_offset if end_dt else None
+    video_upload_dt_utc = (
+        video_upload_dt - ist_offset
+        if video_upload_dt else None
+    )
 
 # Start Date → survey STARTED on this date
     if start_dt_utc:
@@ -468,6 +475,13 @@ def admin_dashboard():
      query = query.filter(
         Survey.end_time >= end_dt_utc,
         Survey.end_time < end_dt_utc + timedelta(days=1)
+    )
+
+# Video Upload Date → video uploaded on this displayed IST date
+    if video_upload_dt_utc:
+     query = query.filter(
+        Survey.video_upload_time >= video_upload_dt_utc,
+        Survey.video_upload_time < video_upload_dt_utc + timedelta(days=1)
     )
 
     status_count_query = Survey.query.filter(

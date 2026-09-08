@@ -842,7 +842,7 @@ onclick="clearFilters()">
 
 {% if survey.display_pdf_upload_time %}
 
-    <span class="{% if survey.pdf_upload_late %}video-upload-late{% endif %}">
+    <span class="{% if survey.pdf_upload_late %}pdf-upload-late{% endif %}">
         {{ survey.display_pdf_upload_time.strftime('%d %b %Y') }}
         <br>
         {{ survey.display_pdf_upload_time.strftime('%I:%M %p') }}

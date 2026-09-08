@@ -708,6 +708,16 @@ onclick="clearFilters()">
     📋 Extract List
 
 </button>
+
+    <button
+    type="button"
+    class="search-btn"
+    onclick="copyVideoUploadExtract()"
+    style="margin-left:10px;">
+
+    🎥 Video Upload Extract
+
+</button>
     </form>
     
 
@@ -774,7 +784,8 @@ onclick="clearFilters()">
 <tr
     data-extract="{{ survey.section_no }}_Cycle{{ survey.cycle_no }}"
     data-status="{{ survey.status }}"
-    data-pdf-reupload="{{ 'true' if survey.pdf_reupload_required else 'false' }}">
+    data-pdf-reupload="{{ 'true' if survey.pdf_reupload_required else 'false' }}"
+    data-video-upload-time="{{ survey.display_video_upload_time.strftime('%d/%m/%Y %I:%M %p') if survey.display_video_upload_time else '' }}">
 
     <td>{{ loop.index }}</td>
 
@@ -1846,6 +1857,35 @@ function copyExtractList() {
 
 </script>
 <script>
+function copyVideoUploadExtract() {
+
+    const lines = Array.from(
+        document.querySelectorAll("tr[data-extract]")
+    ).map(function(row) {
+
+        const extract = row.getAttribute("data-extract");
+        const uploadTime = row.getAttribute("data-video-upload-time");
+
+        return uploadTime
+            ? `${extract}        ${uploadTime}`
+            : null;
+
+    }).filter(Boolean);
+
+    if (!lines.length) {
+        alert("No video upload times found.");
+        return;
+    }
+
+    navigator.clipboard.writeText(lines.join("\n"))
+        .then(function() {
+            alert("Video upload extract copied!");
+        })
+        .catch(function() {
+            alert("Failed to copy video upload extract.");
+        });
+}
+
 function showCaptainReason(button) {
 
     const reason = button.getAttribute("data-reason") || "";

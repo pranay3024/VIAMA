@@ -237,6 +237,8 @@ def admin_dashboard():
     video_pending = status_totals.get("video_pending", 0)
 
     status = request.args.get("status")
+    pdf_delayed = status == "pdf_delayed"
+    video_delayed = status == "video_delayed"
     stretch = request.args.get("stretch")
     state = request.args.get("state")
     captain_name = request.args.get("captain_name")
@@ -287,15 +289,46 @@ def admin_dashboard():
             Survey.pdf_reupload_required.is_(True)
         )
 
+     elif status == "pdf_delayed":
+
+        now_ist = utc_now + ist_offset
+
+        query = query.filter(
+            Survey.end_time.isnot(None),
+            Survey.survey_pdf_uploaded_at.is_(None)
+        )
+
+        # Only surveys whose NEXT DAY 2 PM deadline has passed
+        query = query.filter(
+            Survey.end_time + timedelta(hours=19, minutes=30) < utc_now
+        )
+
+     elif status == "video_delayed":
+
+        now_ist = utc_now + ist_offset
+
+        query = query.filter(
+            Survey.end_time.isnot(None),
+            Survey.video_upload_time.is_(None)
+        )
+
+        # Only surveys whose NEXT DAY 2 PM deadline has passed
+        query = query.filter(
+            Survey.end_time + timedelta(hours=19, minutes=30) < utc_now
+        )
+
      elif status == "rescheduled":
-       query = query.filter(
-        Survey.status == "rescheduled"
-    )
+
+        query = query.filter(
+            Survey.status == "rescheduled"
+        )
 
      elif status == "cancelled":
-      query = query.filter(
-        Survey.status == "cancelled"
-    )
+
+        query = query.filter(
+            Survey.status == "cancelled"
+        )
+
      else:
 
         query = query.filter_by(
@@ -792,13 +825,14 @@ def admin_dashboard():
         else:
             survey.display_pdf_upload_time = None
 
-        # PDF must be uploaded by NEXT DAY 2:00 PM IST
         survey.pdf_upload_late = False
 
         if survey.end_time:
 
             # Survey end time → IST
-            end_time_ist = survey.end_time + ist_offset
+            end_time_ist = (
+                survey.end_time + ist_offset
+            ).replace(tzinfo=None)
 
             # Deadline → next day 2:00 PM IST
             pdf_deadline_ist = datetime.combine(
@@ -806,35 +840,60 @@ def admin_dashboard():
                 datetime.min.time()
             ) + timedelta(hours=14)
 
+            # If PDF is already uploaded
             if survey.survey_pdf_uploaded_at:
 
-                # PDF upload time → IST
                 pdf_upload_time_ist = (
                     survey.survey_pdf_uploaded_at + ist_offset
-                )
+                ).replace(tzinfo=None)
 
-                # Uploaded after deadline
+                # Uploaded after 2 PM → delayed
                 if pdf_upload_time_ist > pdf_deadline_ist:
                     survey.pdf_upload_late = True
 
+            # If PDF is NOT uploaded yet
             else:
 
-                # PDF not uploaded and deadline has passed
-                now_ist = utc_now + ist_offset
+                now_ist = (utc_now + ist_offset).replace(tzinfo=None)
 
+                # Deadline passed → delayed
                 if now_ist > pdf_deadline_ist:
                     survey.pdf_upload_late = True
 
         survey.video_upload_late = False
-        if survey.end_time and survey.video_upload_time:
-            end_time_ist = survey.end_time + ist_offset
-            deadline_ist = datetime.combine(
+
+        if survey.end_time:
+
+            # Survey end time → IST
+            end_time_ist = (
+                survey.end_time + ist_offset
+            ).replace(tzinfo=None)
+
+            # Deadline → next day 2:00 PM IST
+            video_deadline_ist = datetime.combine(
                 end_time_ist.date() + timedelta(days=1),
                 datetime.min.time()
             ) + timedelta(hours=14)
-            upload_time_ist = survey.video_upload_time + ist_offset
-            if upload_time_ist > deadline_ist:
-                survey.video_upload_late = True
+
+            # Video already uploaded
+            if survey.video_upload_time:
+
+                video_upload_time_ist = (
+                    survey.video_upload_time + ist_offset
+                ).replace(tzinfo=None)
+
+                # Uploaded after deadline → delayed
+                if video_upload_time_ist > video_deadline_ist:
+                    survey.video_upload_late = True
+
+            # Video NOT uploaded yet
+            else:
+
+                now_ist = (utc_now + ist_offset).replace(tzinfo=None)
+
+                # Deadline passed → delayed
+                if now_ist > video_deadline_ist:
+                    survey.video_upload_late = True
 
         if (
             survey.status == "video_pending"

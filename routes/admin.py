@@ -236,6 +236,9 @@ def admin_dashboard():
     completed = status_totals.get("completed", 0)
     video_pending = status_totals.get("video_pending", 0)
 
+    ist_offset = timedelta(hours=5, minutes=30)
+    utc_now = datetime.utcnow()
+
     status = request.args.get("status")
     pdf_delayed = status == "pdf_delayed"
     video_delayed = status == "video_delayed"
@@ -730,8 +733,6 @@ def admin_dashboard():
         if section_state_key not in assignment_by_section_state:
             assignment_by_section_state[section_state_key] = assignment
 
-    ist_offset = timedelta(hours=5, minutes=30)
-    utc_now = datetime.utcnow()
     current_state_km = {}
 
     for survey in all_surveys:

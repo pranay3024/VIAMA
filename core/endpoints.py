@@ -5923,3 +5923,48 @@ def captain_unable():
         }
     )
 
+
+@bp.get("/surveys/forms")
+@require_auth("surveys:read")
+def survey_forms():
+    """
+    Return all surveys with their downloadable survey PDF links.
+    """
+
+    from models.db_models import Survey
+
+    surveys = (
+        Survey.query
+        .filter(
+            Survey.end_survey_pdf.isnot(None),
+            Survey.end_survey_pdf != ""
+        )
+        .order_by(Survey.id.desc())
+        .all()
+    )
+
+    rows = []
+
+    for survey in surveys:
+        rows.append({
+            "survey_id": survey.id,
+            "upc_code": survey.upc_code,
+            "cycle_no": survey.cycle_no,
+            "section_no": survey.section_no,
+            "stretch_code": survey.stretch_code,
+            "state": survey.state,
+            "captain_name": survey.captain_name,
+            "survey_day": survey.survey_day,
+            "status": survey.status,
+            "pdf_url": survey.end_survey_pdf,
+            "pdf_uploaded_at": (
+                survey.survey_pdf_uploaded_at.isoformat()
+                if survey.survey_pdf_uploaded_at
+                else None
+            ),
+        })
+
+    return ok({
+        "count": len(rows),
+        "surveys": rows,
+    })

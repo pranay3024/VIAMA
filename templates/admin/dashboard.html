@@ -664,7 +664,7 @@ Video Uploaded - Form Pending
 
     </select>
 
-    <div style="display:flex;align-items:center;gap:10px;">
+    <div style="display:flex;align-items:flex-start;gap:10px;">
 
 <input
     type="date"
@@ -698,6 +698,10 @@ Video Uploaded - Form Pending
 
 </div>
 
+</div>
+
+<div style="display:flex;align-items:flex-start;gap:10px;">
+
 <button
 type="button"
 class="search-btn"
@@ -707,9 +711,7 @@ onclick="clearFilters()">
 
 </button>
 
-</div>
-
-    <button
+<button
     type="submit"
     class="search-btn">
 
@@ -721,7 +723,7 @@ onclick="clearFilters()">
     type="button"
     class="search-btn"
     onclick="copyExtractList()"
-    style="margin-left:10px;">
+    >
 
     📋 Extract List
 
@@ -731,11 +733,13 @@ onclick="clearFilters()">
     type="button"
     class="search-btn"
     onclick="copyVideoUploadExtract()"
-    style="margin-left:10px;">
+    >
 
     🎥 Video Upload Extract
 
 </button>
+
+</div>
     </form>
     
 

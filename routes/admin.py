@@ -108,9 +108,14 @@ def delayed_surveys():
         return redirect("/")
 
     message = None
+
+    # ============================================================
+    # POST -> Sync Gmail data and calculate defect report delays
+    # ============================================================
     if request.method == "POST":
         try:
             gmail = get_gmail()
+
             eligible_surveys = Survey.query.filter(
                 Survey.survey_form_completed.is_(True),
                 Survey.task1_completed.is_(True),
@@ -123,38 +128,98 @@ def delayed_surveys():
 
             for survey in eligible_surveys:
                 survey.defect_report_match_status = "pending"
+
                 try:
+                    # ------------------------------------------------
+                    # Extract survey end date from PDF if not already
+                    # ------------------------------------------------
                     if not survey.extracted_survey_end_date:
                         dates = extract_survey_dates_from_drive(
                             survey.end_survey_pdf
                         )
+
                         survey.extracted_survey_end_date = datetime.strptime(
-                            dates["end_date"], "%Y-%m-%d"
+                            dates["end_date"],
+                            "%Y-%m-%d"
                         ).date()
+
                         survey.survey_end_date_confidence = dates[
                             "end_confidence"
                         ]
 
-                    match = find_defect_report_email(survey, email_index, gmail)
+                    # ------------------------------------------------
+                    # Find defect report email
+                    # ------------------------------------------------
+                    match = find_defect_report_email(
+                        survey,
+                        email_index,
+                        gmail
+                    )
+
                     if not match:
                         survey.defect_report_match_status = "not_found"
                         survey.defect_report_sent_at = None
                         survey.defect_report_delay_days = None
                         continue
 
+                    # ------------------------------------------------
+                    # Save email information
+                    # ------------------------------------------------
                     survey.defect_report_sent_at = match["sent_at"]
                     survey.defect_report_sent_confidence = 1.0
                     survey.defect_report_email_id = match["message_id"]
-                    raw_delay_days = working_days_between(
-                        survey.extracted_survey_end_date,
-                        match["sent_at"].date(),
+
+                    # ====================================================
+                    # DELAY CALCULATION
+                    #
+                    # Survey end date itself is NOT counted.
+                    # Counting starts from the next day.
+                    #
+                    # Monday-Saturday = working day
+                    # Sunday = non-working day
+                    #
+                    # Email sent date IS included.
+                    # ====================================================
+
+                    start_date = survey.extracted_survey_end_date
+                    sent_date = match["sent_at"].date()
+
+                    working_days = 0
+
+                    # Start counting from the day AFTER survey end date
+                    current_date = start_date + timedelta(days=1)
+
+                    # Include the email sent date
+                    while current_date <= sent_date:
+
+                        # Monday = 0
+                        # Tuesday = 1
+                        # Wednesday = 2
+                        # Thursday = 3
+                        # Friday = 4
+                        # Saturday = 5
+                        # Sunday = 6
+                        #
+                        # Therefore Sunday is excluded.
+                        if current_date.weekday() != 6:
+                            working_days += 1
+
+                        current_date += timedelta(days=1)
+
+                    # ------------------------------------------------
+                    # First 3 working days are allowed.
+                    # Anything after that is considered delay.
+                    # ------------------------------------------------
+                    survey.defect_report_delay_days = max(
+                        working_days - 3,
+                        0
                     )
-                    survey.defect_report_delay_days = (
-                        max(raw_delay_days - 3, 0)
-                    )
+
                     survey.defect_report_match_status = "matched"
+
                 except Exception as exc:
                     survey.defect_report_match_status = "error"
+
                     log.exception(
                         "Defect delay sync failed for survey %s: %s",
                         survey.id,
@@ -162,24 +227,40 @@ def delayed_surveys():
                     )
 
                 processed += 1
+
+                # Commit every 25 surveys
                 if processed % 25 == 0:
                     db.session.commit()
+
                     log.info(
                         "Defect delay sync progress: %s/%s surveys",
                         processed,
                         len(eligible_surveys),
                     )
 
+            # Final commit
             db.session.commit()
+
             message = (
                 f"Delay data synchronized for {processed} eligible surveys. "
                 f"Indexed {len(email_index)} sent messages."
             )
+
         except Exception as exc:
             db.session.rollback()
-            message = f"Gmail synchronization failed: {exc}"
 
-    selected_week = safe_int(request.args.get("week"))
+            message = (
+                f"Gmail synchronization failed: {exc}"
+            )
+
+    # ============================================================
+    # GET -> Display delayed surveys
+    # ============================================================
+
+    selected_week = safe_int(
+        request.args.get("week")
+    )
+
     delayed_query = Survey.query.filter(
         Survey.survey_form_completed.is_(True),
         Survey.task1_completed.is_(True),
@@ -188,20 +269,32 @@ def delayed_surveys():
         Survey.defect_report_match_status.isnot(None),
     )
 
+    # ------------------------------------------------------------
+    # Week filter
+    # ------------------------------------------------------------
     if selected_week is not None and selected_week >= 7:
+
         week_start = datetime(2026, 8, 3) + timedelta(
             days=(selected_week - 7) * 7
         )
+
         delayed_query = delayed_query.filter(
             Survey.start_time >= week_start,
             Survey.start_time < week_start + timedelta(days=7),
         )
 
+    # ------------------------------------------------------------
+    # Ordering
+    # ------------------------------------------------------------
     delayed = delayed_query.order_by(
         Survey.defect_report_match_status.asc(),
         Survey.defect_report_delay_days.desc().nullslast(),
         Survey.extracted_survey_end_date.asc(),
     ).all()
+
+    # ============================================================
+    # Render page
+    # ============================================================
 
     return render_template(
         "admin/delayed_surveys.html",

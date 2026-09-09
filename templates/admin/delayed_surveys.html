@@ -62,14 +62,14 @@
                         <td>{{ survey.section_no }}_Cycle{{ survey.cycle_no }}</td>
                         <td>{{ survey.extracted_survey_end_date.strftime('%d/%m/%Y') if survey.extracted_survey_end_date else '-' }}</td>
                         <td>{{ '%.0f%%'|format((survey.survey_end_date_confidence or 0) * 100) }}</td>
-                        <td>{{ survey.defect_report_sent_at.strftime('%d/%m/%Y %I:%M %p') if survey.defect_report_sent_at else '-' }}</td>
+                        <td>{{ survey.defect_report_sent_at.strftime('%d/%m/%Y') if survey.defect_report_sent_at else '-' }}</td>
                         <td>{{ '%.0f%%'|format((survey.defect_report_sent_confidence or 0) * 100) }}</td>
                         <td style="color:red;font-weight:bold;">{{ survey.defect_report_delay_days or 0 }}</td>
                         <td>{{ survey.defect_report_match_status }}</td>
                         <td>
                             <form method="post" action="{{ url_for('admin.manual_delayed_survey_update', survey_id=survey.id) }}">
                                 <input type="date" name="manual_end_date" value="{{ survey.extracted_survey_end_date.isoformat() if survey.extracted_survey_end_date else '' }}" title="Manual survey end date">
-                                <input type="datetime-local" name="manual_sent_at" value="{{ survey.defect_report_sent_at.strftime('%Y-%m-%dT%H:%M') if survey.defect_report_sent_at else '' }}" title="Manual defect report sent date">
+                               <input type="date" name="manual_sent_at" value="{{ survey.defect_report_sent_at.strftime('%Y-%m-%d') if survey.defect_report_sent_at else '' }}" title="Manual defect report sent date">
                                 <button type="submit" class="search-btn">Save</button>
                             </form>
                         </td>

@@ -9,6 +9,7 @@ from models.db_models import db
 from utils.request_params import safe_date, safe_int, safe_week
 
 from sqlalchemy import case, and_, or_
+from sqlalchemy.orm import defer
 
 from sqlalchemy import case
 
@@ -108,7 +109,15 @@ def regional_dashboard():
 
     project_start = datetime(2026, 6, 22)
 
+    today_ist = datetime.utcnow() + timedelta(hours=5, minutes=30)
+    current_week_no = max(
+        1,
+        ((today_ist.date() - project_start.date()).days // 7) + 1,
+    )
+
     week_no = safe_week(week)
+    if week_no is None and not week:
+        week_no = current_week_no
 
     if week_no is not None:
 
@@ -141,7 +150,18 @@ def regional_dashboard():
     # SORTING
     # -----------------------------------
 
-    all_surveys = filtered_query.order_by(
+    heavy_survey_columns = (
+        Survey.end_survey_pdf,
+        Survey.end_survey_photo,
+        Survey.dashcam_photo,
+        Survey.settings_photo,
+        Survey.defect_report_file,
+        Survey.raw_video_excel_file,
+    )
+
+    all_surveys = filtered_query.options(
+        *(defer(column) for column in heavy_survey_columns)
+    ).order_by(
 
     case(
 
@@ -226,15 +246,27 @@ def regional_dashboard():
 
 ).all()
 
-    for survey in all_surveys:
-
-     assignment = SurveyAssignment.query.filter(
-        SurveyAssignment.section_no == survey.section_no,
-        SurveyAssignment.captain_email == survey.captain_email,
-        SurveyAssignment.survey_day == survey.survey_day
+    assignment_rows = SurveyAssignment.query.filter(
+        SurveyAssignment.state.in_(state_list)
     ).order_by(
         SurveyAssignment.id.desc()
-    ).first()
+    ).all()
+    latest_assignments = {}
+    for assignment in assignment_rows:
+        key = (
+            assignment.section_no,
+            assignment.captain_email,
+            assignment.survey_day,
+        )
+        latest_assignments.setdefault(key, assignment)
+
+    for survey in all_surveys:
+
+     assignment = latest_assignments.get((
+        survey.section_no,
+        survey.captain_email,
+        survey.survey_day,
+    ))
 
      if assignment:
         # Make assignment information available
@@ -262,6 +294,27 @@ def regional_dashboard():
             survey.display_end_time = survey.end_time
         else:
             survey.display_end_time = None
+
+        survey.pdf_upload_late = False
+        survey.video_upload_late = False
+        if survey.end_time:
+            end_time_ist = (
+                survey.end_time + timedelta(hours=5, minutes=30)
+            ).replace(tzinfo=None)
+            upload_deadline_ist = datetime.combine(
+                end_time_ist.date() + timedelta(days=1),
+                datetime.min.time(),
+            ) + timedelta(hours=14)
+            if survey.survey_pdf_uploaded_at:
+                survey.pdf_upload_late = (
+                    survey.survey_pdf_uploaded_at
+                    + timedelta(hours=5, minutes=30)
+                ).replace(tzinfo=None) > upload_deadline_ist
+            if survey.video_upload_time:
+                survey.video_upload_late = (
+                    survey.video_upload_time
+                    + timedelta(hours=5, minutes=30)
+                ).replace(tzinfo=None) > upload_deadline_ist
 
         if (
             survey.status == "video_pending"
@@ -297,93 +350,7 @@ def regional_dashboard():
     # REGIONAL MISSED SURVEY LOGIC
     # -----------------------------------
 
-    ist_now = datetime.utcnow() + timedelta(hours=5, minutes=30)
-
-    today_name = ist_now.strftime("%A")
-    current_hour = ist_now.hour
-
-    days_since_monday = ist_now.weekday()
-
-    week_start = (
-        ist_now - timedelta(days=days_since_monday)
-    ).replace(
-        hour=0,
-        minute=0,
-        second=0,
-        microsecond=0
-    )
-
     alerts = []
-
-    today_assignments = SurveyAssignment.query.filter(
-        SurveyAssignment.survey_day == today_name,
-        SurveyAssignment.survey_enabled == True,
-        SurveyAssignment.state.in_(state_list)
-    ).all()
-
-    if current_hour >= 14:
-
-        captains_today = {}
-
-        for assignment in today_assignments:
-
-            captains_today.setdefault(
-                assignment.captain_email,
-                []
-            ).append(assignment)
-
-        for email, surveys in captains_today.items():
-
-            total_surveys = len(surveys)
-            started_surveys = 0
-
-            for assignment in surveys:
-
-                survey_exists = Survey.query.filter(
-                    Survey.section_no == assignment.section_no,
-                    Survey.start_time >= week_start,
-                    Survey.status.in_([
-    "cancelled",
-    "ongoing",
-    "rescheduled",
-    "video_uploaded_pending_form",
-    "groundwork_completed",
-    "video_pending",
-    "completed"
-])
-                ).first()
-
-                if survey_exists:
-                    started_surveys += 1
-
-                    if assignment.status == "missed":
-                        assignment.status = "started"
-                        assignment.alert_acknowledged = False
-
-            if total_surveys == 1:
-
-                if started_surveys == 0:
-
-                    surveys[0].status = "missed"
-
-            elif total_surveys >= 2:
-
-                if started_surveys == 0:
-
-                    surveys[0].status = "missed"
-
-                elif (
-                    current_hour >= 16 and
-                    started_surveys < total_surveys
-                ):
-
-                    for assignment in surveys:
-
-                        if assignment.status != "started":
-
-                            assignment.status = "missed"
-
-    db.session.commit()
 
     missed = SurveyAssignment.query.filter(
         SurveyAssignment.status == "missed",
@@ -444,6 +411,7 @@ def regional_dashboard():
         captains=captains,
 
         weeks=weeks,
+        current_week_no=current_week_no,
         cycles=cycles,
 
         alerts=alerts,

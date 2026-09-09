@@ -5,6 +5,8 @@
 .env.*
 !.env.example
 client_secret.json
+gmail_client_secret.json
+gmail_token.json
 token_drive.pickle
 token_gmail.pickle
 *.pickle

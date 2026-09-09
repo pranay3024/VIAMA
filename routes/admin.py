@@ -38,13 +38,19 @@ from google_drive import (
     PIU_EMAIL_MAPPING,
     download_file_from_drive,
     create_gmail_draft,
-    get_cc_email
+    get_cc_email,
+    get_gmail,
 )
 
 from utils.request_params import (
     safe_date,
     safe_int,
     safe_week
+)
+from utils.defect_report_delay import (
+    build_defect_email_index,
+    find_defect_report_email,
+    working_days_between,
 )
 
 admin_bp = Blueprint(
@@ -53,6 +59,155 @@ admin_bp = Blueprint(
 )
 
 log = logging.getLogger(__name__)
+
+
+@admin_bp.route("/admin/delayed-surveys/manual/<int:survey_id>", methods=["POST"])
+def manual_delayed_survey_update(survey_id):
+    if session.get("role") != "admin":
+        return redirect("/")
+
+    survey = Survey.query.get_or_404(survey_id)
+    end_date_value = request.form.get("manual_end_date", "").strip()
+    sent_at_value = request.form.get("manual_sent_at", "").strip()
+
+    try:
+        if end_date_value:
+            survey.extracted_survey_end_date = datetime.strptime(
+                end_date_value, "%Y-%m-%d"
+            ).date()
+            survey.survey_end_date_confidence = 1.0
+
+        if sent_at_value:
+            survey.defect_report_sent_at = datetime.fromisoformat(
+                sent_at_value
+            )
+            survey.defect_report_sent_confidence = 1.0
+
+        if not survey.extracted_survey_end_date or not survey.defect_report_sent_at:
+            raise ValueError("Both manual dates are required.")
+
+        raw_delay_days = working_days_between(
+            survey.extracted_survey_end_date,
+            survey.defect_report_sent_at.date(),
+        )
+        survey.defect_report_delay_days = (
+            max(raw_delay_days - 3, 0)
+        )
+        survey.defect_report_match_status = "manual"
+        db.session.commit()
+    except Exception as exc:
+        db.session.rollback()
+        log.exception("Manual defect delay update failed for survey %s", survey_id)
+
+    return redirect("/admin/delayed-surveys")
+
+
+@admin_bp.route("/admin/delayed-surveys", methods=["GET", "POST"])
+def delayed_surveys():
+    if session.get("role") != "admin":
+        return redirect("/")
+
+    message = None
+    if request.method == "POST":
+        try:
+            gmail = get_gmail()
+            eligible_surveys = Survey.query.filter(
+                Survey.survey_form_completed.is_(True),
+                Survey.task1_completed.is_(True),
+                Survey.task2_completed.is_(True),
+                Survey.end_survey_pdf.isnot(None),
+            ).all()
+
+            email_index = build_defect_email_index(gmail)
+            processed = 0
+
+            for survey in eligible_surveys:
+                survey.defect_report_match_status = "pending"
+                try:
+                    if not survey.extracted_survey_end_date:
+                        dates = extract_survey_dates_from_drive(
+                            survey.end_survey_pdf
+                        )
+                        survey.extracted_survey_end_date = datetime.strptime(
+                            dates["end_date"], "%Y-%m-%d"
+                        ).date()
+                        survey.survey_end_date_confidence = dates[
+                            "end_confidence"
+                        ]
+
+                    match = find_defect_report_email(survey, email_index, gmail)
+                    if not match:
+                        survey.defect_report_match_status = "not_found"
+                        survey.defect_report_sent_at = None
+                        survey.defect_report_delay_days = None
+                        continue
+
+                    survey.defect_report_sent_at = match["sent_at"]
+                    survey.defect_report_sent_confidence = 1.0
+                    survey.defect_report_email_id = match["message_id"]
+                    raw_delay_days = working_days_between(
+                        survey.extracted_survey_end_date,
+                        match["sent_at"].date(),
+                    )
+                    survey.defect_report_delay_days = (
+                        max(raw_delay_days - 3, 0)
+                    )
+                    survey.defect_report_match_status = "matched"
+                except Exception as exc:
+                    survey.defect_report_match_status = "error"
+                    log.exception(
+                        "Defect delay sync failed for survey %s: %s",
+                        survey.id,
+                        exc,
+                    )
+
+                processed += 1
+                if processed % 25 == 0:
+                    db.session.commit()
+                    log.info(
+                        "Defect delay sync progress: %s/%s surveys",
+                        processed,
+                        len(eligible_surveys),
+                    )
+
+            db.session.commit()
+            message = (
+                f"Delay data synchronized for {processed} eligible surveys. "
+                f"Indexed {len(email_index)} sent messages."
+            )
+        except Exception as exc:
+            db.session.rollback()
+            message = f"Gmail synchronization failed: {exc}"
+
+    selected_week = safe_int(request.args.get("week"))
+    delayed_query = Survey.query.filter(
+        Survey.survey_form_completed.is_(True),
+        Survey.task1_completed.is_(True),
+        Survey.task2_completed.is_(True),
+        Survey.start_time >= datetime(2026, 8, 3),
+        Survey.defect_report_match_status.isnot(None),
+    )
+
+    if selected_week is not None and selected_week >= 7:
+        week_start = datetime(2026, 8, 3) + timedelta(
+            days=(selected_week - 7) * 7
+        )
+        delayed_query = delayed_query.filter(
+            Survey.start_time >= week_start,
+            Survey.start_time < week_start + timedelta(days=7),
+        )
+
+    delayed = delayed_query.order_by(
+        Survey.defect_report_match_status.asc(),
+        Survey.defect_report_delay_days.desc().nullslast(),
+        Survey.extracted_survey_end_date.asc(),
+    ).all()
+
+    return render_template(
+        "admin/delayed_surveys.html",
+        delayed_surveys=delayed,
+        message=message,
+    )
 
 from datetime import datetime
 

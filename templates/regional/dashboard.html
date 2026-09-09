@@ -323,7 +323,8 @@ value="{{ captain.name }}"
 
 <option
 value="{{ w }}"
-{% if request.args.get('week') == w|string %}selected{% endif %}>
+{% if request.args.get('week') == w|string
+or (not request.args and w == current_week_no) %}selected{% endif %}>
 
 Week {{ w }}
 
@@ -396,6 +397,8 @@ Generate
 <th style="width:120px;">End Time</th>
 
 <th>Video<br>Upload Time</th>
+
+<th>PDF<br>Upload Time</th>
 
 <th style="width:160px;">Captain</th>
 
@@ -480,7 +483,7 @@ Generate
 
 {% if survey.video_upload_time %}
 
-    <small style="font-size: 15px; line-height: 1.3;">
+    <small style="font-size: 15px; line-height: 1.3;{% if survey.video_upload_late %}color:red;font-weight:bold;{% endif %}">
         {{ (survey.video_upload_time + timedelta(hours=5, minutes=30)).strftime('%d %b %Y') }}<br>
         {{ (survey.video_upload_time + timedelta(hours=5, minutes=30)).strftime('%I:%M %p') }}
     </small>
@@ -491,6 +494,19 @@ Generate
 
 {% endif %}
 
+</td>
+
+<td>
+{% if survey.survey_pdf_uploaded_at %}
+    <small style="font-size:15px;line-height:1.3;{% if survey.pdf_upload_late %}color:red;font-weight:bold;{% endif %}">
+        {{ (survey.survey_pdf_uploaded_at + timedelta(hours=5, minutes=30)).strftime('%d %b %Y') }}<br>
+        {{ (survey.survey_pdf_uploaded_at + timedelta(hours=5, minutes=30)).strftime('%I:%M %p') }}
+    </small>
+{% elif survey.pdf_upload_late %}
+    <span style="color:red;font-weight:bold;">Delayed</span>
+{% else %}
+    -
+{% endif %}
 </td>
 
     <td style="max-width:160px;

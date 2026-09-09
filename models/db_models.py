@@ -233,6 +233,15 @@ class Survey(db.Model):
 
     task2_completed_at = db.Column(db.DateTime)
 
+    # Cached inputs for the admin defect-report delay check.
+    extracted_survey_end_date = db.Column(db.Date, nullable=True)
+    survey_end_date_confidence = db.Column(db.Float, nullable=True)
+    defect_report_sent_at = db.Column(db.DateTime, nullable=True)
+    defect_report_sent_confidence = db.Column(db.Float, nullable=True)
+    defect_report_email_id = db.Column(db.String(255), nullable=True)
+    defect_report_match_status = db.Column(db.String(30), nullable=True)
+    defect_report_delay_days = db.Column(db.Integer, nullable=True)
+
     defect_report_file = db.Column(db.String(500))
 
     raw_video_excel_file = db.Column(db.String(500))

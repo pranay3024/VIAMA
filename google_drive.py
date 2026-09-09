@@ -447,6 +447,16 @@ def delete_file_from_drive(file_id):
 # --------------------------------------------------
 
 def download_file_from_drive(view_url):
+    if view_url and view_url.startswith(("http://", "https://")):
+        drive_match = re.search(r"/d/([a-zA-Z0-9_-]+)", view_url)
+        if not drive_match and "supabase.co/storage/" in view_url:
+            response = requests.get(view_url, timeout=60)
+            response.raise_for_status()
+            content = response.content
+            if content.startswith(b"%PDF"):
+                return content
+            raise ValueError("Supabase URL did not return a PDF.")
+
     match = re.search(
         r"/d/([a-zA-Z0-9_-]+)",
         view_url

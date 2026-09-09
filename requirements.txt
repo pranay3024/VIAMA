@@ -84,3 +84,4 @@ Werkzeug==3.0.1
 yarl==1.24.2
 zstandard==0.25.0
 google-genai
+holidays>=0.40,<1

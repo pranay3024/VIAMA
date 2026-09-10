@@ -1,8 +1,16 @@
 from flask import Flask
 from extensions import db
+import logging
+import os
+from dotenv import load_dotenv
+
+# Ensure dotenv is loaded before anything else
+# Use the correct path based on whether the app is run from root or VIAMA-main
+env_path = '.env' if os.path.exists('.env') else 'VIAMA-main/.env'
+load_dotenv(env_path)
+
 from routes.regional import regional_bp
 from routes.teamleader import teamleader_bp
-import logging
 
 
 

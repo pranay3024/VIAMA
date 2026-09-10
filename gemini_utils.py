@@ -14,6 +14,10 @@ from pydantic import BaseModel
 from google_drive import download_file_from_drive
 
 
+from dotenv import load_dotenv
+
+load_dotenv()
+
 # Validate API key
 api_key = os.getenv("GEMINI_API_KEY")
 if not api_key:

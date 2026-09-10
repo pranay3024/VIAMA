@@ -110,22 +110,10 @@ def sync_batch(args):
         ).order_by(Survey.id.asc())
 
         if not args.force:
-            query = query.filter(
-                db.or_(
-                    Survey.extracted_survey_end_date.is_(None),
-                    Survey.defect_report_match_status.in_(
-                        [None, "not_found", "error"]
-                    ),
-                )
-            )
-
-        if not args.retry_errors and not args.force:
-            query = query.filter(
-                db.or_(
-                    Survey.defect_report_match_status.is_(None),
-                    Survey.defect_report_match_status != "error",
-                )
-            )
+    # Only process surveys that have NEVER been checked
+           query = query.filter(
+             Survey.defect_report_match_status.is_(None)
+    )
 
         if not args.all:
             query = query.limit(max(args.limit, 1))

@@ -320,6 +320,8 @@ def teamleader_dashboard():
     resurvey_requests=[]
 )
 
+from utils.auto_sync import start_defect_delay_sync_if_ready
+
 @teamleader_bp.route("/teamleader/task1/<int:survey_id>")
 def toggle_task1(survey_id):
 
@@ -337,6 +339,7 @@ def toggle_task1(survey_id):
 )
 
     db.session.commit()
+    start_defect_delay_sync_if_ready(survey)
 
     return ("", 204)
 
@@ -359,6 +362,7 @@ def toggle_task2(survey_id):
 )
 
     db.session.commit()
+    start_defect_delay_sync_if_ready(survey)
 
     return ("", 204)
 
@@ -479,5 +483,6 @@ def toggle_survey_form(survey_id):
 )
 
     db.session.commit()
+    start_defect_delay_sync_if_ready(survey)
 
     return ("", 204)

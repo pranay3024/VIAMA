@@ -26,15 +26,14 @@ def indian_public_holidays(start_date, end_date):
 
 
 def working_days_between(start_date, end_date):
-	"""Count Monday-Saturday dates, excluding Indian public holidays."""
+	"""Count Monday-Saturday dates, only excluding Sundays."""
 	if not start_date or not end_date or end_date <= start_date:
 		return 0
 
-	public_holidays = indian_public_holidays(start_date, end_date)
 	current = start_date + timedelta(days=1)
 	working_days = 0
 	while current <= end_date:
-		if current.weekday() != 6 and current not in public_holidays:
+		if current.weekday() != 6:
 			working_days += 1
 		current += timedelta(days=1)
 	return working_days

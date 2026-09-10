@@ -14,7 +14,7 @@ from models.db_models import User
 from flask import redirect
 from datetime import datetime, timedelta
 from google_drive import download_file_from_drive
-from gemini_utils import extract_survey_dates_from_pdf
+from gemini_utils import extract_survey_dates_from_pdf, extract_survey_dates_from_drive
     
 
 from utils.email_templates import (
@@ -98,6 +98,10 @@ def manual_delayed_survey_update(survey_id):
         db.session.rollback()
         log.exception("Manual defect delay update failed for survey %s", survey_id)
 
+    # Maintain the current week filter query parameter if it exists
+    week_param = request.args.get("week")
+    if week_param:
+        return redirect(url_for("admin.delayed_surveys", week=week_param))
     return redirect("/admin/delayed-surveys")
 
 

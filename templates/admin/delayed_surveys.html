@@ -66,8 +66,8 @@
                         <td>{{ '%.0f%%'|format((survey.defect_report_sent_confidence or 0) * 100) }}</td>
                         <td style="color:red;font-weight:bold;">{{ survey.defect_report_delay_days or 0 }}</td>
                         <td>{{ survey.defect_report_match_status }}</td>
-                        <td>
-                            <form method="post" action="{{ url_for('admin.manual_delayed_survey_update', survey_id=survey.id) }}">
+                                                <td>
+                            <form method="post" action="{{ url_for('admin.manual_delayed_survey_update', survey_id=survey.id, week=request.args.get('week', '')) }}">
                                 <input type="date" name="manual_end_date" value="{{ survey.extracted_survey_end_date.isoformat() if survey.extracted_survey_end_date else '' }}" title="Manual survey end date">
                                <input type="date" name="manual_sent_at" value="{{ survey.defect_report_sent_at.strftime('%Y-%m-%d') if survey.defect_report_sent_at else '' }}" title="Manual defect report sent date">
                                 <button type="submit" class="search-btn">Save</button>

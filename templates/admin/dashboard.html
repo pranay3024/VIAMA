@@ -763,6 +763,14 @@ onclick="clearFilters()">
 
 </button>
 
+<button
+    type="button"
+    class="search-btn"
+    onclick="exportDashboardToExcel()"
+>
+    Export to Excel
+</button>
+
 </div>
     </form>
     
@@ -1938,6 +1946,163 @@ function showCaptainReason(button) {
 
     alert(reason.trim() || "No reason provided.");
 }
+</script>
+
+<script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+
+<script>
+
+function exportDashboardToExcel() {
+
+    const table = document.querySelector(".survey-table");
+
+    if (!table) {
+        alert("Dashboard table not found.");
+        return;
+    }
+
+    const rows = Array.from(
+        table.querySelectorAll("tbody tr")
+    );
+
+    if (!rows.length) {
+        alert("No surveys found to export.");
+        return;
+    }
+
+    // ==========================================
+    // COLUMNS TO EXPORT
+    // 0  S.No.
+    // 1  UPC Code
+    // 2  Section
+    // 3  Cycle
+    // 4  Actual Survey Day
+    // 5  Start Time
+    // 6  End Time
+    // 7  PDF Upload Time
+    // 8  Video Upload Time
+    // 9  Captain
+    // 10 Status
+    // 11 Survey Form
+    // 12 Raw Video
+    // 13 Defect Report
+    //
+    // Road Vision, RV Remark and Details
+    // are intentionally NOT exported.
+    // ==========================================
+
+    const headers = [
+        "S.No.",
+        "UPC Code",
+        "Section",
+        "Cycle",
+        "Actual Survey Day",
+        "Start Time",
+        "End Time",
+        "PDF Upload Time",
+        "Video Upload Time",
+        "Captain",
+        "Status",
+        "Survey Form",
+        "Raw Video",
+        "Defect Report"
+    ];
+
+    const data = [headers];
+
+    rows.forEach(function(row) {
+
+        const cells = Array.from(
+            row.querySelectorAll("td")
+        );
+
+        if (cells.length < 14) {
+            return;
+        }
+
+        const rowData = [];
+
+        for (let i = 0; i < 14; i++) {
+
+            let value = cells[i]
+                .innerText
+                .replace(/\n+/g, " ")
+                .replace(/\s+/g, " ")
+                .trim();
+
+            rowData.push(value);
+        }
+
+        data.push(rowData);
+    });
+
+    if (data.length === 1) {
+        alert("No surveys found to export.");
+        return;
+    }
+
+    // ==========================================
+    // CREATE EXCEL WORKBOOK
+    // ==========================================
+
+    const worksheet = XLSX.utils.aoa_to_sheet(data);
+
+    const workbook = XLSX.utils.book_new();
+
+    XLSX.utils.book_append_sheet(
+        workbook,
+        worksheet,
+        "Survey Dashboard"
+    );
+
+    // ==========================================
+    // COLUMN WIDTHS
+    // ==========================================
+
+    worksheet["!cols"] = [
+        { wch: 7 },    // S.No.
+        { wch: 20 },   // UPC
+        { wch: 12 },   // Section
+        { wch: 8 },    // Cycle
+        { wch: 18 },   // Actual Survey Day
+        { wch: 25 },   // Start Time
+        { wch: 25 },   // End Time
+        { wch: 22 },   // PDF Upload
+        { wch: 22 },   // Video Upload
+        { wch: 25 },   // Captain
+        { wch: 35 },   // Status
+        { wch: 25 },   // Survey Form
+        { wch: 25 },   // Raw Video
+        { wch: 25 }    // Defect Report
+    ];
+
+    // ==========================================
+    // FREEZE HEADER ROW
+    // ==========================================
+
+    worksheet["!freeze"] = {
+        xSplit: 0,
+        ySplit: 1
+    };
+
+    // ==========================================
+    // FILE NAME
+    // ==========================================
+
+    const today = new Date();
+
+    const dateString =
+        today.getFullYear() + "-" +
+        String(today.getMonth() + 1).padStart(2, "0") + "-" +
+        String(today.getDate()).padStart(2, "0");
+
+    XLSX.writeFile(
+        workbook,
+        "VIAMA_Survey_Dashboard_" + dateString + ".xlsx"
+    );
+
+}
+
 </script>
 
     </div>

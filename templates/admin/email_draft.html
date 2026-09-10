@@ -230,29 +230,25 @@ class="search-btn">
 
 <div class="form-group">
 
-<label>Survey Start Date</label>
+<label>Survey Start Date *</label>
 
 <input
 type="date"
 name="start_date"
-value="{{ start_date }}">
-
-<small
-id="dateExtractionStatus"
-style="display:block;margin-top:6px;color:#666;">
-Select a survey to extract dates from its survey form.
-</small>
+value="{{ start_date }}"
+required>
 
 </div>
 
 <div class="form-group">
 
-<label>Survey End Date</label>
+<label>Survey End Date *</label>
 
 <input
 type="date"
 name="end_date"
-value="{{ end_date }}">
+value="{{ end_date }}"
+required>
 
 </div>
 

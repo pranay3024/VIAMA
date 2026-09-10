@@ -14,10 +14,9 @@ from models.db_models import User
 from flask import redirect
 from datetime import datetime, timedelta
 from google_drive import download_file_from_drive
-from gemini_utils import (
-    extract_survey_dates_from_drive,
-    extract_survey_dates_from_pdf,
-)
+from gemini_utils import extract_survey_dates_from_pdf
+    
+
 from utils.email_templates import (
     build_subject,
     build_email_body
@@ -2481,16 +2480,11 @@ def email_draft(email_type):
         # Keep manually entered values, but fill missing values from the
         # signed survey form when the draft is generated directly.
         if not start_date or not end_date:
-            if survey.end_survey_pdf:
-                try:
-                    extracted_dates = extract_survey_dates_from_drive(
-                        survey.end_survey_pdf
-                    )
-                except Exception:
-                    extracted_dates = {}
-
-                start_date = start_date or extracted_dates.get("start_date") or ""
-                end_date = end_date or extracted_dates.get("end_date") or ""
+         flash(
+            "Survey Start Date and Survey End Date are mandatory.",
+            "warning"
+        )
+         return redirect(request.url)
 
         if selected_section.startswith("missed-"):
          survey.cycle_no = assignment.cycle_no

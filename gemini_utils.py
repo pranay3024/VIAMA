@@ -222,7 +222,7 @@ Rules:
     return dates
 
 
-def extract_survey_dates_from_drive(view_url):
+'''def extract_survey_dates_from_drive(view_url):
     if view_url in _date_cache:
         print("[GEMINI SURVEY DATES] using cached validated dates", flush=True)
         return _date_cache[view_url]
@@ -233,5 +233,5 @@ def extract_survey_dates_from_drive(view_url):
 
     dates = extract_survey_dates_from_pdf(pdf_bytes)
     _date_cache[view_url] = dates
-    return dates
+    return date'''
 

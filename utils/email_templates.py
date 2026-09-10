@@ -68,8 +68,7 @@ def build_subject(
         return (
             f"[ZONE-E] - Submission of Cancelled Survey Form "
             f"for NH-[{survey.nh_number}] "
-            f"[{survey.stretch_code}], "
-            f"Survey ID - [{sid}]"
+            f"[{survey.stretch_code}]"
     )
 
     return (

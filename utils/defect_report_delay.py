@@ -127,9 +127,9 @@ def find_defect_report_email(survey, email_index, gmail=None):
 	]
 	if gmail:
 		exact_line = re.compile(
-			r"stretch\s*no\.?\s*([a-z0-9./&()\s-]+?)\s*[_-]\s*cycle\s*([0-9]+)",
-			re.IGNORECASE,
-		)
+        r"stretch\s*no\.?\s*([a-z0-9./&()\s-]+?)\s*[-_]\s*cycle\s*([0-9]+)",
+        re.IGNORECASE,
+)
 		verified = []
 		for item in matches:
 			message = gmail.users().messages().get(

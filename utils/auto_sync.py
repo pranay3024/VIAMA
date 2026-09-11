@@ -255,18 +255,10 @@ def start_defect_delay_sync_if_ready(survey):
     from flask import current_app
 
     app = current_app._get_current_object()
-
-    thread = Thread(
-        target=sync_defect_delay_for_survey,
-        args=(app, survey.id),
-        daemon=True,
-    )
-
-    thread.start()
-
     log.info(
-        "Started automatic defect delay sync for survey %s "
+        "Running automatic defect delay sync for survey %s "
         "(current status=%s)",
         survey.id,
         survey.defect_report_match_status,
     )
+    sync_defect_delay_for_survey(app, survey.id)

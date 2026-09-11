@@ -13,7 +13,7 @@ import argparse
 import logging
 import os
 import sys
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from dotenv import load_dotenv
 from googleapiclient.errors import HttpError
@@ -67,6 +67,20 @@ def parse_args():
         help="Only process surveys starting on/after this date (default: 2026-08-03).",
     )
     parser.add_argument(
+        "--week",
+        type=int,
+        help="Only process one portal week, where Week 7 starts on 2026-08-03.",
+    )
+    parser.add_argument(
+        "--section",
+        help="Only process surveys for one section/stretch number.",
+    )
+    parser.add_argument(
+        "--cycle",
+        type=int,
+        help="Only process one cycle number.",
+    )
+    parser.add_argument(
         "--reset",
         action="store_true",
         help="Clear Week 7+ cached results before processing. Use only for a fresh test run.",
@@ -82,11 +96,19 @@ def is_quota_error(error):
 def sync_batch(args):
     app = create_app()
     with app.app_context():
+        from_date = datetime.strptime(args.from_date, "%Y-%m-%d")
+        week_end = None
+        if args.week is not None:
+            if args.week < 7:
+                raise ValueError("--week must be 7 or greater")
+            from_date = datetime(2026, 8, 3) + timedelta(
+                days=(args.week - 7) * 7
+            )
+            week_end = from_date + timedelta(days=7)
+
         if args.reset:
             reset_count = Survey.query.filter(
-                Survey.start_time >= datetime.strptime(
-                    args.from_date, "%Y-%m-%d"
-                )
+                Survey.start_time >= from_date
             ).update({
                 Survey.extracted_survey_end_date: None,
                 Survey.survey_end_date_confidence: None,
@@ -104,10 +126,15 @@ def sync_batch(args):
             Survey.task1_completed.is_(True),
             Survey.task2_completed.is_(True),
             Survey.end_survey_pdf.isnot(None),
-            Survey.start_time >= datetime.strptime(
-                args.from_date, "%Y-%m-%d"
-            ),
+            Survey.start_time >= from_date,
         ).order_by(Survey.id.asc())
+
+        if week_end is not None:
+            query = query.filter(Survey.start_time < week_end)
+        if args.section:
+            query = query.filter(Survey.section_no == args.section)
+        if args.cycle is not None:
+            query = query.filter(Survey.cycle_no == args.cycle)
 
         if not args.force:
     # Only process surveys that have NEVER been checked
@@ -121,7 +148,7 @@ def sync_batch(args):
         surveys = query.all()
         print(
             f"Eligible Week 7+ batch: {len(surveys)} survey(s) "
-            f"from {args.from_date}"
+            f"from {from_date.date()}"
         )
         if not surveys:
             print("Nothing to process. Use --retry-errors or --force if needed.")

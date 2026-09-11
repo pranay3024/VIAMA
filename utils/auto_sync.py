@@ -1,6 +1,5 @@
 import logging
 from datetime import datetime
-from threading import Thread
 
 from extensions import db
 from models.db_models import Survey
@@ -9,7 +8,7 @@ from gemini_utils import extract_survey_dates_from_drive
 from utils.defect_report_delay import (
     build_defect_email_index,
     find_defect_report_email,
-    working_days_between,
+    defect_report_delay_days,
 )
 
 log = logging.getLogger(__name__)
@@ -189,14 +188,9 @@ def sync_defect_delay_for_survey(app, survey_id):
             # STEP 5:
             # CALCULATE DELAY
             # --------------------------------------------------
-            raw_delay_days = working_days_between(
+            survey.defect_report_delay_days = defect_report_delay_days(
                 survey.extracted_survey_end_date,
                 match["sent_at"].date(),
-            )
-
-            survey.defect_report_delay_days = max(
-                raw_delay_days - 3,
-                0,
             )
 
             survey.defect_report_match_status = "matched"

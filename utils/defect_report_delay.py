@@ -39,6 +39,14 @@ def working_days_between(start_date, end_date):
 	return working_days
 
 
+def defect_report_delay_days(start_date, sent_date, allowed_days=3):
+	"""Return delay days after the allowed Monday-Saturday working days."""
+	return max(
+		working_days_between(start_date, sent_date) - allowed_days,
+		0,
+	)
+
+
 def _normalize(value):
 	return re.sub(r"[^a-z0-9]", "", (value or "").lower())
 
@@ -80,14 +88,23 @@ def _message_matches_subject(survey, subject):
 	return _message_matches(survey, subject)
 
 
-def build_defect_email_index(gmail):
-	"""Read Sent defect-report subjects once and index them by identifiers."""
+def build_defect_email_index(gmail, survey=None):
+	"""Read Sent defect-report subjects and index them by identifiers.
+
+	When a survey is supplied, narrow Gmail's search to its identifiers so a
+	request-triggered sync does not scan the entire Sent mailbox.
+	"""
 	matches = []
 	page_token = None
+	query = 'in:sent has:attachment subject:"Submission of Survey Report"'
+	if survey:
+		for identifier in (survey.nh_number, survey.upc_code):
+			if identifier:
+				query += ' "{}"'.format(str(identifier).replace('"', ''))
 	while True:
 		params = {
 			"userId": "me",
-			"q": 'in:sent has:attachment subject:"Submission of Survey Report"',
+			"q": query,
 			"maxResults": 500,
 		}
 		if page_token:

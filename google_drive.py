@@ -54,6 +54,10 @@ DRIVE_TOKEN_PATH = os.path.join(_HERE, "token_drive.pickle")
 GMAIL_TOKEN_PATH = os.path.join(_HERE, "token_gmail.pickle")
 
 DRIVE_SCOPES = ["https://www.googleapis.com/auth/drive"]
+GMAIL_SCOPES = [
+    "https://www.googleapis.com/auth/gmail.compose",
+    "https://www.googleapis.com/auth/gmail.readonly",
+]
 
 _clients = {}
 _lock = threading.Lock()
@@ -187,6 +191,19 @@ def _client(name):
                 )
 
                 source = "token_gmail.pickle"
+
+            granted_scopes = set(getattr(creds, "scopes", None) or [])
+            missing_scopes = [
+                scope for scope in GMAIL_SCOPES
+                if scope not in granted_scopes
+            ]
+            if missing_scopes:
+                raise GoogleUnavailable(
+                    "Gmail credentials from {} are missing required scope(s): {}. "
+                    "Regenerate the Gmail OAuth token with generate_gmail_token.py "
+                    "and update GMAIL_TOKEN_JSON on Vercel."
+                    .format(source, ", ".join(missing_scopes))
+                )
 
             service, version = "gmail", "v1"
 

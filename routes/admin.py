@@ -50,6 +50,7 @@ from utils.defect_report_delay import (
     build_defect_email_index,
     find_defect_report_email,
     working_days_between,
+    defect_report_delay_days,
 )
 
 admin_bp = Blueprint(
@@ -85,12 +86,9 @@ def manual_delayed_survey_update(survey_id):
         if not survey.extracted_survey_end_date or not survey.defect_report_sent_at:
             raise ValueError("Both manual dates are required.")
 
-        raw_delay_days = working_days_between(
+        survey.defect_report_delay_days = defect_report_delay_days(
             survey.extracted_survey_end_date,
             survey.defect_report_sent_at.date(),
-        )
-        survey.defect_report_delay_days = (
-            max(raw_delay_days - 3, 0)
         )
         survey.defect_report_match_status = "manual"
         db.session.commit()
@@ -172,50 +170,9 @@ def delayed_surveys():
                     survey.defect_report_sent_confidence = 1.0
                     survey.defect_report_email_id = match["message_id"]
 
-                    # ====================================================
-                    # DELAY CALCULATION
-                    #
-                    # Survey end date itself is NOT counted.
-                    # Counting starts from the next day.
-                    #
-                    # Monday-Saturday = working day
-                    # Sunday = non-working day
-                    #
-                    # Email sent date IS included.
-                    # ====================================================
-
-                    start_date = survey.extracted_survey_end_date
-                    sent_date = match["sent_at"].date()
-
-                    working_days = 0
-
-                    # Start counting from the day AFTER survey end date
-                    current_date = start_date + timedelta(days=1)
-
-                    # Include the email sent date
-                    while current_date <= sent_date:
-
-                        # Monday = 0
-                        # Tuesday = 1
-                        # Wednesday = 2
-                        # Thursday = 3
-                        # Friday = 4
-                        # Saturday = 5
-                        # Sunday = 6
-                        #
-                        # Therefore Sunday is excluded.
-                        if current_date.weekday() != 6:
-                            working_days += 1
-
-                        current_date += timedelta(days=1)
-
-                    # ------------------------------------------------
-                    # First 3 working days are allowed.
-                    # Anything after that is considered delay.
-                    # ------------------------------------------------
-                    survey.defect_report_delay_days = max(
-                        working_days - 3,
-                        0
+                    survey.defect_report_delay_days = defect_report_delay_days(
+                        survey.extracted_survey_end_date,
+                        match["sent_at"].date(),
                     )
 
                     survey.defect_report_match_status = "matched"
@@ -272,6 +229,8 @@ def delayed_surveys():
         Survey.defect_report_match_status.isnot(None),
     )
 
+    summary_surveys = delayed_query.all()
+
     # ------------------------------------------------------------
     # Week filter
     # ------------------------------------------------------------
@@ -295,6 +254,18 @@ def delayed_surveys():
         Survey.extracted_survey_end_date.asc(),
     ).all()
 
+    week_totals = {week: 0 for week in range(7, 53)}
+    for survey in summary_surveys:
+        if not survey.start_time or not survey.defect_report_delay_days:
+            continue
+        survey_week = 7 + (
+            (survey.start_time.date() - datetime(2026, 8, 3).date()).days // 7
+        )
+        if survey_week in week_totals:
+            week_totals[survey_week] += survey.defect_report_delay_days
+
+    total_delay_days = sum(week_totals.values())
+
     # ============================================================
     # Render page
     # ============================================================
@@ -302,6 +273,8 @@ def delayed_surveys():
     return render_template(
         "admin/delayed_surveys.html",
         delayed_surveys=delayed,
+        week_totals=week_totals or {},
+        total_delay_days=total_delay_days or 0,
         message=message,
     )
 

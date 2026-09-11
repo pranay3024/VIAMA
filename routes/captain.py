@@ -851,6 +851,10 @@ def complete_survey():
 
             db.session.commit()
 
+            from utils.auto_sync import start_defect_delay_sync_if_ready
+
+            start_defect_delay_sync_if_ready(survey)
+
             # -----------------------------------
             # CLEAR ONLY CURRENT SURVEY
             # -----------------------------------
@@ -1623,6 +1627,10 @@ def reupload_survey_pdf(survey_id):
         survey.pdf_reupload_reason = None
 
         db.session.commit()
+
+        from utils.auto_sync import start_defect_delay_sync_if_ready
+
+        start_defect_delay_sync_if_ready(survey)
 
         # -----------------------------------
         # SUCCESS

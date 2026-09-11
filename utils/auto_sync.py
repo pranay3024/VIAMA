@@ -63,9 +63,8 @@ def sync_defect_delay_for_survey(app, survey_id):
             # DO NOT REPROCESS ALREADY MATCHED SURVEYS
             #
             # IMPORTANT:
-            # "not_found" and "error" are intentionally allowed
-            # to run again because the Gmail email may arrive later
-            # or a temporary API error may have occurred.
+            # The check is intentionally one-shot. A manual admin sync can
+            # be used if a later retry is required.
             # --------------------------------------------------
             if survey.defect_report_match_status == "matched":
                 log.info(
@@ -235,9 +234,8 @@ def start_defect_delay_sync_if_ready(survey):
     Start the automatic defect delay sync when all required
     conditions are satisfied.
 
-    IMPORTANT:
-    Surveys with "not_found" or "error" are allowed to be
-    retried. Only "matched" surveys are skipped.
+    The check is one-shot. Any existing status means the survey was
+    already checked and must not start another automatic run.
     """
 
     if not (
@@ -248,8 +246,8 @@ def start_defect_delay_sync_if_ready(survey):
     ):
         return
 
-    # Already successfully matched.
-    if survey.defect_report_match_status == "matched":
+    # Run only once after all required conditions become true.
+    if survey.defect_report_match_status is not None:
         return
 
     from flask import current_app

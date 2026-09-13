@@ -356,6 +356,7 @@ Clear
 <thead>
 
 <tr>
+<th>S.No.</th>
 <th>UPC Code</th>
 <th>Section</th>
 <th>Cycle</th>
@@ -376,6 +377,10 @@ Clear
 {% for survey in all_surveys %}
 
 <tr>
+
+<td>
+{{ loop.index }}
+</td>
 
 <td>
 {{ survey.upc_code }}

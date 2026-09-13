@@ -2576,6 +2576,7 @@ def request_pdf_reupload(survey_id, reason):
             details=[{"field": "reason", "issue": "required, non-empty"}],
         )
     survey.pdf_reupload_required = True
+    survey.survey_pdf_uploaded_at = None
     survey.pdf_reupload_reason = reason.strip()
     survey.pdf_reupload_count = (survey.pdf_reupload_count or 0) + 1
     db.session.commit()
@@ -2593,6 +2594,7 @@ def complete_pdf_reupload(survey_id, pdf_url):
             code="reupload_not_requested",
         )
     survey.end_survey_pdf = pdf_url
+    survey.survey_pdf_uploaded_at = utc_now()
     survey.pdf_reupload_required = False
     survey.pdf_reupload_reason = None
     db.session.commit()

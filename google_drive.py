@@ -428,7 +428,7 @@ def upload_file_to_drive(
         body=metadata,
         media_body=media,
         fields="id"
-    ).execute()
+    ).execute(num_retries=5)
 
     drive.permissions().create(
         fileId=file["id"],
@@ -436,7 +436,7 @@ def upload_file_to_drive(
             "type": "anyone",
             "role": "reader"
         }
-    ).execute()
+    ).execute(num_retries=5)
 
     return {
 

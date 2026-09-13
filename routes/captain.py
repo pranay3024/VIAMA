@@ -1617,6 +1617,7 @@ def reupload_survey_pdf(survey_id):
         # -----------------------------------
 
         survey.end_survey_pdf = new_pdf_url
+        survey.survey_pdf_uploaded_at = datetime.utcnow()
 
         survey.pdf_reupload_required = False
 

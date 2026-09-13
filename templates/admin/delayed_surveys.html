@@ -19,7 +19,7 @@
     </div>
 
     <div class="dashboard-content">
-        <form method="get" style="display:flex;align-items:center;gap:10px;margin-bottom:15px;">
+        <form method="get" style="display:flex;align-items:center;gap:10px;margin-bottom:15px;flex-wrap:wrap;">
             <label for="delay-week">Week</label>
             <select id="delay-week" name="week">
                 <option value="">All Week 7 onwards ({{ total_delay_days|default(0) }} days)</option>
@@ -29,7 +29,22 @@
                     </option>
                 {% endfor %}
             </select>
+            <label for="delay-team">Team</label>
+            <select id="delay-team" name="team">
+                <option value="">All Teams</option>
+                <option value="Krish" {% if selected_team == 'Krish' %}selected{% endif %}>Krish (North-East)</option>
+                <option value="Godbole" {% if selected_team == 'Godbole' %}selected{% endif %}>Godbole (Odisha)</option>
+                <option value="Aspizo" {% if selected_team == 'Aspizo' %}selected{% endif %}>Aspizo (UP-Jharkhand)</option>
+            </select>
+            <label for="delay-state">State</label>
+            <select id="delay-state" name="state">
+                <option value="">All States</option>
+                {% for state_value, state_label in [('WEST BENGAL', 'West Bengal'), ('ODISHA', 'Odisha'), ('UP', 'UP'), ('JHARKHAND', 'Jharkhand'), ('BIHAR', 'Bihar'), ('ASSAM', 'Assam'), ('MEGHALAYA', 'Meghalaya')] %}
+                    <option value="{{ state_value }}" {% if selected_state == state_value %}selected{% endif %}>{{ state_label }}</option>
+                {% endfor %}
+            </select>
             <button type="submit" class="search-btn">Filter</button>
+            <a href="{{ url_for('admin.delayed_surveys') }}" class="search-btn">Clear Filters</a>
         </form>
 
         <p style="font-weight:bold;margin:0 0 15px;">

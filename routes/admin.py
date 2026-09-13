@@ -98,9 +98,14 @@ def manual_delayed_survey_update(survey_id):
 
     # Maintain the current week filter query parameter if it exists
     week_param = request.args.get("week")
-    if week_param:
-        return redirect(url_for("admin.delayed_surveys", week=week_param))
-    return redirect("/admin/delayed-surveys")
+    team_param = request.args.get("team")
+    state_param = request.args.get("state")
+    return redirect(url_for(
+        "admin.delayed_surveys",
+        week=week_param or None,
+        team=team_param or None,
+        state=state_param or None,
+    ))
 
 
 @admin_bp.route("/admin/delayed-surveys", methods=["GET", "POST"])
@@ -220,6 +225,13 @@ def delayed_surveys():
     selected_week = safe_int(
         request.args.get("week")
     )
+    selected_team = request.args.get("team", "").strip()
+    selected_state = request.args.get("state", "").strip()
+    team_states = {
+        "Krish": ("WEST BENGAL", "ASSAM", "BIHAR", "MEGHALAYA"),
+        "Godbole": ("ODISHA",),
+        "Aspizo": ("UP", "UTTAR PRADESH", "JHARKHAND"),
+    }
 
     delayed_query = Survey.query.filter(
         Survey.survey_form_completed.is_(True),
@@ -228,6 +240,18 @@ def delayed_surveys():
         Survey.start_time >= datetime(2026, 8, 3),
         Survey.defect_report_match_status.isnot(None),
     )
+
+    if selected_team in team_states:
+        delayed_query = delayed_query.filter(
+            Survey.state.in_(team_states[selected_team])
+        )
+    if selected_state:
+        state_values = (
+            ("UP", "UTTAR PRADESH")
+            if selected_state == "UP"
+            else (selected_state,)
+        )
+        delayed_query = delayed_query.filter(Survey.state.in_(state_values))
 
     summary_surveys = delayed_query.all()
 
@@ -275,6 +299,8 @@ def delayed_surveys():
         delayed_surveys=delayed,
         week_totals=week_totals or {},
         total_delay_days=total_delay_days or 0,
+        selected_team=selected_team,
+        selected_state=selected_state,
         message=message,
     )
 
@@ -1768,6 +1794,7 @@ def request_pdf_reupload(survey_id):
     survey = Survey.query.get_or_404(survey_id)
 
     survey.pdf_reupload_required = True
+    survey.survey_pdf_uploaded_at = None
 
     survey.pdf_reupload_reason = request.form["reason"]
 

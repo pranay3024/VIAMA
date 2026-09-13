@@ -69,6 +69,9 @@
                     <tr>
                         <th>S.No.</th>
                         <th>Stretch / Cycle</th>
+                        <th>Start Time</th>
+                        <th>End Time</th>
+                        <th>Video Upload Time</th>
                         <th>Survey End Date</th>
                         <th>End Date Confidence</th>
                         <th>Defect Report Sent</th>
@@ -83,6 +86,9 @@
                     <tr>
                         <td>{{ loop.index }}</td>
                         <td>{{ survey.section_no }}_Cycle{{ survey.cycle_no }}</td>
+                        <td>{{ survey.display_start_time.strftime('%d/%m/%Y %I:%M %p') if survey.display_start_time else '-' }}</td>
+                        <td>{{ survey.display_end_time.strftime('%d/%m/%Y %I:%M %p') if survey.display_end_time else '-' }}</td>
+                        <td>{{ survey.display_video_upload_time.strftime('%d/%m/%Y %I:%M %p') if survey.display_video_upload_time else '-' }}</td>
                         <td>{{ survey.extracted_survey_end_date.strftime('%d/%m/%Y') if survey.extracted_survey_end_date else '-' }}</td>
                         <td>{{ '%.0f%%'|format((survey.survey_end_date_confidence or 0) * 100) }}</td>
                         <td>{{ survey.defect_report_sent_at.strftime('%d/%m/%Y') if survey.defect_report_sent_at else '-' }}</td>
@@ -98,7 +104,7 @@
                         </td>
                     </tr>
                 {% else %}
-                    <tr><td colspan="9">No delayed surveys found.</td></tr>
+                    <tr><td colspan="12">No delayed surveys found.</td></tr>
                 {% endfor %}
                 </tbody>
             </table>

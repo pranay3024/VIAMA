@@ -278,6 +278,20 @@ def delayed_surveys():
         Survey.extracted_survey_end_date.asc(),
     ).all()
 
+    ist_offset = timedelta(hours=5, minutes=30)
+
+    for survey in delayed:
+        survey.display_start_time = (
+            survey.start_time + ist_offset if survey.start_time else None
+        )
+        survey.display_end_time = (
+            survey.end_time + ist_offset if survey.end_time else None
+        )
+        survey.display_video_upload_time = (
+            survey.video_upload_time + ist_offset
+            if survey.video_upload_time else None
+        )
+
     week_totals = {week: 0 for week in range(7, 53)}
     for survey in summary_surveys:
         if not survey.start_time or not survey.defect_report_delay_days:

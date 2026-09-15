@@ -2223,7 +2223,8 @@ def survey_dates_for_gmail_draft(survey_id):
     print(
         f"[GEMINI SURVEY DATES] database survey_id={survey_id} "
         f"section={survey.section_no} stretch={survey.stretch_code} "
-        f"has_form_url={bool(survey.end_survey_pdf)}",
+        f"has_form_url={bool(survey.end_survey_pdf)} "
+        f"cached_end_date={survey.extracted_survey_end_date}",
         flush=True,
     )
     if not survey.end_survey_pdf:
@@ -2232,6 +2233,21 @@ def survey_dates_for_gmail_draft(survey_id):
             flush=True,
         )
         return jsonify({"start_date": None, "end_date": None})
+
+    # Prefer the date already saved in the database so the gmail-draft page
+    # never burns free-tier Gemini quota for a survey we already extracted.
+    # The Gemini extractor only returns an end date (no start date), so this
+    # endpoint never has a start date to expose.
+    if survey.extracted_survey_end_date:
+        print(
+            f"[GEMINI SURVEY DATES] survey_id={survey_id} "
+            f"using stored end_date={survey.extracted_survey_end_date}",
+            flush=True,
+        )
+        return jsonify({
+            "start_date": None,
+            "end_date": survey.extracted_survey_end_date.isoformat(),
+        })
 
     try:
         dates = extract_survey_dates_from_drive(survey.end_survey_pdf)
@@ -2248,11 +2264,17 @@ def survey_dates_for_gmail_draft(survey_id):
             f"[GEMINI SURVEY DATES] survey_id={survey_id} error={exc}",
             flush=True,
         )
-        dates = {"start_date": None, "end_date": None}
+        return jsonify({"start_date": None, "end_date": None}), 502
+
+    survey.extracted_survey_end_date = datetime.strptime(
+        dates["end_date"], "%Y-%m-%d"
+    ).date()
+    survey.survey_end_date_confidence = dates["end_confidence"]
+    db.session.commit()
 
     return jsonify({
-        "start_date": dates.get("start_date"),
-        "end_date": dates.get("end_date"),
+        "start_date": None,
+        "end_date": survey.extracted_survey_end_date.isoformat(),
     })
 
 @admin_bp.route(

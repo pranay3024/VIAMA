@@ -2,6 +2,8 @@ import io
 import json
 import os
 import re
+import threading
+import time
 from datetime import date, datetime
 from typing import Optional
 
@@ -29,6 +31,44 @@ client = genai.Client(api_key=api_key)
 MODEL_ID = (os.getenv("GEMINI_MODEL") or "gemini-3.6-flash").strip()
 
 _date_cache = {}
+
+
+# Google can drop connections when several syncs run at once (SSL EOF /
+# RemoteDisconnected). Serialising extraction avoids the connection churn that
+# triggers those drops.
+_EXTRACT_LOCK = threading.Lock()
+
+
+def _safe_generate(contents, config):
+    """Call generate_content with retries on transient transport errors."""
+    import httpx
+    from http.client import RemoteDisconnected
+
+    last_exc = None
+    for attempt in range(4):
+        try:
+            return client.models.generate_content(
+                model=MODEL_ID,
+                contents=contents,
+                config=config,
+            )
+        except (
+            httpx.ReadError,
+            httpx.ConnectError,
+            httpx.ReadTimeout,
+            httpx.RemoteProtocolError,
+            ConnectionError,
+            RemoteDisconnected,
+        ) as exc:
+            last_exc = exc
+            print(
+                f"[GEMINI SURVEY DATES] transient error, "
+                f"attempt {attempt + 1}/4: {exc}",
+                flush=True,
+            )
+            if attempt < 3:
+                time.sleep(1 + attempt * 2)
+    raise last_exc
 
 
 class SurveyDates(BaseModel):
@@ -152,16 +192,15 @@ Rules:
         response_schema=SurveyDates,
     )
 
-    response = client.models.generate_content(
-        model=MODEL_ID,
-        contents=[
+    response = _safe_generate(
+        [
             "COMPLETE FIRST PAGE:",
             types.Part.from_bytes(data=full_page_bytes, mime_type="image/png"),
             "ENLARGED DATE HEADER:",
             types.Part.from_bytes(data=header_bytes, mime_type="image/png"),
             prompt,
         ],
-        config=config,
+        config,
     )
 
     data = None
@@ -203,15 +242,14 @@ Rules:
                 response_mime_type="application/json",
                 response_schema=SurveyDates,
             )
-            retry_response = client.models.generate_content(
-                model=MODEL_ID,
-                contents=[
+            retry_response = _safe_generate(
+                [
                     "Return only complete JSON. Do not truncate.",
                     types.Part.from_bytes(data=full_page_bytes, mime_type="image/png"),
                     types.Part.from_bytes(data=header_bytes, mime_type="image/png"),
                     prompt,
                 ],
-                config=retry_config,
+                retry_config,
             )
             retry_text = (getattr(retry_response, "text", "") or "").strip()
             retry_match = re.search(r"\{.*\}", retry_text, flags=re.DOTALL)
@@ -241,11 +279,14 @@ def extract_survey_dates_from_drive(view_url):
         print("[GEMINI SURVEY DATES] using cached validated dates", flush=True)
         return _date_cache[view_url]
 
-    print("[GEMINI SURVEY DATES] downloading survey form from Drive", flush=True)
-    pdf_bytes = download_file_from_drive(view_url)
-    print(f"[GEMINI SURVEY DATES] downloaded PDF bytes: {len(pdf_bytes)}", flush=True)
+    # Serialise the download + model call so burst-triggered background syncs
+    # do not hammer Drive and Gemini simultaneously (which drops connections).
+    with _EXTRACT_LOCK:
+        print("[GEMINI SURVEY DATES] downloading survey form from Drive", flush=True)
+        pdf_bytes = download_file_from_drive(view_url)
+        print(f"[GEMINI SURVEY DATES] downloaded PDF bytes: {len(pdf_bytes)}", flush=True)
 
-    dates = extract_survey_dates_from_pdf(pdf_bytes)
-    _date_cache[view_url] = dates
-    return dates
+        dates = extract_survey_dates_from_pdf(pdf_bytes)
+        _date_cache[view_url] = dates
+        return dates
 

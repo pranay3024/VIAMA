@@ -5943,6 +5943,17 @@ def survey_forms():
         .all()
     )
 
+    # Lazy extraction: this API is the place the consumer checks for the
+    # survey end date, so any uploaded form whose date is still missing
+    # (quota failure at upload, older flow, etc.) gets a one-time best-effort
+    # extraction here. Already-extracted dates are never touched again -
+    # the helper is a no-op when the date exists.
+    from utils.auto_sync import extract_survey_end_date_if_missing
+
+    for survey in surveys:
+        if not survey.extracted_survey_end_date:
+            extract_survey_end_date_if_missing(survey)
+
     rows = []
 
     for survey in surveys:
@@ -5957,11 +5968,6 @@ def survey_forms():
             "survey_day": survey.survey_day,
             "status": survey.status,
             "pdf_url": survey.end_survey_pdf,
-            "pdf_uploaded_at": (
-                survey.survey_pdf_uploaded_at.isoformat()
-                if survey.survey_pdf_uploaded_at
-                else None
-            ),
             "end_date": (
                 survey.extracted_survey_end_date.isoformat()
                 if survey.extracted_survey_end_date

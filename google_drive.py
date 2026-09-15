@@ -520,17 +520,35 @@ def download_file_from_drive(view_url):
         f"https://drive.google.com/uc?export=download&id={file_id}&confirm=t",
     ]
 
-    for public_url in public_urls:
-        response = requests.get(public_url, timeout=60)
-        response.raise_for_status()
-        content = response.content
+    # Drive is prone to dropping connections when a few syncs hit it at once
+    # (SSL EOF / RemoteDisconnected). Retry each public URL with backoff before
+    # surfacing the failure.
+    import time as _time
 
-        if content.startswith(b"%PDF"):
-            print(
-                f"[DRIVE DOWNLOAD] public download succeeded for file_id={file_id}",
-                flush=True,
-            )
-            return content
+    for public_url in public_urls:
+        for attempt in range(3):
+            try:
+                response = requests.get(public_url, timeout=60)
+                response.raise_for_status()
+                content = response.content
+
+                if content.startswith(b"%PDF"):
+                    print(
+                        f"[DRIVE DOWNLOAD] public download succeeded for file_id={file_id}",
+                        flush=True,
+                    )
+                    return content
+
+                # The page returned but not a PDF - do not retry this URL shape.
+                break
+            except (requests.ConnectionError, requests.Timeout) as exc:
+                print(
+                    f"[DRIVE DOWNLOAD] attempt {attempt + 1}/3 failed for file_id={file_id}: {exc}",
+                    flush=True,
+                )
+                if attempt < 2:
+                    _time.sleep(1 + attempt * 2)
+        content = ""
 
     raise ValueError(
         "The Google Drive file could not be downloaded through the API or public link. "

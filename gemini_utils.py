@@ -219,7 +219,7 @@ Rules:
     if not dates["end_date"]:
         raise ValueError(f"Gemini did not return a valid end date. Extracted: {dates}")
 
-    if dates["end_confidence"] < 0.85:
+    if dates["end_confidence"] < 0.5:
         raise ValueError(f"Gemini date confidence is too low: {dates}")
 
     print(f"[GEMINI SURVEY DATES] parsed result: {dates}", flush=True)

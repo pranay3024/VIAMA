@@ -47,7 +47,15 @@ def _valid_date(value):
     value = re.sub(r"(\d{1,2})(st|nd|rd|th)\b", r"\1", value.strip(), flags=re.IGNORECASE)
     value = re.sub(r"[,]+", " ", value)
     value = re.sub(r"\s+", " ", value).strip()
-    normalized = value.replace("/", "-").replace(".", "-")
+    normalized = value.replace("|", "-").replace("/", "-").replace(".", "-")
+    # Collapse spaces around separators so e.g. "31 - 08 - 026" parses. Multi-word
+    # month names ("4 September 2026") are unaffected (they have no dashes).
+    normalized = re.sub(r"\s*-\s*", "-", normalized)
+    normalized = re.sub(r"\s+", " ", normalized).strip().strip("-")
+    # Short 3-digit years on this survey form are abbreviated e.g. "026" = 2026.
+    # Expand "31-08-026" -> "31-08-2026". The leading zero is consumed so the
+    # captured group is just the two-digit year.
+    normalized = re.sub(r"-0(\d{2})$", r"-20\1", normalized)
     date_formats = (
         "%d-%m-%Y",
         "%d-%m-%y",
@@ -125,6 +133,8 @@ Rules:
 - If any end-date digit is ambiguous, return the end date with confidence below 0.85 so the record is flagged for review rather than silently guessed.
 - Inspect the enlarged header crop carefully, including handwritten digits.
 - A vertical separator stroke or bar before a date is not the digit 1. For example, read `| 3/08/2026` as `03/08/2026`, never `31/08/2026`.
+- The survey form may also write the date split by vertical bars, e.g. `31 | 08 | 026` or `03 | 08 | 2026`. Treat each `|` as a plain separator between day, month and year, never as a digit.
+- A short 3-digit year like `026` means 2026 (the project year). Normalize it to 2026.
 - Accept any clearly printed date format (e.g., 4 September 2026, 04/09/2026, 2026-09-04).
 - For numeric dates with an ambiguous day/month order, use day-first order (DD/MM/YYYY) for this Indian survey form.
 - Do not guess, repair, or infer unclear digits. Return null for a date that cannot be read confidently.

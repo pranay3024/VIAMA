@@ -2,7 +2,11 @@
 
 import base64
 import re
+import socket
+import time
 from datetime import date, datetime, timedelta
+
+from googleapiclient.errors import HttpError
 
 try:
 	import holidays
@@ -59,6 +63,34 @@ def _header(headers, name):
 	return ""
 
 
+def _is_retryable_gmail_error(exc):
+	"""True for transient network / rate-limit Gmail API failures."""
+	if isinstance(exc, (socket.timeout, TimeoutError, ConnectionError)):
+		return True
+	if isinstance(exc, HttpError):
+		return exc.resp.status in (429, 500, 502, 503, 504)
+	return False
+
+
+def _gmail_call(request, attempts=5):
+	"""Execute a Gmail API request with backoff on transient failures."""
+	last_exc = None
+	for attempt in range(attempts):
+		try:
+			return request.execute()
+		except Exception as exc:
+			if not _is_retryable_gmail_error(exc):
+				raise
+			last_exc = exc
+			print(
+				f"[GMAIL] transient error, attempt {attempt + 1}/{attempts}: {exc}",
+				flush=True,
+			)
+			if attempt < attempts - 1:
+				time.sleep(1 + attempt * 2)
+	raise last_exc
+
+
 def _message_text(payload):
 	parts = []
 	body = payload.get("body", {}).get("data")
@@ -109,15 +141,17 @@ def build_defect_email_index(gmail, survey=None):
 		}
 		if page_token:
 			params["pageToken"] = page_token
-		response = gmail.users().messages().list(**params).execute()
+		response = _gmail_call(gmail.users().messages().list(**params))
 
 		for item in response.get("messages", []):
-			message = gmail.users().messages().get(
-				userId="me",
-				id=item["id"],
-				format="metadata",
-				metadataHeaders=["Subject"],
-			).execute()
+			message = _gmail_call(
+				gmail.users().messages().get(
+					userId="me",
+					id=item["id"],
+					format="metadata",
+					metadataHeaders=["Subject"],
+				)
+			)
 			headers = message.get("payload", {}).get("headers", [])
 			subject = _header(headers, "Subject")
 			internal_ms = int(message.get("internalDate", "0"))
@@ -137,32 +171,52 @@ def build_defect_email_index(gmail, survey=None):
 
 
 def find_defect_report_email(survey, email_index, gmail=None):
-	"""Return the latest email matching subject and exact body stretch line."""
-	matches = [
+	"""Return the earliest email carrying this survey's identifiers.
+
+	The Gmail search query already restricts to messages containing the
+	survey's identifiers, so a match is confirmed by checking the identifiers
+	in the full body + subject rather than by a brittle stretch-line regex.
+	The regex is kept only as a light cross-check; emails whose body layout
+	differs (no "stretch no. ... - cycle" line) are still matched correctly.
+	"""
+	# With gmail available we can verify full bodies below, so every message
+	# returned by the (identifier-narrowed) query is a candidate. Without gmail
+	# we must fall back to the subject carrying the survey identifiers.
+	subject_matches = [
 		item for item in email_index
-		if _message_matches_subject(survey, item["subject"])
+		if _message_matches(survey, item["subject"])
 	]
 	if gmail:
 		exact_line = re.compile(
         r"stretch\s*no\.?\s*([a-z0-9./&()\s-]+?)\s*[-_]\s*cycle\s*([0-9]+)",
         re.IGNORECASE,
 )
-		verified = []
-		for item in matches:
-			message = gmail.users().messages().get(
-				userId="me",
-				id=item["message_id"],
-				format="full",
-			).execute()
-			body_text = _message_text(message.get("payload", {}))
-			body_match = exact_line.search(body_text)
-			if not body_match:
+		candidates = []
+		for item in email_index:
+			try:
+				message = _gmail_call(
+					gmail.users().messages().get(
+						userId="me",
+						id=item["message_id"],
+						format="full",
+					)
+				)
+			except Exception:
 				continue
-			section = _normalize(body_match.group(1))
-			cycle = int(body_match.group(2))
-			if section == _normalize(survey.section_no) and cycle == survey.cycle_no:
-				verified.append(item)
-		matches = verified
+			body_text = _message_text(message.get("payload", {}))
+			full_text = body_text + " " + item["subject"]
+			if not _message_matches(survey, full_text):
+				continue
+			body_match = exact_line.search(body_text)
+			if body_match:
+				section = _normalize(body_match.group(1))
+				cycle = int(body_match.group(2))
+				if section == _normalize(survey.section_no) and cycle != survey.cycle_no:
+					continue
+			candidates.append(item)
+		matches = candidates
+	else:
+		matches = subject_matches
 	if not matches:
 		return None
 

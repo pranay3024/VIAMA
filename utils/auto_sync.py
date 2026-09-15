@@ -14,6 +14,11 @@ from utils.defect_report_delay import (
 
 log = logging.getLogger(__name__)
 
+# Cap how many per-survey syncs may touch Google (Drive/Gemini/Gmail) at once.
+# TL "YES" clicks arrive in bursts (50/day); the parallel bursts are what
+# caused connection drops / API timeouts, so let at most a few run at a time.
+_SYNC_SEMAPHORE = threading.BoundedSemaphore(3)
+
 
 def extract_survey_end_date_if_missing(survey):
     """
@@ -52,6 +57,11 @@ def extract_survey_end_date_if_missing(survey):
 
 
 def sync_defect_delay_for_survey(app, survey_id):
+    with _SYNC_SEMAPHORE:
+        return _run_sync_defect_delay(app, survey_id)
+
+
+def _run_sync_defect_delay(app, survey_id):
     """
     Background job to sync defect-report delay for one survey.
 

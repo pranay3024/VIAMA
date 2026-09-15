@@ -233,12 +233,20 @@ def delayed_surveys():
         "Aspizo": ("UP", "UTTAR PRADESH", "JHARKHAND"),
     }
 
-    delayed_query = Survey.query.filter(
+    # A survey appears only after the Team Leader ticks all three conditions
+    # (Survey Form / Raw Video / Defect Report) as YES. That tick triggers the
+    # auto-sync flow: Gemini extracts the survey end date -> Gmail API matches
+    # the sent defect report mails -> the sent date is extracted -> the delay
+    # is calculated. No other upload/tick state brings a record in here.
+    from utils.visibility import exclude_deleted
+
+    delayed_query = exclude_deleted(Survey.query, Survey).filter(
         Survey.survey_form_completed.is_(True),
         Survey.task1_completed.is_(True),
         Survey.task2_completed.is_(True),
         Survey.start_time >= datetime(2026, 8, 3),
-        Survey.defect_report_match_status.isnot(None),
+        Survey.status.isnot(None),
+        Survey.status != "cancelled",
     )
 
     if selected_team in team_states:
@@ -286,6 +294,10 @@ def delayed_surveys():
         )
         survey.display_end_time = (
             survey.end_time + ist_offset if survey.end_time else None
+        )
+        survey.display_pdf_upload_time = (
+            survey.survey_pdf_uploaded_at + ist_offset
+            if survey.survey_pdf_uploaded_at else None
         )
         survey.display_video_upload_time = (
             survey.video_upload_time + ist_offset

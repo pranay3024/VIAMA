@@ -1,4 +1,5 @@
 import logging
+import threading
 from datetime import datetime
 
 from extensions import db
@@ -12,6 +13,42 @@ from utils.defect_report_delay import (
 )
 
 log = logging.getLogger(__name__)
+
+
+def extract_survey_end_date_if_missing(survey):
+    """
+    Best-effort, first-upload-only extraction of the survey end date via Gemini.
+
+    Runs once, the moment a survey PDF is uploaded to the portal for the very
+    first time (captain upload or API complete). PDF re-uploads never touch the
+    extracted date, and an already-extracted date is never overwritten, so the
+    survey end date stays the same. Gemini/download failures are logged and
+    swallowed so the upload flow is never blocked - the team-leader and admin
+    syncs remain as fallbacks.
+    """
+    if survey.extracted_survey_end_date or not survey.end_survey_pdf:
+        return
+
+    try:
+        dates = extract_survey_dates_from_drive(survey.end_survey_pdf)
+        survey.extracted_survey_end_date = datetime.strptime(
+            dates["end_date"], "%Y-%m-%d"
+        ).date()
+        survey.survey_end_date_confidence = dates["end_confidence"]
+        db.session.commit()
+        log.info(
+            "Survey %s: extracted survey end date=%s confidence=%s",
+            survey.id,
+            survey.extracted_survey_end_date,
+            survey.survey_end_date_confidence,
+        )
+    except Exception as exc:
+        db.session.rollback()
+        log.exception(
+            "Survey %s: end-date extraction failed: %s",
+            survey.id,
+            exc,
+        )
 
 
 def sync_defect_delay_for_survey(app, survey_id):
@@ -137,7 +174,10 @@ def sync_defect_delay_for_survey(app, survey_id):
                 survey_id,
             )
 
-            email_index = build_defect_email_index(gmail)
+            # Narrow the search to this survey's identifiers (nh_number /
+            # upc_code) so Gmail only returns matching mails instead of the
+            # whole Sent mailbox - this is what keeps the sync near-instant.
+            email_index = build_defect_email_index(gmail, survey)
 
             log.info(
                 "Survey %s: indexed %s defect-report emails",
@@ -259,4 +299,13 @@ def start_defect_delay_sync_if_ready(survey):
         survey.id,
         survey.defect_report_match_status,
     )
-    sync_defect_delay_for_survey(app, survey.id)
+
+    # Run in the background so the Team Leader's toggle responds instantly.
+    # sync_defect_delay_for_survey creates its own app context, so it is safe
+    # to run on a daemon thread that outlives the request.
+    threading.Thread(
+        target=sync_defect_delay_for_survey,
+        args=(app, survey.id),
+        daemon=True,
+        name=f"defect-delay-sync-{survey.id}",
+    ).start()

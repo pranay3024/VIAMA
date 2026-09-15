@@ -5962,6 +5962,12 @@ def survey_forms():
                 if survey.survey_pdf_uploaded_at
                 else None
             ),
+            "end_date": (
+                survey.extracted_survey_end_date.isoformat()
+                if survey.extracted_survey_end_date
+                else None
+            ),
+            "end_date_confidence": survey.survey_end_date_confidence,
         })
 
     return ok({

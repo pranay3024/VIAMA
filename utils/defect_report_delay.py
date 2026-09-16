@@ -135,6 +135,34 @@ def _message_matches_subject(survey, subject):
 	return _message_matches(survey, subject)
 
 
+def _message_matches_section_cycle(survey, text):
+	"""Return whether an email explicitly identifies this section and cycle."""
+	normalized_text = _normalize(text)
+	section = _normalize(survey.section_no)
+	cycle = str(survey.cycle_no or "")
+	if not section or not cycle:
+		return False
+
+	patterns = (
+		f"stretchno{section}cycle{cycle}",
+		f"stretch{section}cycle{cycle}",
+		f"section{section}cycle{cycle}",
+	)
+	if any(pattern in normalized_text for pattern in patterns):
+		return True
+
+	# The generated subject contains UPC_cycle_completion, for example
+	# ``N/02005/06001/UP_008_080926``.
+	upc = _normalize(survey.upc_code)
+	return bool(
+		upc
+		and re.search(
+			rf"{re.escape(upc)}0*{int(survey.cycle_no):03d}",
+			normalized_text,
+		)
+	)
+
+
 def build_defect_email_index(gmail, survey=None):
 	"""Read Sent defect-report subjects and index them by identifiers.
 
@@ -186,26 +214,12 @@ def build_defect_email_index(gmail, survey=None):
 
 
 def find_defect_report_email(survey, email_index, gmail=None):
-	"""Return the earliest email carrying this survey's identifiers.
+	"""Return the earliest exact section/cycle email for this survey.
 
-	The Gmail search query already restricts to messages containing the
-	survey's identifiers, so a match is confirmed by checking the identifiers
-	in the full body + subject rather than by a brittle stretch-line regex.
-	The regex is kept only as a light cross-check; emails whose body layout
-	differs (no "stretch no. ... - cycle" line) are still matched correctly.
+	NH and UPC identify the project, not a unique survey cycle. The section and
+	cycle identity must also be present before an email can be selected.
 	"""
-	# With gmail available we can verify full bodies below, so every message
-	# returned by the (identifier-narrowed) query is a candidate. Without gmail
-	# we must fall back to the subject carrying the survey identifiers.
-	subject_matches = [
-		item for item in email_index
-		if _message_matches(survey, item["subject"])
-	]
 	if gmail:
-		exact_line = re.compile(
-        r"stretch\s*no\.?\s*([a-z0-9./&()\s-]+?)\s*[-_]\s*cycle\s*([0-9]+)",
-        re.IGNORECASE,
-)
 		candidates = []
 		for item in email_index:
 			try:
@@ -222,16 +236,16 @@ def find_defect_report_email(survey, email_index, gmail=None):
 			full_text = body_text + " " + item["subject"]
 			if not _message_matches(survey, full_text):
 				continue
-			body_match = exact_line.search(body_text)
-			if body_match:
-				section = _normalize(body_match.group(1))
-				cycle = int(body_match.group(2))
-				if section == _normalize(survey.section_no) and cycle != survey.cycle_no:
-					continue
+			if not _message_matches_section_cycle(survey, full_text):
+				continue
 			candidates.append(item)
 		matches = candidates
 	else:
-		matches = subject_matches
+		matches = [
+			item for item in email_index
+			if _message_matches(survey, item["subject"])
+			and _message_matches_section_cycle(survey, item["subject"])
+		]
 	if not matches:
 		return None
 

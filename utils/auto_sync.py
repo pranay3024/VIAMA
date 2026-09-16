@@ -19,6 +19,12 @@ log = logging.getLogger(__name__)
 # caused connection drops / API timeouts, so let at most a few run at a time.
 _SYNC_SEMAPHORE = threading.BoundedSemaphore(3)
 
+# Gemini is metered (per-request). A PDF that fails extraction is retried, but
+# never forever - after this many failed auto attempts we stop paying for it and
+# leave the survey for manual/admin correction. 2 attempts absorbs flaky
+# network blips without burning credits on an unreadable PDF.
+MAX_AUTO_EXTRACT_ATTEMPTS = 2
+
 
 def extract_survey_end_date_if_missing(survey):
     """
@@ -29,10 +35,18 @@ def extract_survey_end_date_if_missing(survey):
     extracted date, and an already-extracted date is never overwritten, so the
     survey end date stays the same. Gemini/download failures are logged and
     swallowed so the upload flow is never blocked - the team-leader and admin
-    syncs remain as fallbacks.
+    syncs remain as fallbacks. Every attempt is counted and is bounded by
+    MAX_AUTO_EXTRACT_ATTEMPTS so failed PDFs stop costing credits.
     """
     if survey.extracted_survey_end_date or not survey.end_survey_pdf:
-        return
+        return False
+
+    attempts = getattr(survey, "end_date_extract_attempts", None) or 0
+    if attempts >= MAX_AUTO_EXTRACT_ATTEMPTS:
+        return False
+
+    survey.end_date_extract_attempts = attempts + 1
+    db.session.commit()
 
     try:
         dates = extract_survey_dates_from_drive(survey.end_survey_pdf)
@@ -47,13 +61,16 @@ def extract_survey_end_date_if_missing(survey):
             survey.extracted_survey_end_date,
             survey.survey_end_date_confidence,
         )
+        return True
     except Exception as exc:
         db.session.rollback()
         log.exception(
-            "Survey %s: end-date extraction failed: %s",
+            "Survey %s: end-date extraction failed (attempt %d): %s",
             survey.id,
+            attempts + 1,
             exc,
         )
+        return False
 
 
 def sync_defect_delay_for_survey(app, survey_id):
@@ -132,10 +149,35 @@ def _run_sync_defect_delay(app, survey_id):
             # --------------------------------------------------
             if not survey.extracted_survey_end_date:
 
-                log.info(
-                    "Survey %s: extracting survey end date from Drive/Gemini",
-                    survey_id,
+                extract_attempts = (
+                    getattr(survey, "end_date_extract_attempts", None) or 0
                 )
+
+                if extract_attempts >= MAX_AUTO_EXTRACT_ATTEMPTS:
+
+                    # The PDF already failed extraction the max allowed times -
+                    # stop spending Gemini credits on it. Without an end date a
+                    # delay cannot be computed, so do not loop this survey
+                    # forever; mark it done so the queue stops retrying it.
+                    log.warning(
+                        "Survey %s: skipping Gemini extraction after %d "
+                        "failed auto attempts",
+                        survey_id,
+                        extract_attempts,
+                    )
+                    survey.defect_report_match_status = "not_found"
+                    db.session.commit()
+                    return
+
+                log.info(
+                    "Survey %s: extracting survey end date from Drive/Gemini "
+                    "(auto attempt %d)",
+                    survey_id,
+                    extract_attempts + 1,
+                )
+
+                survey.end_date_extract_attempts = extract_attempts + 1
+                db.session.commit()
 
                 dates = extract_survey_dates_from_drive(
                     survey.end_survey_pdf

@@ -23,6 +23,7 @@ STATEMENTS = [
     "ALTER TABLE surveys ADD COLUMN IF NOT EXISTS defect_report_email_id VARCHAR(255)",
     "ALTER TABLE surveys ADD COLUMN IF NOT EXISTS defect_report_match_status VARCHAR(30)",
     "ALTER TABLE surveys ADD COLUMN IF NOT EXISTS defect_report_delay_days INTEGER",
+    "ALTER TABLE surveys ADD COLUMN IF NOT EXISTS end_date_extract_attempts INTEGER NOT NULL DEFAULT 0",
 ]
 
 engine = create_engine(DATABASE_URL, pool_pre_ping=True)

@@ -242,6 +242,10 @@ class Survey(db.Model):
     # Cached inputs for the admin defect-report delay check.
     extracted_survey_end_date = db.Column(db.Date, nullable=True)
     survey_end_date_confidence = db.Column(db.Float, nullable=True)
+    # How many Gemini extraction attempts have been made for this survey's PDF.
+    # Guards the budget: after MAX_AUTO_EXTRACT_ATTEMPTS the auto paths stop
+    # paying for a PDF that keeps failing, leaving it for admin correction.
+    end_date_extract_attempts = db.Column(db.Integer, nullable=False, default=0)
     defect_report_sent_at = db.Column(db.DateTime, nullable=True)
     defect_report_sent_confidence = db.Column(db.Float, nullable=True)
     defect_report_email_id = db.Column(db.String(255), nullable=True)

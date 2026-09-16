@@ -15,6 +15,10 @@ from flask import redirect
 from datetime import datetime, timedelta
 from google_drive import download_file_from_drive
 from gemini_utils import extract_survey_dates_from_pdf, extract_survey_dates_from_drive
+from utils.auto_sync import (
+    MAX_AUTO_EXTRACT_ATTEMPTS,
+    extract_survey_end_date_if_missing,
+)
     
 
 from utils.email_templates import (
@@ -141,18 +145,24 @@ def delayed_surveys():
                     # Extract survey end date from PDF if not already
                     # ------------------------------------------------
                     if not survey.extracted_survey_end_date:
-                        dates = extract_survey_dates_from_drive(
-                            survey.end_survey_pdf
-                        )
+                        extract_survey_end_date_if_missing(survey)
 
-                        survey.extracted_survey_end_date = datetime.strptime(
-                            dates["end_date"],
-                            "%Y-%m-%d"
-                        ).date()
-
-                        survey.survey_end_date_confidence = dates[
-                            "end_confidence"
-                        ]
+                        if (
+                            not survey.extracted_survey_end_date
+                            and (
+                                getattr(
+                                    survey,
+                                    "end_date_extract_attempts",
+                                    None,
+                                )
+                                or 0
+                            )
+                            >= MAX_AUTO_EXTRACT_ATTEMPTS
+                        ):
+                            survey.defect_report_match_status = (
+                                "not_found"
+                            )
+                            continue
 
                     # ------------------------------------------------
                     # Find defect report email

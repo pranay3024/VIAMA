@@ -279,6 +279,61 @@ def _run_sync_defect_delay(app, survey_id):
             )
 
 
+def process_pending_defect_delays(app, limit=6):
+    """Process surveys queued as ``pending`` inside this one request.
+
+    Runs up to 3 syncs at a time via a thread pool so 20-30 queued surveys
+    drain in a few minutes. Doing the work on the request thread (not a
+    fire-and-forget daemon thread) is what makes it reliable on serverless -
+    the request stays alive until the batch is done.
+    """
+    from concurrent.futures import ThreadPoolExecutor
+
+    with app.app_context():
+        queued = (
+            Survey.query
+            .filter(Survey.defect_report_match_status == "pending")
+            .order_by(Survey.id.asc())
+            .limit(limit)
+            .all()
+        )
+        ids = [survey.id for survey in queued]
+        if not ids:
+            return 0, 0
+
+    log.info(
+        "Defect delay sweep: processing %s queued surveys",
+        len(ids),
+    )
+
+    processed = 0
+    with ThreadPoolExecutor(max_workers=3) as executor:
+        futures = [
+            executor.submit(sync_defect_delay_for_survey, app, survey_id)
+            for survey_id in ids
+        ]
+        for future in futures:
+            try:
+                future.result()
+                processed += 1
+            except Exception as exc:
+                log.exception("Defect delay sweep item failed: %s", exc)
+
+    with app.app_context():
+        remaining = (
+            Survey.query
+            .filter(Survey.defect_report_match_status == "pending")
+            .count()
+        )
+
+    log.info(
+        "Defect delay sweep done: processed=%s remaining=%s",
+        processed,
+        remaining,
+    )
+    return processed, remaining
+
+
 def start_defect_delay_sync_if_ready(survey):
     """
     Start the automatic defect delay sync when all required
@@ -300,22 +355,16 @@ def start_defect_delay_sync_if_ready(survey):
     if survey.defect_report_match_status is not None:
         return
 
-    from flask import current_app
-
-    app = current_app._get_current_object()
     log.info(
-        "Running automatic defect delay sync for survey %s "
+        "Queuing automatic defect delay sync for survey %s "
         "(current status=%s)",
         survey.id,
         survey.defect_report_match_status,
     )
 
-    # Run in the background so the Team Leader's toggle responds instantly.
-    # sync_defect_delay_for_survey creates its own app context, so it is safe
-    # to run on a daemon thread that outlives the request.
-    threading.Thread(
-        target=sync_defect_delay_for_survey,
-        args=(app, survey.id),
-        daemon=True,
-        name=f"defect-delay-sync-{survey.id}",
-    ).start()
+    # Queue the survey. The sweep picks it up and does the extraction +
+    # matching inside a request that stays alive on serverless, so ticking
+    # 20-30 surveys at once only records the queue entries here - instantly -
+    # instead of waiting on Gemini/Gmail one by one.
+    survey.defect_report_match_status = "pending"
+    db.session.commit()

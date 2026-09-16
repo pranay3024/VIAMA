@@ -31,6 +31,7 @@ from flask import (
     session,
     url_for,
     flash,
+    current_app,
 )
 
 from google_drive import (
@@ -2276,6 +2277,32 @@ def survey_dates_for_gmail_draft(survey_id):
         "start_date": None,
         "end_date": survey.extracted_survey_end_date.isoformat(),
     })
+
+
+@admin_bp.route("/admin/defect-delay-sweep")
+def defect_delay_sweep():
+    """Process the queued (pending) defect-delay surveys for this request.
+
+    The delayed-surveys page polls this. Each call processes up to ``limit``
+    (default 6) queued surveys; the page keeps calling while some remain, so a
+    20-30 survey batch drains in a few minutes without any click blocking.
+    """
+    if not session.get("user_id") or session.get("role") != "admin":
+        return jsonify({"processed": 0, "remaining": 0}), 403
+
+    from utils.auto_sync import process_pending_defect_delays
+
+    try:
+        limit = int(request.args.get("limit", 6))
+    except (TypeError, ValueError):
+        limit = 6
+    limit = max(1, min(limit, 50))
+
+    processed, remaining = process_pending_defect_delays(
+        current_app._get_current_object(),
+        limit=limit,
+    )
+    return jsonify({"processed": processed, "remaining": remaining})
 
 @admin_bp.route(
     "/admin/gmail-drafts/<email_type>",

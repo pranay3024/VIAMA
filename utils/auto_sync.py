@@ -280,8 +280,10 @@ def _run_sync_defect_delay(app, survey_id):
 
 
 def process_pending_defect_delays(app, limit=6):
-    """Process surveys queued as ``pending`` inside this one request.
+    """Process surveys in the queue inside this one request.
 
+    Picks up ``pending`` surveys and also ``error`` ones so a transient Google
+    failure self-heals on the next sweep instead of leaving the survey stuck.
     Runs up to 3 syncs at a time via a thread pool so 20-30 queued surveys
     drain in a few minutes. Doing the work on the request thread (not a
     fire-and-forget daemon thread) is what makes it reliable on serverless -
@@ -292,7 +294,7 @@ def process_pending_defect_delays(app, limit=6):
     with app.app_context():
         queued = (
             Survey.query
-            .filter(Survey.defect_report_match_status == "pending")
+            .filter(Survey.defect_report_match_status.in_(["pending", "error"]))
             .order_by(Survey.id.asc())
             .limit(limit)
             .all()
@@ -322,7 +324,7 @@ def process_pending_defect_delays(app, limit=6):
     with app.app_context():
         remaining = (
             Survey.query
-            .filter(Survey.defect_report_match_status == "pending")
+            .filter(Survey.defect_report_match_status.in_(["pending", "error"]))
             .count()
         )
 

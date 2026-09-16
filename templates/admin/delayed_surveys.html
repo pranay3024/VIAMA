@@ -132,9 +132,11 @@
                 return;
             }
             if (data.remaining > 0) {
+                let polls = 0;
                 const timer = setInterval(async () => {
                     data = await sweepOnce();
-                    if (!data.remaining || data.error) {
+                    polls += 1;
+                    if (!data.remaining || data.error || polls >= 30) {
                         clearInterval(timer);
                         window.location.reload();
                     }

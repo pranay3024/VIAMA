@@ -28,15 +28,14 @@ MAX_AUTO_EXTRACT_ATTEMPTS = 2
 
 def extract_survey_end_date_if_missing(survey):
     """
-    Best-effort, first-upload-only extraction of the survey end date via Gemini.
+    Best-effort extraction of the survey end date via Gemini, on demand.
 
-    Runs once, the moment a survey PDF is uploaded to the portal for the very
-    first time (captain upload or API complete). PDF re-uploads never touch the
-    extracted date, and an already-extracted date is never overwritten, so the
+    Runs only from credit-bounded paths: the TL portal tick (sync STEP 1) and
+    manual admin actions (gmail draft, bulk sync). Uploading a PDF never calls
+    Gemini anymore. An already-extracted date is never overwritten, so the
     survey end date stays the same. Gemini/download failures are logged and
-    swallowed so the upload flow is never blocked - the team-leader and admin
-    syncs remain as fallbacks. Every attempt is counted and is bounded by
-    MAX_AUTO_EXTRACT_ATTEMPTS so failed PDFs stop costing credits.
+    swallowed so the caller flow is never blocked. Every attempt is counted and
+    is bounded by MAX_AUTO_EXTRACT_ATTEMPTS so failed PDFs stop costing credits.
     """
     if survey.extracted_survey_end_date or not survey.end_survey_pdf:
         return False

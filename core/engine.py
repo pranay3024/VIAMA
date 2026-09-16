@@ -2441,9 +2441,6 @@ def complete_survey(survey_id, pdf_url, actor_role=None):
 
     db.session.commit()
 
-    from utils.auto_sync import extract_survey_end_date_if_missing
-
-    extract_survey_end_date_if_missing(survey)
     return survey
 
 

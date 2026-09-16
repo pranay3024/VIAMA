@@ -27,8 +27,10 @@ if not api_key:
 
 client = genai.Client(api_key=api_key)
 
-# Updated default model to gemini-3.6-flash
-MODEL_ID = (os.getenv("GEMINI_MODEL") or "gemini-3.6-flash").strip()
+# Cheap flash-lite model: date extraction is a low-complexity vision task, so
+# the full flash tier (gemini-3.6-flash) is overkill and costs ~2.5x more on
+# input. Override any time via GEMINI_MODEL if accuracy demands it.
+MODEL_ID = (os.getenv("GEMINI_MODEL") or "gemini-3.5-flash-lite").strip()
 
 _date_cache = {}
 

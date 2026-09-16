@@ -811,16 +811,16 @@ def admin_dashboard():
 # WEEK
     if week_no is not None:
 
-     count_week_start = project_start + timedelta(
-        days=(week_no - 1) * 7
-    )
+        count_week_start = project_start + timedelta(
+            days=(week_no - 1) * 7
+        )
 
-    count_week_end = count_week_start + timedelta(days=7)
+        count_week_end = count_week_start + timedelta(days=7)
 
-    status_count_query = status_count_query.filter(
-        Survey.start_time >= count_week_start,
-        Survey.start_time < count_week_end
-    )
+        status_count_query = status_count_query.filter(
+            Survey.start_time >= count_week_start,
+            Survey.start_time < count_week_end
+        )
 
 # DATE RANGE
     if start_dt_utc:

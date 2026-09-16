@@ -17,7 +17,6 @@ import os
 from utils.image_compressor import compress_image
 from utils.visibility import exclude_deleted
 from utils.request_params import safe_count, safe_int
-from utils.auto_sync import extract_survey_end_date_if_missing
 
 
 
@@ -851,12 +850,6 @@ def complete_survey():
              assignment.status = "completed"
 
             db.session.commit()
-
-            # -----------------------------------
-            # EXTRACT SURVEY END DATE (1st upload)
-            # -----------------------------------
-
-            extract_survey_end_date_if_missing(survey)
 
             # -----------------------------------
             # CLEAR ONLY CURRENT SURVEY

@@ -2293,9 +2293,9 @@ def defect_delay_sweep():
     from utils.auto_sync import process_pending_defect_delays
 
     try:
-        limit = int(request.args.get("limit", 6))
+        limit = int(request.args.get("limit", 50))
     except (TypeError, ValueError):
-        limit = 6
+        limit = 50
     limit = max(1, min(limit, 50))
 
     processed, remaining = process_pending_defect_delays(

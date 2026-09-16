@@ -284,13 +284,11 @@ def process_pending_defect_delays(app, limit=6):
 
     Picks up ``pending`` surveys and also ``error`` ones so a transient Google
     failure self-heals on the next sweep instead of leaving the survey stuck.
-    Runs up to 3 syncs at a time via a thread pool so 20-30 queued surveys
-    drain in a few minutes. Doing the work on the request thread (not a
-    fire-and-forget daemon thread) is what makes it reliable on serverless -
-    the request stays alive until the batch is done.
+    Runs the selected surveys serially so Gemini and Gmail are never called in
+    parallel. Doing the work on the request thread (not a fire-and-forget
+    daemon thread) is what makes it reliable on serverless - the request stays
+    alive until the selected chunk is done.
     """
-    from concurrent.futures import ThreadPoolExecutor
-
     with app.app_context():
         queued = (
             Survey.query
@@ -309,17 +307,15 @@ def process_pending_defect_delays(app, limit=6):
     )
 
     processed = 0
-    with ThreadPoolExecutor(max_workers=3) as executor:
-        futures = [
-            executor.submit(sync_defect_delay_for_survey, app, survey_id)
-            for survey_id in ids
-        ]
-        for future in futures:
-            try:
-                future.result()
-                processed += 1
-            except Exception as exc:
-                log.exception("Defect delay sweep item failed: %s", exc)
+    # Gemini and Gmail are external, quota-limited services. Process the
+    # selected batch in one request so a 50-survey click never creates a
+    # burst of concurrent provider calls.
+    for survey_id in ids:
+        try:
+            sync_defect_delay_for_survey(app, survey_id)
+            processed += 1
+        except Exception as exc:
+            log.exception("Defect delay sweep item failed: %s", exc)
 
     with app.app_context():
         remaining = (
@@ -353,7 +349,9 @@ def start_defect_delay_sync_if_ready(survey):
     ):
         return
 
-    # Run only once after all required conditions become true.
+    # Queue the work and let the sweep process it outside the click request.
+    # Gemini/Gmail are quota-limited and the team leader can complete up to 50
+    # surveys in one batch.
     if survey.defect_report_match_status is not None:
         return
 
@@ -364,12 +362,5 @@ def start_defect_delay_sync_if_ready(survey):
         survey.defect_report_match_status,
     )
 
-    # Run synchronously inside this request. Serverless (Vercel) kills
-    # background threads started after the response is sent, which left surveys
-    # stuck as "pending", so the clicked survey is completed now - the click
-    # simply waits a few seconds. The admin-page sweep remains as the backstop
-    # for large batches that arrive faster than anyone can watch.
-    from flask import current_app
-
-    app = current_app._get_current_object()
-    sync_defect_delay_for_survey(app, survey.id)
+    survey.defect_report_match_status = "pending"
+    db.session.commit()

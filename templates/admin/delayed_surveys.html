@@ -113,13 +113,13 @@
 
     <script>
         // Drain the queued defect-delay surveys without blocking any click.
-        // Each poll processes up to 6 surveys; while any remain it keeps
+        // Each poll processes up to 50 surveys; while any remain it keeps
         // polling every 10s, then reloads so the table shows final statuses.
         const sweepUrl = "{{ url_for('admin.defect_delay_sweep') }}";
 
         async function sweepOnce() {
             try {
-                const response = await fetch(sweepUrl + "?limit=6", { method: "GET" });
+                const response = await fetch(sweepUrl + "?limit=50", { method: "GET" });
                 return await response.json();
             } catch (error) {
                 return { processed: 0, remaining: 0, error: error };

@@ -358,15 +358,18 @@ def start_defect_delay_sync_if_ready(survey):
         return
 
     log.info(
-        "Queuing automatic defect delay sync for survey %s "
+        "Running automatic defect delay sync for survey %s "
         "(current status=%s)",
         survey.id,
         survey.defect_report_match_status,
     )
 
-    # Queue the survey. The sweep picks it up and does the extraction +
-    # matching inside a request that stays alive on serverless, so ticking
-    # 20-30 surveys at once only records the queue entries here - instantly -
-    # instead of waiting on Gemini/Gmail one by one.
-    survey.defect_report_match_status = "pending"
-    db.session.commit()
+    # Run synchronously inside this request. Serverless (Vercel) kills
+    # background threads started after the response is sent, which left surveys
+    # stuck as "pending", so the clicked survey is completed now - the click
+    # simply waits a few seconds. The admin-page sweep remains as the backstop
+    # for large batches that arrive faster than anyone can watch.
+    from flask import current_app
+
+    app = current_app._get_current_object()
+    sync_defect_delay_for_survey(app, survey.id)

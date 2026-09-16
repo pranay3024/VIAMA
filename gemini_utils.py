@@ -150,7 +150,49 @@ def _get_first_page_images(pdf_bytes):
         return pdf_bytes, pdf_bytes
 
 
+def _extract_end_date_from_pdf_text(pdf_bytes):
+    """Extract an end date from a text-backed PDF before using Gemini."""
+    try:
+        document = fitz.open(stream=pdf_bytes, filetype="pdf")
+        text = document[0].get_text("text")
+    except Exception:
+        return None
+
+    label_match = re.search(
+        r"survey\s*end\s*date|end\s*date",
+        text,
+        flags=re.IGNORECASE,
+    )
+    if not label_match:
+        return None
+
+    nearby_text = text[label_match.end():label_match.end() + 120]
+    candidates = re.findall(
+        r"\b\d{1,2}\s*[/|.-]\s*\d{1,2}\s*[/|.-]\s*\d{2,4}\b"
+        r"|\b\d{1,2}\s+(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|"
+        r"Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|"
+        r"Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)"
+        r"\s+\d{4}\b",
+        nearby_text,
+        flags=re.IGNORECASE,
+    )
+    for candidate in candidates:
+        normalized = _valid_date(candidate)
+        if normalized:
+            return normalized
+    return None
+
+
 def extract_survey_dates_from_pdf(pdf_bytes):
+    text_date = _extract_end_date_from_pdf_text(pdf_bytes)
+    if text_date:
+        dates = {"end_date": text_date, "end_confidence": 1.0}
+        print(
+            f"[GEMINI SURVEY DATES] parsed text-layer result: {dates}",
+            flush=True,
+        )
+        return dates
+
     full_page_bytes, header_bytes = _get_first_page_images(pdf_bytes)
 
     prompt = """
@@ -263,6 +305,42 @@ Rules:
         "end_date": _valid_date(normalized_data.get("end_date")),
         "end_confidence": float(normalized_data.get("end_confidence") or 0),
     }
+
+    if not dates["end_date"]:
+        retry_prompt = """
+Return only JSON for the survey end date visible in the supplied images.
+Look specifically at the row labelled Survey End Date or To. Do not use the
+Survey Start Date. Read the date exactly as written, including day, month and
+year. Use DD/MM/YYYY for numeric dates. Return null only if the end-date row is
+not readable.
+"""
+        retry_response = _safe_generate(
+            [
+                "FOCUSED END-DATE RETRY:",
+                types.Part.from_bytes(data=header_bytes, mime_type="image/png"),
+                types.Part.from_bytes(data=full_page_bytes, mime_type="image/png"),
+                retry_prompt,
+            ],
+            config,
+        )
+        retry_data = getattr(retry_response, "parsed", None)
+        if retry_data is not None:
+            if hasattr(retry_data, "model_dump"):
+                retry_data = retry_data.model_dump()
+            elif hasattr(retry_data, "dict"):
+                retry_data = retry_data.dict()
+        if not isinstance(retry_data, dict):
+            retry_text = (getattr(retry_response, "text", "") or "").strip()
+            retry_match = re.search(r"\{.*\}", retry_text, flags=re.DOTALL)
+            retry_data = (
+                json.loads(retry_match.group(0))
+                if retry_match
+                else {}
+            )
+        dates = {
+            "end_date": _valid_date(retry_data.get("end_date")),
+            "end_confidence": float(retry_data.get("end_confidence") or 0),
+        }
 
     if not dates["end_date"]:
         raise ValueError(f"Gemini did not return a valid end date. Extracted: {dates}")

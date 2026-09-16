@@ -824,6 +824,8 @@ onclick="clearFilters()">
 </th>
 <th>RV<br>Remark</th>
 
+<th>Survey Form<br>Approved</th>
+
 <th style="min-width:90px;">Details</th>
 
     </tr>
@@ -1455,6 +1457,29 @@ View
 {% else %}
 
 -
+
+{% endif %}
+
+</td>
+
+<!-- SURVEY FORM APPROVAL -->
+
+<td style="text-align:center;">
+
+{% if survey.survey_form_approved %}
+
+<span style="color:green;font-weight:bold;">YES</span>
+
+{% else %}
+
+<form method="post"
+      action="{{ url_for('admin.approve_survey_form', survey_id=survey.id) }}"
+      onsubmit="return confirm('Approve this survey form?');">
+    <button type="submit"
+            style="border:0;background:none;color:#c00;font-weight:bold;cursor:pointer;">
+        NO
+    </button>
+</form>
 
 {% endif %}
 

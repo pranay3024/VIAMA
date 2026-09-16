@@ -129,6 +129,12 @@ class Survey(db.Model):
     db.Boolean,
     default=False
 )
+
+    survey_form_approved = db.Column(
+    db.Boolean,
+    default=False,
+    nullable=False
+)
     
     show_on_dashboard = db.Column(
     db.Boolean,

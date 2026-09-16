@@ -3,6 +3,7 @@
 import base64
 import re
 import socket
+import threading
 import time
 from datetime import date, datetime, timedelta
 
@@ -65,11 +66,19 @@ def _header(headers, name):
 
 def _is_retryable_gmail_error(exc):
 	"""True for transient network / rate-limit Gmail API failures."""
-	if isinstance(exc, (socket.timeout, TimeoutError, ConnectionError)):
+	if isinstance(exc, (socket.timeout, TimeoutError, ConnectionError, OSError)):
 		return True
 	if isinstance(exc, HttpError):
 		return exc.resp.status in (429, 500, 502, 503, 504)
 	return False
+
+
+# The cached Gmail client wraps a single httplib2 connection pool, which is
+# NOT thread-safe. When the sweep runs several syncs at once they must never
+# touch it simultaneously (that corruption shows up as SSL "record layer
+# failure" / EOF errors), so every Gmail HTTP call is serialised through this
+# lock.
+_GMAIL_LOCK = threading.Lock()
 
 
 def _gmail_call(request, attempts=5):
@@ -77,7 +86,8 @@ def _gmail_call(request, attempts=5):
 	last_exc = None
 	for attempt in range(attempts):
 		try:
-			return request.execute()
+			with _GMAIL_LOCK:
+				return request.execute()
 		except Exception as exc:
 			if not _is_retryable_gmail_error(exc):
 				raise

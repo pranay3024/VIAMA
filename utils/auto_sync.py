@@ -323,17 +323,19 @@ def _run_sync_defect_delay(app, survey_id):
 def process_pending_defect_delays(app, limit=6):
     """Process surveys in the queue inside this one request.
 
-    Picks up ``pending`` surveys and also ``error`` ones so a transient Google
-    failure self-heals on the next sweep instead of leaving the survey stuck.
-    Runs the selected surveys serially so Gemini and Gmail are never called in
-    parallel. Doing the work on the request thread (not a fire-and-forget
-    daemon thread) is what makes it reliable on serverless - the request stays
-    alive until the selected chunk is done.
+    Picks up ``pending`` surveys only. ``error`` surveys are deliberately left
+    alone: auto-sweeps fire on every page load/poll, and re-running a survey
+    whose date extraction failed would spend another Gemini call each time.
+    Errors are retried explicitly (admin manual retry / CLI), never by the
+    background sweep. Runs the selected surveys serially so Gemini and Gmail
+    are never called in parallel. Doing the work on the request thread (not a
+    fire-and-forget daemon thread) is what makes it reliable on serverless -
+    the request stays alive until the selected chunk is done.
     """
     with app.app_context():
         queued = (
             Survey.query
-            .filter(Survey.defect_report_match_status.in_(["pending", "error"]))
+            .filter(Survey.defect_report_match_status == "pending")
             .order_by(Survey.id.asc())
             .limit(limit)
             .all()
@@ -361,7 +363,7 @@ def process_pending_defect_delays(app, limit=6):
     with app.app_context():
         remaining = (
             Survey.query
-            .filter(Survey.defect_report_match_status.in_(["pending", "error"]))
+            .filter(Survey.defect_report_match_status == "pending")
             .count()
         )
 

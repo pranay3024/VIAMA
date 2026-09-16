@@ -47,13 +47,21 @@ def _safe_generate(contents, config):
     from http.client import RemoteDisconnected
 
     last_exc = None
-    for attempt in range(3):
+    for attempt in range(2):
+        started = time.time()
         try:
-            return client.models.generate_content(
+            response = client.models.generate_content(
                 model=MODEL_ID,
                 contents=contents,
                 config=config,
             )
+            print(
+                f"[GEMINI_CALL] ts={datetime.utcnow().isoformat()} "
+                f"model={MODEL_ID} ok=True attempt={attempt + 1} "
+                f"elapsed={time.time() - started:.1f}s",
+                flush=True,
+            )
+            return response
         except (
             httpx.ReadError,
             httpx.ConnectError,
@@ -64,12 +72,13 @@ def _safe_generate(contents, config):
         ) as exc:
             last_exc = exc
             print(
-                f"[GEMINI SURVEY DATES] transient error, "
-                f"attempt {attempt + 1}/3: {exc}",
+                f"[GEMINI_CALL] ts={datetime.utcnow().isoformat()} "
+                f"model={MODEL_ID} ok=False attempt={attempt + 1} "
+                f"elapsed={time.time() - started:.1f}s err={exc}",
                 flush=True,
             )
-            if attempt < 2:
-                time.sleep(0.5 + attempt * 1.5)
+            if attempt < 1:
+                time.sleep(0.5)
     raise last_exc
 
 
@@ -133,8 +142,14 @@ def _get_first_page_images(pdf_bytes):
 
         document = fitz.open(stream=pdf_bytes, filetype="pdf")
         page = document[0]
-        matrix = fitz.Matrix(4, 4)
-        full_page = page.get_pixmap(matrix=matrix, alpha=False)
+        # Token minimisation: Gemini bills images per 768px tile. A 4x full A4
+        # page (~2380x3368px) is ~20 tiles (~5k tokens) - the single biggest
+        # cost of one extraction. Render the full page at 2x (still legible)
+        # and keep only the date header crop at 3x where the handwriting is.
+        full_page = page.get_pixmap(
+            matrix=fitz.Matrix(2, 2),
+            alpha=False,
+        )
         header_clip = fitz.Rect(
             0,
             0,
@@ -142,7 +157,7 @@ def _get_first_page_images(pdf_bytes):
             page.rect.height * 0.30,
         )
         header = page.get_pixmap(
-            matrix=matrix,
+            matrix=fitz.Matrix(3, 3),
             clip=header_clip,
             alpha=False,
         )
@@ -281,25 +296,7 @@ Rules:
                 data = None
 
         if data is None:
-            retry_config = types.GenerateContentConfig(
-                max_output_tokens=4096,
-                response_mime_type="application/json",
-                response_schema=SurveyDates,
-            )
-            retry_response = _safe_generate(
-                [
-                    "Return only complete JSON. Do not truncate.",
-                    types.Part.from_bytes(data=full_page_bytes, mime_type="image/png"),
-                    types.Part.from_bytes(data=header_bytes, mime_type="image/png"),
-                    prompt,
-                ],
-                retry_config,
-            )
-            retry_text = (getattr(retry_response, "text", "") or "").strip()
-            retry_match = re.search(r"\{.*\}", retry_text, flags=re.DOTALL)
-            if not retry_match:
-                raise ValueError(f"Gemini returned invalid JSON: {text}")
-            data = json.loads(retry_match.group(0))
+            raise ValueError(f"Gemini returned unparseable JSON: {text}")
 
     normalized_data = {str(k).lower(): v for k, v in data.items()} if isinstance(data, dict) else {}
 

@@ -2272,28 +2272,21 @@ def survey_dates_for_gmail_draft(survey_id):
             "end_date": survey.extracted_survey_end_date.isoformat(),
         })
 
-    try:
-        dates = extract_survey_dates_from_drive(survey.end_survey_pdf)
-        print(
-            f"[GEMINI SURVEY DATES] survey_id={survey_id} extracted={dates}",
-            flush=True,
-        )
-    except Exception as exc:
-        log.exception(
-            "Gemini survey-date extraction failed for survey_id=%s",
-            survey_id,
-        )
-        print(
-            f"[GEMINI SURVEY DATES] survey_id={survey_id} error={exc}",
-            flush=True,
-        )
-        return jsonify({"start_date": None, "end_date": None}), 502
+    # Guarded (attempt-capped) extraction: MAX_AUTO_EXTRACT_ATTEMPTS per PDF.
+    # Repeatedly selecting the same unreadable survey must not spend a fresh
+    # Gemini call every time.
+    extract_survey_end_date_if_missing(survey)
+    survey = Survey.query.get(survey_id)
 
-    survey.extracted_survey_end_date = datetime.strptime(
-        dates["end_date"], "%Y-%m-%d"
-    ).date()
-    survey.survey_end_date_confidence = dates["end_confidence"]
-    db.session.commit()
+    if not survey.extracted_survey_end_date:
+        if (getattr(survey, "end_date_extract_attempts", None) or 0) >= MAX_AUTO_EXTRACT_ATTEMPTS:
+            print(
+                f"[GEMINI SURVEY DATES] survey_id={survey_id} auto attempts "
+                f"exhausted; skipping Gemini",
+                flush=True,
+            )
+            return jsonify({"start_date": None, "end_date": None}), 202
+        return jsonify({"start_date": None, "end_date": None}), 502
 
     return jsonify({
         "start_date": None,

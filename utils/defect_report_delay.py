@@ -81,8 +81,13 @@ def _is_retryable_gmail_error(exc):
 _GMAIL_LOCK = threading.Lock()
 
 
-def _gmail_call(request, attempts=5):
-	"""Execute a Gmail API request with backoff on transient failures."""
+def _gmail_call(request, attempts=3):
+	"""Execute a Gmail API request with backoff on transient failures.
+
+	Retries are deliberately short: on Vercel the request must finish well
+	under the function duration cap, so a single sync absorbs at most one or
+	two quick retries instead of blowing the whole timeout.
+	"""
 	last_exc = None
 	for attempt in range(attempts):
 		try:
@@ -97,7 +102,7 @@ def _gmail_call(request, attempts=5):
 				flush=True,
 			)
 			if attempt < attempts - 1:
-				time.sleep(1 + attempt * 2)
+				time.sleep(0.5 + attempt * 1.5)
 	raise last_exc
 
 

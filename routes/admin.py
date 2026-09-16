@@ -2287,7 +2287,7 @@ def defect_delay_sweep():
     (default 6) queued surveys; the page keeps calling while some remain, so a
     20-30 survey batch drains in a few minutes without any click blocking.
     """
-    if not session.get("user_id") or session.get("role") != "admin":
+    if not session.get("user_id") or session.get("role") not in ("admin", "team_leader"):
         return jsonify({"processed": 0, "remaining": 0}), 403
 
     from utils.auto_sync import process_pending_defect_delays

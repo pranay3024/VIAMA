@@ -45,7 +45,7 @@ def _safe_generate(contents, config):
     from http.client import RemoteDisconnected
 
     last_exc = None
-    for attempt in range(4):
+    for attempt in range(3):
         try:
             return client.models.generate_content(
                 model=MODEL_ID,
@@ -63,11 +63,11 @@ def _safe_generate(contents, config):
             last_exc = exc
             print(
                 f"[GEMINI SURVEY DATES] transient error, "
-                f"attempt {attempt + 1}/4: {exc}",
+                f"attempt {attempt + 1}/3: {exc}",
                 flush=True,
             )
-            if attempt < 3:
-                time.sleep(1 + attempt * 2)
+            if attempt < 2:
+                time.sleep(0.5 + attempt * 1.5)
     raise last_exc
 
 

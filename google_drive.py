@@ -526,7 +526,7 @@ def download_file_from_drive(view_url):
     import time as _time
 
     for public_url in public_urls:
-        for attempt in range(3):
+        for attempt in range(2):
             try:
                 response = requests.get(public_url, timeout=60)
                 response.raise_for_status()
@@ -543,11 +543,11 @@ def download_file_from_drive(view_url):
                 break
             except (requests.ConnectionError, requests.Timeout) as exc:
                 print(
-                    f"[DRIVE DOWNLOAD] attempt {attempt + 1}/3 failed for file_id={file_id}: {exc}",
+                    f"[DRIVE DOWNLOAD] attempt {attempt + 1}/2 failed for file_id={file_id}: {exc}",
                     flush=True,
                 )
-                if attempt < 2:
-                    _time.sleep(1 + attempt * 2)
+                if attempt < 1:
+                    _time.sleep(0.5)
         content = ""
 
     raise ValueError(

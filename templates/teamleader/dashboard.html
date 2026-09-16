@@ -750,6 +750,10 @@ document.querySelectorAll(".task-btn").forEach(function(btn){
                 this.outerHTML =
                 '<span style="color:green;font-weight:bold;">✅ YES</span>';
 
+                // Drain the defect-delay queue in the background so surveys
+                // ticked this session complete without anyone opening admin.
+                fetch("/admin/defect-delay-sweep?limit=6", { method: "GET" }).then();
+
             }
 
         });

@@ -69,7 +69,7 @@ onclick="copyList()">
 
 </button>
 
-<pre id="extractList">{%- set ns = namespace(current_status=None) -%}
+<pre id="extractList">{% if status == "pdf_delayed" %}*SURVEY FORM PDF DELAYED* - {{ surveys|length }}{% elif status == "video_delayed" %}*VIDEO DELAYED* - {{ surveys|length }}{% else %}{%- set ns = namespace(current_status=None) -%}
 {%- for survey in surveys %}
 {%- if survey.status != ns.current_status %}
 {%- set ns.current_status = survey.status %}
@@ -91,7 +91,7 @@ onclick="copyList()">
 {{ survey.section_no }}_Cycle{{ survey.cycle_no }}
 {%- if not loop.last %}
 {% endif %}
-{%- endfor %}</pre>
+{%- endfor %}{% endif %}</pre>
 
 <script>
 

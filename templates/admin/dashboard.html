@@ -1642,9 +1642,47 @@ document
 
 function copyExtractList() {
 
+    const urlParams = new URLSearchParams(window.location.search);
+    const activeFilter = urlParams.get("status") || "";
+
     const rows = Array.from(
         document.querySelectorAll("tr[data-extract]")
     );
+
+    // ==========================================
+    // DELAYED FILTER → SINGLE HEADING
+    // ==========================================
+
+    if (activeFilter === "pdf_delayed" || activeFilter === "video_delayed") {
+
+        const extractItems = rows.map(function(row) {
+            return row.getAttribute("data-extract");
+        }).filter(function(e) { return e; });
+
+        if (extractItems.length === 0) {
+            alert("⚠️ No surveys found.");
+            return;
+        }
+
+        const heading = activeFilter === "pdf_delayed"
+            ? "*SURVEY FORM PDF DELAYED*"
+            : "*VIDEO DELAYED*";
+
+        let output = heading + " - " + extractItems.length + "\n";
+        extractItems.forEach(function(item) {
+            output += item + "\n";
+        });
+
+        navigator.clipboard.writeText(output.trim())
+            .then(function() {
+                alert("✅ Extract List copied!");
+            })
+            .catch(function() {
+                alert("⚠️ Failed to copy Extract List.");
+            });
+
+        return;
+    }
 
     // ==========================================
     // STATUS ORDER

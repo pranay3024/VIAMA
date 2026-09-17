@@ -1198,8 +1198,8 @@ def admin_dashboard():
                 survey.end_time + ist_offset
             ).replace(tzinfo=None)
 
-            # Deadline → next day 1:00 PM IST
-            pdf_deadline_ist = datetime.combine(
+# Deadline → next day 1:00 PM IST
+            video_deadline_ist = datetime.combine(
                 end_time_ist.date() + timedelta(days=1),
                 datetime.min.time()
             ) + timedelta(hours=13)
@@ -2880,7 +2880,8 @@ def extract_list():
 
     return render_template(
         "admin/extract_list.html",
-        surveys=surveys
+        surveys=surveys,
+        status=status
     )
 
 @admin_bp.route("/test-gemini-dates/<int:survey_id>")

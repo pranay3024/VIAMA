@@ -1020,7 +1020,7 @@ def admin_dashboard():
             deadline_ist = datetime.combine(
                 end_time_ist.date() + timedelta(days=1),
                 datetime.min.time(),
-            ) + timedelta(hours=14)
+            ) + timedelta(hours=13)
             return now_ist > deadline_ist
 
         all_surveys = [
@@ -1163,11 +1163,11 @@ def admin_dashboard():
                 survey.end_time + ist_offset
             ).replace(tzinfo=None)
 
-            # Deadline → next day 2:00 PM IST
+            # Deadline → next day 1:00 PM IST
             pdf_deadline_ist = datetime.combine(
                 end_time_ist.date() + timedelta(days=1),
                 datetime.min.time()
-            ) + timedelta(hours=14)
+            ) + timedelta(hours=13)
 
             # If PDF is already uploaded
             if survey.survey_pdf_uploaded_at:
@@ -1198,11 +1198,11 @@ def admin_dashboard():
                 survey.end_time + ist_offset
             ).replace(tzinfo=None)
 
-            # Deadline → next day 2:00 PM IST
-            video_deadline_ist = datetime.combine(
+            # Deadline → next day 1:00 PM IST
+            pdf_deadline_ist = datetime.combine(
                 end_time_ist.date() + timedelta(days=1),
                 datetime.min.time()
-            ) + timedelta(hours=14)
+            ) + timedelta(hours=13)
 
             # Video already uploaded
             if survey.video_upload_time:

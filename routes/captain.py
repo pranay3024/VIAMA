@@ -852,6 +852,41 @@ def complete_survey():
             db.session.commit()
 
             # -----------------------------------
+            # EXTRACT SURVEY FORM FIELDS (ONE Gemini call)
+            #
+            # As soon as the form is uploaded, Gemini reads the handwritten
+            # start/end dates and the printed AE/IE/SC, PIU and Contractor
+            # values together. This populates the delay section immediately
+            # (defect-report sent stays '-'). Never re-runs once stored, so
+            # Gemini is billed for this form exactly once.
+            # -----------------------------------
+
+            print(
+                f"[DEBUG_FLOW] complete_survey survey={survey.id} calling "
+                f"extract_survey_form_fields with {len(pdf_bytes)} bytes",
+                flush=True,
+            )
+
+            try:
+                from utils.auto_sync import extract_survey_form_fields
+                result = extract_survey_form_fields(
+                    survey, pdf_bytes=pdf_bytes
+                )
+                print(
+                    f"[DEBUG_FLOW] complete_survey survey={survey.id} "
+                    f"hook returned {result} "
+                    f"start={survey.extracted_survey_start_date} "
+                    f"end={survey.extracted_survey_end_date}",
+                    flush=True,
+                )
+            except Exception as exc:
+                print(
+                    "SURVEY FORM EXTRACTION ERROR:",
+                    exc,
+                    flush=True,
+                )
+
+            # -----------------------------------
             # CLEAR ONLY CURRENT SURVEY
             # -----------------------------------
 
@@ -1624,6 +1659,34 @@ def reupload_survey_pdf(survey_id):
         survey.pdf_reupload_reason = None
 
         db.session.commit()
+
+        # -----------------------------------
+        # EXTRACT SURVEY FORM FIELDS (ONE Gemini call)
+        # -----------------------------------
+
+        print(
+            f"[DEBUG_FLOW] reupload survey={survey.id} calling "
+            f"extract_survey_form_fields with {len(pdf_bytes)} bytes",
+            flush=True,
+        )
+
+        try:
+            from utils.auto_sync import extract_survey_form_fields
+            result = extract_survey_form_fields(
+                survey, pdf_bytes=pdf_bytes
+            )
+            print(
+                f"[DEBUG_FLOW] reupload survey={survey.id} hook returned {result} "
+                f"start={survey.extracted_survey_start_date} "
+                f"end={survey.extracted_survey_end_date}",
+                flush=True,
+            )
+        except Exception as exc:
+            print(
+                "SURVEY FORM RE-EXTRACTION ERROR:",
+                exc,
+                flush=True,
+            )
 
         # -----------------------------------
         # SUCCESS

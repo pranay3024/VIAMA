@@ -2441,6 +2441,12 @@ def complete_survey(survey_id, pdf_url, actor_role=None):
 
     db.session.commit()
 
+    try:
+        from utils.auto_sync import extract_survey_form_fields
+        extract_survey_form_fields(survey, view_url=pdf_url)
+    except Exception as exc:
+        print("SURVEY FORM EXTRACTION ERROR:", exc, flush=True)
+
     return survey
 
 
@@ -2599,6 +2605,13 @@ def complete_pdf_reupload(survey_id, pdf_url):
     survey.pdf_reupload_required = False
     survey.pdf_reupload_reason = None
     db.session.commit()
+
+    try:
+        from utils.auto_sync import extract_survey_form_fields
+        extract_survey_form_fields(survey, view_url=pdf_url)
+    except Exception as exc:
+        print("SURVEY FORM EXTRACTION ERROR:", exc, flush=True)
+
     return survey
 
 

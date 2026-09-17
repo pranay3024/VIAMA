@@ -9,7 +9,7 @@
         <div class="nav-left">
             <div class="welcome-text">
                 <h2>Delayed Defect Reports</h2>
-                <p>Surveys with more than 3 working days between end date and sent date</p>
+                <p>Surveys appear once the form is uploaded; the sent date fills in when all TL conditions are ticked</p>
             </div>
         </div>
         <div style="display:flex;gap:15px;align-items:center;">
@@ -72,8 +72,12 @@
                         <th>PDF Upload Time</th>
                         <th>End Time</th>
                         <th>Video Upload Time</th>
+                        <th>Survey Start Date</th>
                         <th>Survey End Date</th>
                         <th>End Date Confidence</th>
+                        <th>AE/IE/SC Name</th>
+                        <th>PIU Name</th>
+                        <th>Contractor / O&amp;M Agency</th>
                         <th>Defect Report Sent</th>
                         <th>Gmail Sent Confidence</th>
                         <th>Working Days Delay</th>
@@ -89,12 +93,16 @@
                         <td>{{ survey.display_pdf_upload_time.strftime('%d/%m/%Y %I:%M %p') if survey.display_pdf_upload_time else '-' }}</td>
                         <td>{{ survey.display_end_time.strftime('%d/%m/%Y %I:%M %p') if survey.display_end_time else '-' }}</td>
                         <td>{{ survey.display_video_upload_time.strftime('%d/%m/%Y %I:%M %p') if survey.display_video_upload_time else '-' }}</td>
+                        <td>{{ survey.extracted_survey_start_date.strftime('%d/%m/%Y') if survey.extracted_survey_start_date else '-' }}</td>
                         <td>{{ survey.extracted_survey_end_date.strftime('%d/%m/%Y') if survey.extracted_survey_end_date else '-' }}</td>
                         <td>{{ '%.0f%%'|format((survey.survey_end_date_confidence or 0) * 100) }}</td>
+                        <td>{{ survey.extracted_ae_ie_sc_name if survey.extracted_ae_ie_sc_name else '-' }}</td>
+                        <td>{{ survey.extracted_piu_name if survey.extracted_piu_name else '-' }}</td>
+                        <td>{{ survey.extracted_contractor_agency if survey.extracted_contractor_agency else '-' }}</td>
                         <td>{{ survey.defect_report_sent_at.strftime('%d/%m/%Y') if survey.defect_report_sent_at else '-' }}</td>
                         <td>{{ '%.0f%%'|format((survey.defect_report_sent_confidence or 0) * 100) }}</td>
-                        <td style="color:red;font-weight:bold;">{{ survey.defect_report_delay_days or 0 }}</td>
-                        <td>{{ survey.defect_report_match_status }}</td>
+                        <td style="color:red;font-weight:bold;">{{ survey.defect_report_delay_days if survey.defect_report_delay_days is not none else '-' }}</td>
+                        <td>{{ survey.defect_report_match_status if survey.defect_report_match_status else '-' }}</td>
                                                 <td>
                             <form method="post" action="{{ url_for('admin.manual_delayed_survey_update', survey_id=survey.id, week=request.args.get('week', '')) }}">
                                 <input type="date" name="manual_end_date" value="{{ survey.extracted_survey_end_date.isoformat() if survey.extracted_survey_end_date else '' }}" title="Manual survey end date">
@@ -104,7 +112,7 @@
                         </td>
                     </tr>
                 {% else %}
-                    <tr><td colspan="12">No delayed surveys found.</td></tr>
+                    <tr><td colspan="16">No delayed surveys found.</td></tr>
                 {% endfor %}
                 </tbody>
             </table>

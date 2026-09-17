@@ -256,6 +256,13 @@ class Survey(db.Model):
 
     raw_video_excel_file = db.Column(db.String(500))
 
+    # Fields extracted from the uploaded survey form by a SINGLE Gemini call.
+    extracted_survey_start_date = db.Column(db.Date, nullable=True)
+    survey_start_date_confidence = db.Column(db.Float, nullable=True)
+    extracted_ae_ie_sc_name = db.Column(db.String(255), nullable=True)
+    extracted_piu_name = db.Column(db.String(255), nullable=True)
+    extracted_contractor_agency = db.Column(db.String(255), nullable=True)
+
     captain_status = db.Column(
     db.String(30),
     default="pending",

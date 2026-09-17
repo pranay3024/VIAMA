@@ -87,6 +87,16 @@ class SurveyDates(BaseModel):
     end_confidence: Optional[float] = None
 
 
+class SurveyFormFields(BaseModel):
+    start_date: Optional[str] = None
+    start_confidence: Optional[float] = None
+    end_date: Optional[str] = None
+    end_confidence: Optional[float] = None
+    ae_ie_sc_name: Optional[str] = None
+    piu_name: Optional[str] = None
+    contractor_agency: Optional[str] = None
+
+
 MIN_SURVEY_DATE = date(2026, 6, 1)
 MAX_SURVEY_DATE = date.today()
 
@@ -366,4 +376,212 @@ def extract_survey_dates_from_drive(view_url):
         dates = extract_survey_dates_from_pdf(pdf_bytes)
         _date_cache[view_url] = dates
         return dates
+
+
+def _get_pdf_page_images(pdf_bytes, max_pages=8, scale=1.5):
+    """Render up to ``max_pages`` PNG pages plus an enlarged page-1 date header.
+
+    Called once per survey form so one Gemini request can read every field
+    (handwritten dates in the header plus the printed project details).
+    """
+    try:
+        document = fitz.open(stream=pdf_bytes, filetype="pdf")
+        pages = min(len(document), max_pages)
+        images = []
+        for page_index in range(pages):
+            pix = document[page_index].get_pixmap(
+                matrix=fitz.Matrix(scale, scale),
+                alpha=False,
+            )
+            images.append(pix.tobytes("png"))
+        header = None
+        if pages:
+            page = document[0]
+            header_clip = fitz.Rect(
+                0,
+                0,
+                page.rect.width,
+                page.rect.height * 0.30,
+            )
+            header = page.get_pixmap(
+                matrix=fitz.Matrix(3, 3),
+                clip=header_clip,
+                alpha=False,
+            ).tobytes("png")
+        return images, header
+    except Exception as exc:
+        print(f"[GEMINI SURVEY FORM] Page rendering issue: {exc}", flush=True)
+        return [pdf_bytes], pdf_bytes
+
+
+def _parse_gemini_response(response):
+    """Return the parsed JSON dict (or None) from a generate_content response."""
+    data = None
+    parsed_response = getattr(response, "parsed", None)
+    if isinstance(parsed_response, dict):
+        data = parsed_response
+    elif parsed_response is not None:
+        if hasattr(parsed_response, "model_dump"):
+            data = parsed_response.model_dump()
+        elif hasattr(parsed_response, "dict"):
+            data = parsed_response.dict()
+
+    if data is None:
+        response_parts = []
+        for candidate in getattr(response, "candidates", []) or []:
+            content = getattr(candidate, "content", None)
+            for part in getattr(content, "parts", []) or []:
+                part_text = getattr(part, "text", None)
+                if part_text:
+                    response_parts.append(part_text)
+        text = "".join(response_parts).strip() or (
+            getattr(response, "text", "") or ""
+        ).strip()
+        if not text:
+            return None
+        text = re.sub(r"^```json\s*|\s*```$", "", text, flags=re.IGNORECASE).strip()
+        json_match = re.search(r"\{.*\}", text, flags=re.DOTALL)
+        if json_match:
+            try:
+                data = json.loads(json_match.group(0))
+            except json.JSONDecodeError:
+                data = None
+
+    return data if isinstance(data, dict) else None
+
+
+def _coerce_confidence(value):
+    try:
+        value = float(value)
+    except (TypeError, ValueError):
+        return None
+    return value if 0.0 <= value <= 1.0 else None
+
+
+def _clean_text(value):
+    if not isinstance(value, str):
+        return None
+    cleaned = re.sub(r"\s+", " ", value.strip()).strip()
+    return cleaned or None
+
+
+def extract_survey_form_fields_from_pdf(pdf_bytes):
+    """Extract ALL survey-form fields in a SINGLE Gemini call.
+
+    Returns a dict with keys: start_date, start_confidence, end_date,
+    end_confidence, ae_ie_sc_name, piu_name, contractor_agency. Only dates are
+    handwritten; the rest are printed. No retry call is made - this is the one
+    and only Gemini request for a form, keeping the credit budget predictable.
+    """
+    text_end_date = _extract_end_date_from_pdf_text(pdf_bytes)
+
+    images, header_bytes = _get_pdf_page_images(pdf_bytes)
+
+    prompt = """
+Do not output any reasoning, chain of thought, explanations, or preamble. Output ONLY the extracted fields directly in JSON.
+
+Extract from this NHAI road-survey form the following fields:
+1. start_date - the handwritten Survey Start Date / From date (usually in the top header).
+2. start_confidence - visual certainty of the start date (0.0 to 1.0).
+3. end_date - the handwritten Survey End Date / To date (usually in the top header).
+4. end_confidence - visual certainty of the end date (0.0 to 1.0).
+5. ae_ie_sc_name - the printed name/designation of the AE/IE/SC (Assistant Engineer / In-charge Engineer / Sectional Engineer / Engineer-in-Charge) who checked the form.
+6. piu_name - the printed PIU (Project Implementation Unit) name.
+7. contractor_agency - the printed Contractor / O&M Agency name.
+
+Required JSON format:
+{
+  "start_date": "",
+  "start_confidence": 0.0,
+  "end_date": "",
+  "end_confidence": 0.0,
+  "ae_ie_sc_name": "",
+  "piu_name": "",
+  "contractor_agency": ""
+}
+
+Rules:
+- The project began in June 2026 and continues to the present. Reject any year before 2026. Never output 2020, 2021, 2022, 2023, 2024 or 2025.
+- A short 3-digit year like "026" means 2026.
+- Accept any clearly written date format (e.g. 4 September 2026, 04/09/2026, 2026-09-04).
+- The form may write dates split by vertical bars, e.g. "31 | 08 | 026". Treat each "|" as a plain separator between day, month and year, never as a digit. A vertical stroke before a date is not the digit 1 - read "| 3/08/2026" as "03/08/2026", never "31/08/2026".
+- For numeric dates with an ambiguous day/month order, use day-first order (DD/MM/YYYY) for this Indian form.
+- Read every handwritten digit of the start and end date independently; never assume they are equal or consecutive.
+- If any date digit is ambiguous, lower its confidence below 0.85 so the record is flagged rather than guessed. Return null for a date that cannot be read confidently or is missing/blurry.
+- For ae_ie_sc_name, piu_name and contractor_agency copy the printed value exactly as shown (keep the original spelling/case). Return null if a field is missing or unreadable.
+- Do not guess, repair, or infer unclear values.
+- Confidence values must be between 0.0 and 1.0 and reflect visual certainty only.
+"""
+
+    config = types.GenerateContentConfig(
+        max_output_tokens=2048,
+        response_mime_type="application/json",
+        response_schema=SurveyFormFields,
+    )
+
+    contents = ["COMPLETE SURVEY FORM PAGE 1:"]
+    contents.append(types.Part.from_bytes(data=images[0], mime_type="image/png"))
+    contents.append("ENLARGED DATE HEADER:")
+    contents.append(types.Part.from_bytes(data=header_bytes, mime_type="image/png"))
+    for index in range(1, len(images)):
+        contents.append(f"ADDITIONAL SURVEY FORM PAGE {index + 1}:")
+        contents.append(types.Part.from_bytes(data=images[index], mime_type="image/png"))
+    contents.append(prompt)
+
+    response = _safe_generate(contents, config)
+
+    data = _parse_gemini_response(response)
+    if data is None:
+        raise ValueError("Gemini returned unparseable JSON for the survey form fields")
+
+    normalized = {str(k).lower(): v for k, v in data.items()}
+
+    fields = {
+        "start_date": _valid_date(normalized.get("start_date")),
+        "start_confidence": _coerce_confidence(normalized.get("start_confidence")),
+        "end_date": _valid_date(normalized.get("end_date")) or text_end_date,
+        "end_confidence": _coerce_confidence(normalized.get("end_confidence")),
+        "ae_ie_sc_name": _clean_text(normalized.get("ae_ie_sc_name")),
+        "piu_name": _clean_text(normalized.get("piu_name")),
+        "contractor_agency": _clean_text(normalized.get("contractor_agency")),
+    }
+
+    print(f"[GEMINI SURVEY FORM] parsed result: {fields}", flush=True)
+    return fields
+
+
+def extract_survey_form_fields_from_drive(view_url):
+    """Download a survey form from Drive and extract all fields in one call."""
+    if view_url in _form_fields_cache:
+        print("[GEMINI SURVEY FORM] using cached validated form fields", flush=True)
+        return _form_fields_cache[view_url]
+
+    with _EXTRACT_LOCK:
+        print("[GEMINI SURVEY FORM] downloading survey form from Drive", flush=True)
+        pdf_bytes = download_file_from_drive(view_url)
+        print(f"[GEMINI SURVEY FORM] downloaded PDF bytes: {len(pdf_bytes)}", flush=True)
+
+        fields = extract_survey_form_fields_from_pdf(pdf_bytes)
+        _form_fields_cache[view_url] = fields
+        return fields
+
+
+def apply_survey_form_fields(survey, fields):
+    """Assign extracted form fields onto a Survey object (does not commit).
+
+    Only non-empty dates are written, so a field Gemini could not read stays
+    None and is never overwritten by a stale value.
+    """
+    if fields.get("start_date"):
+        survey.extracted_survey_start_date = date.fromisoformat(fields["start_date"])
+        survey.survey_start_date_confidence = fields.get("start_confidence")
+    if fields.get("end_date"):
+        survey.extracted_survey_end_date = date.fromisoformat(fields["end_date"])
+        survey.survey_end_date_confidence = fields.get("end_confidence")
+    survey.extracted_ae_ie_sc_name = fields.get("ae_ie_sc_name")
+    survey.extracted_piu_name = fields.get("piu_name")
+    survey.extracted_contractor_agency = fields.get("contractor_agency")
+
+
+_form_fields_cache = {}
 

@@ -244,17 +244,17 @@ def delayed_surveys():
         "Aspizo": ("UP", "UTTAR PRADESH", "JHARKHAND"),
     }
 
-    # A survey appears only after the Team Leader ticks all three conditions
-    # (Survey Form / Raw Video / Defect Report) as YES. That tick triggers the
-    # auto-sync flow: Gemini extracts the survey end date -> Gmail API matches
-    # the sent defect report mails -> the sent date is extracted -> the delay
-    # is calculated. No other upload/tick state brings a record in here.
+    # A survey appears in the delay report as soon as its survey form reaches
+    # the portal and Gemini extracts the dates (status is "video pending" or
+    # "completed"). At that point only the survey start/end dates are populated
+    # and "Defect Report Sent" shows '-'. The defect-report sent date is read
+    # from Gmail only after the Team Leader ticks all three conditions
+    # (Survey Form / Raw Video / Defect Report) as YES, and the delay is then
+    # calculated from the already-extracted end date.
     from utils.visibility import exclude_deleted
 
     delayed_query = exclude_deleted(Survey.query, Survey).filter(
-        Survey.survey_form_completed.is_(True),
-        Survey.task1_completed.is_(True),
-        Survey.task2_completed.is_(True),
+        Survey.end_survey_pdf.isnot(None),
         Survey.start_time >= datetime(2026, 8, 3),
         Survey.status.isnot(None),
         Survey.status != "cancelled",
@@ -289,13 +289,31 @@ def delayed_surveys():
         )
 
     # ------------------------------------------------------------
-    # Ordering
+    # Ordering: forms whose defect report has not been sent yet come first,
+    # then the actual delays (largest first).
     # ------------------------------------------------------------
+    sent_pending = case(
+        (Survey.defect_report_sent_at.is_(None), 0),
+        else_=1,
+    )
+    awaiting_extract = case(
+        (Survey.defect_report_delay_days.is_(None), 0),
+        else_=1,
+    )
     delayed = delayed_query.order_by(
-        Survey.defect_report_match_status.asc(),
+        sent_pending.asc(),
+        awaiting_extract.asc(),
+        Survey.survey_pdf_uploaded_at.desc().nullslast(),
         Survey.defect_report_delay_days.desc().nullslast(),
-        Survey.extracted_survey_end_date.asc(),
     ).all()
+
+    print(
+        f"[DEBUG_FLOW] delayed-surveys page: {len(delayed)} rows; "
+        f"missing_start={sum(1 for s in delayed if not s.extracted_survey_start_date)} "
+        f"missing_end={sum(1 for s in delayed if not s.extracted_survey_end_date)} "
+        f"missing_status={sum(1 for s in delayed if s.defect_report_match_status is None)}",
+        flush=True,
+    )
 
     ist_offset = timedelta(hours=5, minutes=30)
 
@@ -2257,18 +2275,21 @@ def survey_dates_for_gmail_draft(survey_id):
         )
         return jsonify({"start_date": None, "end_date": None})
 
-    # Prefer the date already saved in the database so the gmail-draft page
-    # never burns free-tier Gemini quota for a survey we already extracted.
-    # The Gemini extractor only returns an end date (no start date), so this
-    # endpoint never has a start date to expose.
+    # Prefer the dates already saved in the database so the gmail-draft page
+    # never burns Gemini quota for a survey we already extracted. Since the
+    # form-field extractor now stores the start date too, both are exposed.
     if survey.extracted_survey_end_date:
         print(
             f"[GEMINI SURVEY DATES] survey_id={survey_id} "
-            f"using stored end_date={survey.extracted_survey_end_date}",
+            f"using stored start={survey.extracted_survey_start_date} "
+            f"end_date={survey.extracted_survey_end_date}",
             flush=True,
         )
         return jsonify({
-            "start_date": None,
+            "start_date": (
+                survey.extracted_survey_start_date.isoformat()
+                if survey.extracted_survey_start_date else None
+            ),
             "end_date": survey.extracted_survey_end_date.isoformat(),
         })
 
@@ -2289,7 +2310,10 @@ def survey_dates_for_gmail_draft(survey_id):
         return jsonify({"start_date": None, "end_date": None}), 502
 
     return jsonify({
-        "start_date": None,
+        "start_date": (
+            survey.extracted_survey_start_date.isoformat()
+            if survey.extracted_survey_start_date else None
+        ),
         "end_date": survey.extracted_survey_end_date.isoformat(),
     })
 

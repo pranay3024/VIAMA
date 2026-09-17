@@ -5957,12 +5957,21 @@ def survey_forms():
             "survey_day": survey.survey_day,
             "status": survey.status,
             "pdf_url": survey.end_survey_pdf,
+            "start_date": (
+                survey.extracted_survey_start_date.isoformat()
+                if survey.extracted_survey_start_date
+                else None
+            ),
+            "start_date_confidence": survey.survey_start_date_confidence,
             "end_date": (
                 survey.extracted_survey_end_date.isoformat()
                 if survey.extracted_survey_end_date
                 else None
             ),
             "end_date_confidence": survey.survey_end_date_confidence,
+            "ae_ie_sc_name": survey.extracted_ae_ie_sc_name,
+            "piu_name": survey.extracted_piu_name,
+            "contractor_agency": survey.extracted_contractor_agency,
         })
 
     return ok({

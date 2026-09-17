@@ -23,7 +23,7 @@ load_dotenv()
 from app import create_app
 from extensions import db
 from google_drive import get_gmail
-from gemini_utils import extract_survey_dates_from_drive
+from gemini_utils import extract_survey_form_fields_from_drive, apply_survey_form_fields
 from models.db_models import Survey
 from utils.defect_report_delay import (
     build_defect_email_index,
@@ -172,13 +172,10 @@ def sync_batch(args):
             )
             try:
                 if args.force or not survey.extracted_survey_end_date:
-                    dates = extract_survey_dates_from_drive(
+                    fields = extract_survey_form_fields_from_drive(
                         survey.end_survey_pdf
                     )
-                    survey.extracted_survey_end_date = datetime.strptime(
-                        dates["end_date"], "%Y-%m-%d"
-                    ).date()
-                    survey.survey_end_date_confidence = dates["end_confidence"]
+                    apply_survey_form_fields(survey, fields)
 
                 match = find_defect_report_email(survey, email_index, gmail)
                 if not match:

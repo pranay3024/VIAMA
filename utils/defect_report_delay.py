@@ -152,12 +152,15 @@ def _message_matches_section_cycle(survey, text):
 		return True
 
 	# The generated subject contains UPC_cycle_completion, for example
-	# ``N/02005/06001/UP_008_080926``.
+	# ``N/02005/06001/UP_008_080926``.  Require the 6-digit date suffix
+	# so that e.g. cycle 010 does not accidentally match the leading digits
+	# of a different cycle's number (the old ``0*`` prefix caused false
+	# matches like 0*010 matching 0010 from cycle 001's text).
 	upc = _normalize(survey.upc_code)
 	return bool(
 		upc
 		and re.search(
-			rf"{re.escape(upc)}0*{int(survey.cycle_no):03d}",
+			rf"{re.escape(upc)}{int(survey.cycle_no):03d}\d{{6}}",
 			normalized_text,
 		)
 	)

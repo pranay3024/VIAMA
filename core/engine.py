@@ -2400,6 +2400,9 @@ def groundwork_complete(survey_id):
     survey = lock_survey(survey_id)
     assert_transition(survey, SURVEY_GROUNDWORK_COMPLETED)
     survey.status = SURVEY_GROUNDWORK_COMPLETED
+    # Match the portal's groundwork button, which stamps the IST end time here.
+    if survey.end_time is None:
+        survey.end_time = ist_aware_now()
     db.session.commit()
     return survey
 
@@ -2426,7 +2429,6 @@ def complete_survey(survey_id, pdf_url, actor_role=None):
     survey.end_survey_pdf = pdf_url
     survey.video_uploaded = False
     survey.status = SURVEY_VIDEO_PENDING
-    survey.end_time = ist_aware_now()
     survey.video_pending_start_time = utc_now()
 
     assignment = (

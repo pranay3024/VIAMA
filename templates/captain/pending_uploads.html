@@ -81,14 +81,42 @@ class="main-btn">
 
 {% endif %}
 
-{% if survey.status in ["ongoing", "groundwork_completed", "video_pending"] %}
+{% if survey.status == "ongoing" %}
+
+<p style="
+    color:#d32f2f;
+    font-weight:bold;
+    font-size:15px;
+">
+⚠ Groundwork has not been completed yet.
+</p>
+
+<p>
+Please click <b>Complete Groundwork</b> for this stretch
+before uploading the video counts.
+</p>
+
+<a
+href="/continue-survey/{{ survey.id }}"
+class="main-btn"
+style="
+    text-decoration:none;
+">
+
+✅ COMPLETE GROUNDWORK
+
+</a>
+
+<hr style="margin:20px 0;">
+
+{% elif survey.status in ["groundwork_completed", "video_pending"] %}
 
 <p>
 Has the video been uploaded?
 </p>
 
 <form
-action="{{ url_for('captain.upload_video', survey_id=survey.id) }}"
+action="/upload-video/{{ survey.id }}"
 method="POST">
 
 <button

@@ -342,76 +342,98 @@ def checklist():
         import tempfile
 
         from google_drive import upload_file_to_drive
+        from config_drive import IMAGE_FOLDER_ID
 
-        ext = os.path.splitext(
-            dashcam_photo.filename
-        )[1].lower()
-
-        dashcam_name = (
-            str(uuid.uuid4()) + ext
-        )
-
-        # -----------------------------------------------------
-        # CREATE TEMP FILE
-        # -----------------------------------------------------
-
-        fd, temp_path = tempfile.mkstemp(
-            suffix=ext
-        )
-
-        os.close(fd)
-
-        # -----------------------------------------------------
-        # SAVE IMAGE
-        # -----------------------------------------------------
-
-        dashcam_photo.save(temp_path)
-
-        # -----------------------------------------------------
-        # COMPRESS IMAGE
-        # -----------------------------------------------------
-
-        compressed_path = compress_image(
-            temp_path
-        )
-
-        # -----------------------------------------------------
-        # READ COMPRESSED IMAGE
-        # -----------------------------------------------------
-
-        with open(
-            compressed_path,
-            "rb"
-        ) as f:
-
-            image_bytes = f.read()
-
-        # -----------------------------------------------------
-        # UPLOAD TO GOOGLE DRIVE
-        # -----------------------------------------------------
-
-        result = upload_file_to_drive(
-            file_bytes=image_bytes,
-            filename=dashcam_name,
-            folder_id="1W1SCf0_E28VdM8zfzzjFOR-aJL2-e0tT",
-            mime_type="image/jpeg"
-        )
-
-        dashcam_url = result["image_url"]
-
-        # -----------------------------------------------------
-        # CLEANUP
-        # -----------------------------------------------------
+        temp_path = None
+        compressed_path = None
 
         try:
-            os.remove(temp_path)
-        except Exception:
-            pass
 
-        try:
-            os.remove(compressed_path)
-        except Exception:
-            pass
+            ext = os.path.splitext(
+                dashcam_photo.filename
+            )[1].lower()
+
+            dashcam_name = (
+                str(uuid.uuid4()) + ext
+            )
+
+            # -----------------------------------------------------
+            # CREATE TEMP FILE
+            # -----------------------------------------------------
+
+            fd, temp_path = tempfile.mkstemp(
+                suffix=ext
+            )
+
+            os.close(fd)
+
+            # -----------------------------------------------------
+            # SAVE IMAGE
+            # -----------------------------------------------------
+
+            dashcam_photo.save(temp_path)
+
+            # -----------------------------------------------------
+            # COMPRESS IMAGE
+            # -----------------------------------------------------
+
+            compressed_path = compress_image(
+                temp_path
+            )
+
+            # -----------------------------------------------------
+            # READ COMPRESSED IMAGE
+            # -----------------------------------------------------
+
+            with open(
+                compressed_path,
+                "rb"
+            ) as f:
+
+                image_bytes = f.read()
+
+            # -----------------------------------------------------
+            # UPLOAD TO GOOGLE DRIVE
+            # -----------------------------------------------------
+
+            result = upload_file_to_drive(
+                file_bytes=image_bytes,
+                filename=dashcam_name,
+                folder_id=IMAGE_FOLDER_ID,
+                mime_type="image/jpeg"
+            )
+
+            dashcam_url = result["image_url"]
+
+        except Exception as exc:
+
+            from flask import current_app
+
+            current_app.logger.error(
+                "Dashcam photo upload failed for %s: %s: %s",
+                user.email,
+                type(exc).__name__,
+                exc
+            )
+
+            flash(
+                "Dashcam photo upload failed. The survey was "
+                "saved without the photo - please try uploading "
+                "the photo again later.",
+                "warning"
+            )
+
+        finally:
+
+            try:
+                os.remove(temp_path)
+            except Exception:
+                pass
+
+            try:
+                os.remove(compressed_path)
+            except Exception:
+                pass
 
     # =========================================================
     # CREATE NEW SURVEY
@@ -603,13 +625,17 @@ def groundwork_complete():
 
         survey.status = "groundwork_completed"
 
-        # Stop survey timing here
-        if survey.end_time is None:
-            survey.end_time = datetime.now(
-                pytz.timezone("Asia/Kolkata")
-            )
+    # Stop survey timing here regardless of the current status. Previously this
+    # only ran for "ongoing", so a survey whose groundwork was completed via the
+    # API, or that reached this screen from a later status, never got an end
+    # time and displayed "-" even after the survey was completed.
+    if survey.end_time is None:
 
-        db.session.commit()
+        survey.end_time = datetime.now(
+            pytz.timezone("Asia/Kolkata")
+        )
+
+    db.session.commit()
 
     return redirect("/recording")
 
@@ -836,9 +862,9 @@ def complete_survey():
 
             survey.video_pending_start_time = datetime.utcnow()
 
-            # -----------------------------------
-            # UPDATE ASSIGNMENT
-            # -----------------------------------
+        # -----------------------------------
+        # UPDATE ASSIGNMENT
+        # -----------------------------------
 
             assignment = SurveyAssignment.query.filter(
                SurveyAssignment.section_no == survey.section_no,
@@ -1125,6 +1151,20 @@ def video_counts(survey_id):
     session["survey_id"] = survey.id
 
     # -----------------------------------
+    # GROUNDWORK MUST COME FIRST
+    # -----------------------------------
+
+    if survey.status == "ongoing":
+
+        flash(
+            "Please click 'Complete Groundwork' first "
+            "before uploading video counts for this stretch.",
+            "warning"
+        )
+
+        return redirect("/recording")
+
+    # -----------------------------------
     # SAVE VIDEO COUNTS
     # -----------------------------------
 
@@ -1261,6 +1301,16 @@ def upload_video(survey_id):
 
         # Make this the currently active survey
         session["survey_id"] = survey.id
+
+        if survey.status == "ongoing":
+
+            flash(
+                "Please click 'Complete Groundwork' first "
+                "before uploading the video counts for this stretch.",
+                "warning"
+            )
+
+            return redirect("/recording")
 
         return redirect(
             f"/video-counts/{survey.id}"

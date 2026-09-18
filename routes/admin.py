@@ -1714,8 +1714,12 @@ def missed_extract():
 @admin_bp.route("/admin/survey/<int:survey_id>")
 def survey_details_admin(survey_id):
 
-    # Allow Admin + Regional Manager
-    if session.get("role") not in ["admin", "regional_manager"]:
+    # Allow Admin + Regional Manager + Survey Form Approver
+    if session.get("role") not in [
+        "admin",
+        "regional_manager",
+        "form_approver",
+    ]:
         return redirect("/")
 
     from datetime import timedelta
@@ -1743,17 +1747,6 @@ def survey_details_admin(survey_id):
         display_start_time=display_start_time,
         display_end_time=display_end_time
     )
-
-
-@admin_bp.route("/admin/survey/<int:survey_id>/approve-form", methods=["POST"])
-def approve_survey_form(survey_id):
-    if session.get("role") != "admin":
-        return redirect("/")
-
-    survey = Survey.query.get_or_404(survey_id)
-    survey.survey_form_approved = True
-    db.session.commit()
-    return redirect("/admin")
 
 
 @admin_bp.route(

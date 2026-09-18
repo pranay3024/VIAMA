@@ -184,6 +184,8 @@ margin-top:10px;">
 
 {% else %}
 
+{% if session.get("role") == "admin" %}
+
 <button
 class="main-btn"
 onclick="openPdfModal()"
@@ -192,6 +194,8 @@ style="background:#dc3545;">
 ❌ Request PDF Re-upload
 
 </button>
+
+{% endif %}
 
 {% endif %}
 
@@ -265,6 +269,8 @@ class="view-btn">
 
 
 
+{% if session.get("role") == "admin" %}
+
 <div
 id="pdfModal"
 style="display:none;
@@ -325,6 +331,8 @@ Cancel
 </div>
 
 </div>
+
+{% endif %}
 
 <script>
 

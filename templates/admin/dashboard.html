@@ -1462,24 +1462,17 @@ View
 
 </td>
 
-<!-- SURVEY FORM APPROVAL -->
+<!-- SURVEY FORM APPROVAL (set by Survey Form Approver; read-only here) -->
 
 <td style="text-align:center;">
 
 {% if survey.survey_form_approved %}
 
-<span style="color:green;font-weight:bold;">Approved</span>
+<span style="color:green;font-weight:bold;">YES</span>
 
 {% else %}
 
-<form method="post"
-      action="{{ url_for('admin.approve_survey_form', survey_id=survey.id) }}"
-      onsubmit="return confirm('Approve this survey form?');">
-    <button type="submit"
-            style="border:0;background:none;color:#c00;font-weight:bold;cursor:pointer;">
-        NO
-    </button>
-</form>
+<span style="color:red;font-weight:bold;">NO</span>
 
 {% endif %}
 

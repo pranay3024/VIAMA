@@ -43,6 +43,7 @@ def create_app():
     from routes.captain import captain_bp
     from routes.roadvision import roadvision_bp
     from routes.sync import sync_bp
+    from routes.form_approver import form_approver_bp
 
 
     app.register_blueprint(auth_bp)
@@ -52,6 +53,7 @@ def create_app():
     app.register_blueprint(teamleader_bp)
     app.register_blueprint(roadvision_bp)
     app.register_blueprint(sync_bp)
+    app.register_blueprint(form_approver_bp)
 
     # JSON API at /api/v1 - additive; none of the routes above are affected.
     from core.api import register_api

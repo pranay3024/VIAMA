@@ -69,6 +69,7 @@
                     <tr>
                         <th>S.No.</th>
                         <th>Stretch / Cycle</th>
+                        <th>Survey PDF</th>
                         <th>PDF Upload Time</th>
                         <th>End Time</th>
                         <th>Video Upload Time</th>
@@ -90,6 +91,13 @@
                     <tr>
                         <td>{{ loop.index }}</td>
                         <td>{{ survey.section_no }}_Cycle{{ survey.cycle_no }}</td>
+                        <td>
+                            {% if survey.end_survey_pdf %}
+                                <a href="{{ survey.end_survey_pdf }}" class="view-btn" target="_blank" rel="noopener">View</a>
+                            {% else %}
+                                -
+                            {% endif %}
+                        </td>
                         <td>{{ survey.display_pdf_upload_time.strftime('%d/%m/%Y %I:%M %p') if survey.display_pdf_upload_time else '-' }}</td>
                         <td>{{ survey.display_end_time.strftime('%d/%m/%Y %I:%M %p') if survey.display_end_time else '-' }}</td>
                         <td>{{ survey.display_video_upload_time.strftime('%d/%m/%Y %I:%M %p') if survey.display_video_upload_time else '-' }}</td>
@@ -112,7 +120,7 @@
                         </td>
                     </tr>
                 {% else %}
-                    <tr><td colspan="16">No delayed surveys found.</td></tr>
+                    <tr><td colspan="17">No delayed surveys found.</td></tr>
                 {% endfor %}
                 </tbody>
             </table>

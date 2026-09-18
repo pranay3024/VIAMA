@@ -60,6 +60,9 @@ def login():
                 
                 elif user.role == "roadvision":
                     return redirect("/roadvision")
+                
+                if user.role == "form_approver":
+                    return redirect("/form-approver")
 
         return "Invalid Credentials"
 

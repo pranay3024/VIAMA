@@ -5956,6 +5956,7 @@ def survey_forms():
             "captain_name": survey.captain_name,
             "survey_day": survey.survey_day,
             "status": survey.status,
+            "survey_form_approved": survey.survey_form_approved,
             "pdf_url": survey.end_survey_pdf,
             "start_date": (
                 survey.extracted_survey_start_date.isoformat()

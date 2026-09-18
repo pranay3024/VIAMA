@@ -104,6 +104,7 @@ ROLE_BACKUP_CAPTAIN = "backup_captain"
 ROLE_REGIONAL_MANAGER = "regional_manager"
 ROLE_TEAM_LEADER = "team_leader"
 ROLE_ROADVISION = "roadvision"
+ROLE_FORM_APPROVER = "form_approver"
 
 ROLES = (
     ROLE_ADMIN,
@@ -112,6 +113,7 @@ ROLES = (
     ROLE_REGIONAL_MANAGER,
     ROLE_TEAM_LEADER,
     ROLE_ROADVISION,
+    ROLE_FORM_APPROVER,
 )
 
 #: Landing page per role - routes/auth.py:55-71.
@@ -122,6 +124,7 @@ ROLE_LANDING = {
     ROLE_TEAM_LEADER: "/teamleader",
     ROLE_BACKUP_CAPTAIN: "/backup-home",
     ROLE_ROADVISION: "/roadvision",
+    ROLE_FORM_APPROVER: "/form-approver",
 }
 
 # ---------------------------------------------------------------------------

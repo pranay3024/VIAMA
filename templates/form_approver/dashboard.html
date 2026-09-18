@@ -1,0 +1,713 @@
+<!DOCTYPE html>
+<html>
+<head>
+
+    <title>Survey Form Approver</title>
+
+    <meta name="viewport"
+          content="width=device-width, initial-scale=1.0">
+
+    <link rel="stylesheet"
+          href="{{ url_for('static',
+          filename='css/admin.css') }}">
+
+</head>
+<body>
+
+    <div class="top-navbar">
+
+        <div class="nav-left">
+
+            <img
+            src="{{ url_for('static',
+            filename='images/viama_logo.png') }}"
+            class="logo-img">
+
+            <div class="welcome-text">
+
+                <h2>Welcome</h2>
+
+                <p>
+                    Survey Monitoring & Operations Center
+                </p>
+
+            </div>
+
+        </div>
+
+        <div style="display:flex;gap:15px;align-items:center;">
+
+    <a
+    href="/form-approver/change-password"
+    class="logout-btn">
+
+    🔒 Change Password
+
+    </a>
+
+    <a
+    href="/logout"
+    class="logout-btn">
+
+    Logout
+
+    </a>
+
+</div>
+
+    </div>
+
+    <div class="dashboard-content">
+
+    {% if success_message %}
+
+    <div style="
+        background:#dcfce7;
+        color:#166534;
+        padding:12px 18px;
+        border-radius:10px;
+        border:1px solid #86efac;
+        font-weight:600;
+        margin-bottom:18px;
+    ">
+
+        {{ success_message }}
+
+    </div>
+
+    {% endif %}
+
+    <form method="GET" class="advanced-filter">
+
+        <select name="state">
+
+            <option value="">
+                States
+            </option>
+
+            {% for state in states %}
+
+            <option value="{{ state }}"
+            {% if request.args.get("state") == state %}selected{% endif %}>
+                {{ state }}
+            </option>
+
+            {% endfor %}
+
+        </select>
+
+        <select name="team">
+
+            <option value="">
+                Teams
+            </option>
+
+            <option value="krish"
+            {% if request.args.get("team") == "krish" %}selected{% endif %}>
+                North-East
+            </option>
+
+            <option value="godbole"
+            {% if request.args.get("team") == "godbole" %}selected{% endif %}>
+                Odisha
+            </option>
+
+            <option value="aspizo"
+            {% if request.args.get("team") == "aspizo" %}selected{% endif %}>
+                UP-Jharkhand
+            </option>
+
+        </select>
+
+        <!-- Week -->
+        <select name="week" id="weekFilter">
+
+            <option value="">
+                Week
+            </option>
+
+            {% for week in weeks %}
+
+            <option
+                value="{{ week }}"
+                {% if request.args.get("week") == week|string
+                or (not request.args and week == current_week_no) %}
+                selected
+                {% endif %}
+            >
+                Week {{ week }}
+            </option>
+
+            {% endfor %}
+
+        </select>
+
+        <!-- Cycle -->
+        <select name="cycle">
+
+            <option value="">
+                Cycle
+            </option>
+
+            {% for cycle in cycles %}
+
+            <option
+                value="{{ cycle }}"
+                {% if request.args.get("cycle") == cycle|string %}
+                selected
+                {% endif %}
+            >
+                Cycle {{ cycle }}
+            </option>
+
+            {% endfor %}
+
+        </select>
+
+        <!-- Day -->
+        <select name="day">
+
+            <option value="">
+                Day
+            </option>
+
+            {% for d in ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"] %}
+
+            <option value="{{ d }}"
+            {% if request.args.get("day") == d %}selected{% endif %}>
+                {{ d }}
+            </option>
+
+            {% endfor %}
+
+        </select>
+
+        <select name="status">
+
+            <option value="">
+                Status
+            </option>
+
+            <option value="ongoing"
+            {% if request.args.get("status") == "ongoing" %}selected{% endif %}>
+                SURVEY STARTED BUT NOT COMPLETED
+            </option>
+
+            <option value="completed"
+            {% if request.args.get("status") == "completed" %}selected{% endif %}>
+                Completed
+            </option>
+
+            <option value="video_uploaded_pending_form"
+            {% if request.args.get("status") == "video_uploaded_pending_form" %}selected{% endif %}>
+                Video Uploaded - Form Pending
+            </option>
+
+            <option value="video_pending"
+            {% if request.args.get("status") == "video_pending" %}selected{% endif %}>
+                Video Pending
+            </option>
+
+            <option value="groundwork_completed"
+            {% if request.args.get("status") == "groundwork_completed" %}selected{% endif %}>
+                Groundwork Completed - Video and Form Pending
+            </option>
+
+            <option value="pdf_reupload_required"
+            {% if request.args.get("status") == "pdf_reupload_required" %}selected{% endif %}>
+                PDF Re-upload Required
+            </option>
+
+            <option value="rescheduled"
+            {% if request.args.get("status") == "rescheduled" %}selected{% endif %}>
+                Rescheduled
+            </option>
+
+            <option value="cancelled"
+            {% if request.args.get("status") == "cancelled" %}selected{% endif %}>
+                Cancelled
+            </option>
+
+        </select>
+
+        <div style="display:flex;align-items:flex-start;gap:10px;">
+
+            <a
+                href="/form-approver"
+                class="search-btn"
+                style="text-decoration:none;">
+
+                ✕ Clear
+
+            </a>
+
+            <button
+                type="submit"
+                class="search-btn">
+
+                Apply Filters
+
+            </button>
+
+        </div>
+
+    </form>
+
+    <div class="table-wrapper">
+
+    <table class="survey-table">
+
+    <thead>
+
+    <tr>
+
+<th>S.No.</th>
+
+<th>UPC<br>Code</th>
+
+<th style="min-width:80px;">Section</th>
+
+<th style="min-width:100px;">Cycle</th>
+
+<th>Actual<br>Survey<br>Day</th>
+
+<th style="min-width:170px;">Start<br>Time</th>
+
+<th style="min-width:170px;">End<br>Time</th>
+
+<th style="min-width:140px;">PDF<br>Upload Time</th>
+
+<th>Video<br>Upload Time</th>
+
+<th style="min-width:160px;">Status</th>
+
+<th>Survey<br>Form</th>
+
+<th>Raw<br>Video</th>
+
+<th style="min-width:140px;">Survey Form<br>Approved</th>
+
+<th style="min-width:90px;">Details</th>
+
+    </tr>
+
+    </thead>
+
+    <tbody>
+
+   {% for survey in all_surveys %}
+
+<tr>
+
+    <td>{{ loop.index }}</td>
+
+    <td>{{ survey.upc_code }}</td>
+
+    <td>{{ survey.section_no }}</td>
+
+    <td>
+
+{% if survey.is_resurvey %}
+
+{{ survey.cycle_no }} (R)
+
+{% else %}
+
+{{ survey.cycle_no }}
+
+{% endif %}
+
+</td>
+
+    <td>{{ survey.scheduled_day }}</td>
+
+    <td style="min-width:140px;line-height:1.4;">
+
+{% if survey.display_start_time %}
+
+{{ survey.display_start_time.strftime('%A') }}<br>
+{{ survey.display_start_time.strftime('%I:%M %p') }}<br>
+
+<small>
+{{ survey.display_start_time.strftime('%d %b %Y') }}
+</small>
+
+{% else %}
+
+-
+
+{% endif %}
+
+</td>
+
+<td style="min-width:140px;line-height:1.4;">
+
+{% if survey.display_end_time %}
+
+{{ survey.display_end_time.strftime('%A') }}<br>
+{{ survey.display_end_time.strftime('%I:%M %p') }}<br>
+
+<small>
+{{ survey.display_end_time.strftime('%d %b %Y') }}
+</small>
+
+{% else %}
+
+-
+
+{% endif %}
+
+</td>
+
+<td style="min-width:140px;line-height:1.4;">
+
+{% if survey.display_pdf_upload_time %}
+
+    <span class="{% if survey.pdf_upload_late %}pdf-upload-late{% endif %}">
+        {{ survey.display_pdf_upload_time.strftime('%d %b %Y') }}
+        <br>
+        {{ survey.display_pdf_upload_time.strftime('%I:%M %p') }}
+    </span>
+
+{% elif survey.pdf_upload_late %}
+
+    <span style="color:red; font-weight:bold;">
+        Delayed
+    </span>
+
+{% else %}
+
+    -
+
+{% endif %}
+
+</td>
+
+<td>
+
+{% if survey.display_video_upload_time %}
+
+    <span class="{% if survey.video_upload_late %}video-upload-late{% endif %}">
+        {{ survey.display_video_upload_time.strftime('%d %b %Y') }}
+        <br>
+        {{ survey.display_video_upload_time.strftime('%I:%M %p') }}
+    </span>
+
+{% elif survey.video_upload_late %}
+
+    <span style="color:red; font-weight:bold;">
+        Delayed
+    </span>
+
+{% else %}
+
+    -
+
+{% endif %}
+
+</td>
+
+<td style="
+    min-width:220px;
+    text-align:center;
+    vertical-align:middle;
+">
+
+    {% set s_status = (survey.status|string|trim|lower) %}
+
+    {% if s_status == "cancelled" %}
+
+        <span style="
+            background:linear-gradient(135deg,#fee2e2,#fecaca);
+            color:#b91c1c;
+            padding:9px 18px;
+            border-radius:25px;
+            font-weight:700;
+            display:inline-flex;
+            align-items:center;
+            justify-content:center;
+            gap:7px;
+            min-width:155px;
+            border:1px solid #fca5a5;
+            box-shadow:0 2px 5px rgba(185,28,28,.12);
+        ">
+             CANCELLED
+        </span>
+
+    {% elif s_status == "rescheduled" %}
+
+        <span style="
+            background:linear-gradient(135deg,#fef3c7,#fde68a);
+            color:#92400e;
+            padding:9px 18px;
+            border-radius:25px;
+            font-weight:700;
+            display:inline-flex;
+            align-items:center;
+            justify-content:center;
+            gap:7px;
+            min-width:155px;
+            border:1px solid #fbbf24;
+            box-shadow:0 2px 5px rgba(146,64,14,.12);
+        ">
+             RESCHEDULED
+        </span>
+
+    {% elif s_status == "ongoing" %}
+
+        <span style="
+            background:linear-gradient(135deg,#dcfce7,#bbf7d0);
+            color:#166534;
+            padding:9px 18px;
+            border-radius:25px;
+            font-weight:700;
+            display:inline-flex;
+            align-items:center;
+            justify-content:center;
+            gap:7px;
+            min-width:155px;
+            border:1px solid #86efac;
+            box-shadow:0 2px 5px rgba(22,101,52,.10);
+        ">
+             SURVEY STARTED BUT NOT COMPLETED
+        </span>
+
+    {% elif s_status == "groundwork_completed" %}
+
+        <span style="
+            background:linear-gradient(135deg,#dcfce7,#bbf7d0);
+            color:#166534;
+            padding:9px 18px;
+            border-radius:18px;
+            font-weight:700;
+            display:inline-flex;
+            flex-direction:column;
+            align-items:center;
+            justify-content:center;
+            gap:3px;
+            min-width:190px;
+            border:1px solid #86efac;
+            box-shadow:0 2px 5px rgba(22,101,52,.10);
+            line-height:1.25;
+        ">
+            <span>Groundwork Completed</span>
+            <span style="font-size:11px;">
+                Form and Video Pending
+            </span>
+        </span>
+
+    {% elif s_status == "video_uploaded_pending_form" %}
+
+        <span style="
+            background:linear-gradient(135deg,#dbeafe,#bfdbfe);
+            color:#1d4ed8;
+            padding:9px 18px;
+            border-radius:25px;
+            font-weight:700;
+            display:inline-flex;
+            flex-direction:column;
+            align-items:center;
+            justify-content:center;
+            gap:2px;
+            min-width:180px;
+            border:1px solid #93c5fd;
+            box-shadow:0 2px 5px rgba(29,78,216,.10);
+            line-height:1.25;
+        ">
+            <span> Video Uploaded</span>
+            <span>Form Pending</span>
+        </span>
+
+    {% elif s_status == "video_pending" %}
+
+        <span style="
+            background:linear-gradient(135deg,#fef3c7,#fde68a);
+            color:#b45309;
+            padding:9px 18px;
+            border-radius:25px;
+            font-weight:700;
+            display:inline-flex;
+            align-items:center;
+            justify-content:center;
+            gap:7px;
+            min-width:155px;
+            border:1px solid #fbbf24;
+            box-shadow:0 2px 5px rgba(180,83,9,.10);
+        ">
+             VIDEO PENDING
+        </span>
+
+    {% elif s_status == "completed" %}
+
+        <span style="
+            background:linear-gradient(135deg,#dcfce7,#a7f3d0);
+            color:#047857;
+            padding:9px 18px;
+            border-radius:25px;
+            font-weight:700;
+            display:inline-flex;
+            align-items:center;
+            justify-content:center;
+            gap:7px;
+            min-width:155px;
+            border:1px solid #6ee7b7;
+            box-shadow:0 2px 5px rgba(4,120,87,.10);
+        ">
+             COMPLETED
+        </span>
+
+    {% elif s_status == "pending" %}
+
+        <span style="
+            background:linear-gradient(135deg,#f3f4f6,#e5e7eb);
+            color:#6b7280;
+            padding:9px 18px;
+            border-radius:25px;
+            font-weight:700;
+            display:inline-flex;
+            align-items:center;
+            justify-content:center;
+            gap:7px;
+            min-width:155px;
+            border:1px solid #d1d5db;
+        ">
+             PENDING
+        </span>
+
+    {% else %}
+
+        <span style="
+            background:#f3f4f6;
+            color:#4b5563;
+            padding:9px 18px;
+            border-radius:25px;
+            font-weight:700;
+            display:inline-flex;
+            align-items:center;
+            justify-content:center;
+            min-width:155px;
+            border:1px solid #d1d5db;
+        ">
+            {{ s_status or "UNKNOWN" }}
+        </span>
+
+    {% endif %}
+
+</td>
+
+    <td>
+
+{% if survey.survey_form_completed %}
+
+ YES
+
+{% if survey.display_form_completed_time %}
+<br>
+<small>
+{{ survey.display_form_completed_time.strftime('%d %b %Y') }}<br>
+{{ survey.display_form_completed_time.strftime('%I:%M %p') }}
+</small>
+{% endif %}
+
+{% else %}
+
+ NO
+
+{% endif %}
+
+    </td>
+
+    <td>
+
+{% if survey.task1_completed %}
+
+ YES
+
+{% if survey.display_task1_completed_time %}
+<br>
+<small>
+{{ survey.display_task1_completed_time.strftime('%d %b %Y') }}<br>
+{{ survey.display_task1_completed_time.strftime('%I:%M %p') }}
+</small>
+{% endif %}
+
+{% else %}
+
+ NO
+
+{% endif %}
+
+    </td>
+
+    <!-- SURVEY FORM APPROVAL (main action) -->
+
+    <td style="text-align:center;">
+
+{% if survey.survey_form_approved %}
+
+    <span style="color:green;font-weight:bold;">YES</span>
+
+{% else %}
+
+    <span style="color:red;font-weight:bold;">NO</span>
+
+    <br>
+
+    <form method="post"
+          action="{{ url_for('form_approver.survey_form_approval', survey_id=survey.id) }}"
+          onsubmit="return confirm('Approve this survey form?');"
+          style="margin-top:6px;">
+
+        <input type="hidden" name="action" value="approve">
+
+        {% for key, value in filter_args.items() %}
+            {% if value %}
+                <input type="hidden" name="{{ key }}" value="{{ value }}">
+            {% endif %}
+        {% endfor %}
+
+        <button type="submit"
+                style="border:none;background:linear-gradient(135deg,#16a34a,#15803d);color:#fff;padding:5px 14px;border-radius:14px;font-weight:600;cursor:pointer;">
+            ✅ Approve
+        </button>
+
+    </form>
+
+{% endif %}
+
+    </td>
+
+    <td>
+
+    <a
+    href="/admin/survey/{{ survey.id }}"
+    class="view-btn">
+
+    View
+
+    </a>
+
+    </td>
+
+</tr>
+
+    {% else %}
+
+<tr>
+    <td colspan="14" style="text-align:center;padding:24px;">
+        No surveys found for the selected filters.
+    </td>
+</tr>
+
+    {% endfor %}
+
+    </tbody>
+
+    </table>
+
+    </div>
+
+    </div>
+
+</body>
+</html>

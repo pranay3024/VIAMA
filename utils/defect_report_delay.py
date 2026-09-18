@@ -64,12 +64,54 @@ def _header(headers, name):
 	return ""
 
 
+def _error_reason(exc):
+	"""Return the API error reason (e.g. ``rateLimitExceeded``) if any."""
+	try:
+		for detail in (getattr(exc, "error_details", None) or []):
+			reason = detail.get("reason")
+			if reason:
+				return reason
+	except Exception:
+		pass
+	text = str(exc)
+	if "rateLimitExceeded" in text:
+		return "rateLimitExceeded"
+	if "userRateLimitExceeded" in text:
+		return "userRateLimitExceeded"
+	if "Quota exceeded" in text:
+		return "quotaExceeded"
+	return str(getattr(getattr(exc, "resp", None), "reason", "") or "")
+
+
+def _is_gmail_quota_error(exc):
+	"""True for Gmail per-user unit / rate-limit quota errors.
+
+	Gmail's per-user unit windows surface as a 403 (or 429) whose reason is
+	e.g. ``rateLimitExceeded``/``quotaExceeded``. The window rolls over within
+	a minute, so these are transient - they must be retried, never treated as
+	permanent failures.
+	"""
+	return (
+		isinstance(exc, HttpError)
+		and _error_reason(exc) in (
+			"rateLimitExceeded",
+			"userRateLimitExceeded",
+			"quotaExceeded",
+			"limitExceeded",
+			"dailyLimitExceeded",
+		)
+	)
+
+
 def _is_retryable_gmail_error(exc):
 	"""True for transient network / rate-limit Gmail API failures."""
 	if isinstance(exc, (socket.timeout, TimeoutError, ConnectionError, OSError)):
 		return True
 	if isinstance(exc, HttpError):
-		return exc.resp.status in (429, 500, 502, 503, 504)
+		if exc.resp.status in (429, 500, 502, 503, 504):
+			return True
+		if exc.resp.status == 403 and _is_gmail_quota_error(exc):
+			return True
 	return False
 
 
@@ -86,7 +128,10 @@ def _gmail_call(request, attempts=3):
 
 	Retries are deliberately short: on Vercel the request must finish well
 	under the function duration cap, so a single sync absorbs at most one or
-	two quick retries instead of blowing the whole timeout.
+	two quick retries instead of blowing the whole timeout. Rate-limit quota
+	errors get one slightly longer pause: Gmail resets its per-user unit
+	window every minute, and the observed spikes clear in under a second, so
+	a single in-request retry usually completes the call.
 	"""
 	last_exc = None
 	for attempt in range(attempts):
@@ -102,7 +147,9 @@ def _gmail_call(request, attempts=3):
 				flush=True,
 			)
 			if attempt < attempts - 1:
-				time.sleep(0.5 + attempt * 1.5)
+				delay = (2.0 if _is_gmail_quota_error(exc) else 0.5)
+				delay += attempt * 1.5
+				time.sleep(delay)
 	raise last_exc
 
 
@@ -225,6 +272,21 @@ def find_defect_report_email(survey, email_index, gmail=None):
 	if gmail:
 		candidates = []
 		for item in email_index:
+			subject = item.get("subject", "")
+
+			# The index already carries each Subject header. Generated subjects
+			# contain the project identifiers and the ``UPC_<cycle>_<date>``
+			# token, so most surveys are decided here - matching from the index
+			# alone skips the second Gmail call (a ``format=full`` body download)
+			# per candidate, which is what pushed the sweep over Gmail's
+			# per-user unit quota.
+			if (
+				_message_matches(survey, subject)
+				and _message_matches_section_cycle(survey, subject)
+			):
+				candidates.append(item)
+				continue
+
 			try:
 				message = _gmail_call(
 					gmail.users().messages().get(
@@ -236,7 +298,7 @@ def find_defect_report_email(survey, email_index, gmail=None):
 			except Exception:
 				continue
 			body_text = _message_text(message.get("payload", {}))
-			full_text = body_text + " " + item["subject"]
+			full_text = body_text + " " + subject
 			if not _message_matches(survey, full_text):
 				continue
 			if not _message_matches_section_cycle(survey, full_text):

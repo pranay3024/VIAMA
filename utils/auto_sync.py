@@ -13,6 +13,7 @@ from utils.defect_report_delay import (
     build_defect_email_index,
     find_defect_report_email,
     defect_report_delay_days,
+    _is_retryable_gmail_error,
 )
 
 log = logging.getLogger(__name__)
@@ -423,11 +424,24 @@ def _run_sync_defect_delay(app, survey_id):
             # --------------------------------------------------
             db.session.rollback()
 
+            # A transient Gmail failure (403/429 quota or rate-limit, 5xx,
+            # dropped connection) must NOT poison this survey into ``error``:
+            # the auto-sweep only ever picks up ``pending`` surveys, so an
+            # ``error`` would sit dead until a manual admin retry. Requeue it
+            # instead - the next sweep poll retries and normally completes the
+            # moment Gmail's per-minute user quota window has reset. These
+            # failures burn no Gemini credits (dates are already persisted
+            # before Gmail runs) and re-runs are bounded by the extraction
+            # attempt cap.
+            transient = _is_retryable_gmail_error(exc)
+
             try:
                 survey = Survey.query.get(survey_id)
 
                 if survey:
-                    survey.defect_report_match_status = "error"
+                    survey.defect_report_match_status = (
+                        "pending" if transient else "error"
+                    )
                     db.session.commit()
 
             except Exception:

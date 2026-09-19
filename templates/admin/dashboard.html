@@ -910,9 +910,9 @@ onclick="clearFilters()">
 {% if survey.display_pdf_upload_time %}
 
     <span class="{% if survey.pdf_upload_late %}pdf-upload-late{% endif %}">
-        {{ survey.display_pdf_upload_time.strftime('%d %b %Y') }}
+        {{ survey.display_pdf_upload_time.strftime('%d/%m/%Y') }}
         <br>
-        {{ survey.display_pdf_upload_time.strftime('%I:%M %p') }}
+        {{ survey.display_pdf_upload_time.strftime('%H:%M') }}
     </span>
 
 {% elif survey.pdf_upload_late %}
@@ -934,7 +934,7 @@ onclick="clearFilters()">
 {% if survey.display_video_upload_time %}
 
     <span class="{% if survey.video_upload_late %}video-upload-late{% endif %}">
-        {{ survey.display_video_upload_time.strftime('%d %b %Y') }}
+        {{ survey.display_video_upload_time.strftime('%d/%m/%Y') }}
         <br>
         {{ survey.display_video_upload_time.strftime('%H:%M') }}
     </span>

@@ -123,15 +123,28 @@ def _is_retryable_gmail_error(exc):
 _GMAIL_LOCK = threading.Lock()
 
 
-def _gmail_call(request, attempts=3):
+# Gmail's per-user unit window ("Total Query Cost" / "Units per minute per
+# user") resets at a minute boundary and every Gmail call costs units against
+# it. A 403 with an exhausted window cannot clear in a few seconds - retrying
+# inside the same window just re-fails. So quota/rate-limit retries wait until
+# the next minute boundary (waits out the whole window) instead of a short
+# pauseholmes, which finally lets the request complete.
+#
+# The long wait must still fit under the Vercel function duration cap
+# (vercel.json ``maxDuration``). Cap the number of attempts and the single
+# window-long wait so a quota error absorbs at most one full window reset and
+# never blows the whole sweep request.
+_GMAIL_QUOTA_MAX_WAIT_SECONDS = 55.0
+
+
+def _gmail_call(request, attempts=3, quota_max_wait=_GMAIL_QUOTA_MAX_WAIT_SECONDS):
 	"""Execute a Gmail API request with backoff on transient failures.
 
-	Retries are deliberately short: on Vercel the request must finish well
-	under the function duration cap, so a single sync absorbs at most one or
-	two quick retries instead of blowing the whole timeout. Rate-limit quota
-	errors get one slightly longer pause: Gmail resets its per-user unit
-	window every minute, and the observed spikes clear in under a second, so
-	a single in-request retry usually completes the call.
+	Quota/rate-limit errors wait until the next minute window boundary (up to
+	``quota_max_wait`` seconds) so the retry lands in a fresh per-user window;
+	other transient errors (timeouts, 5xx) get short second-or-two pauses.
+	Callers that cannot afford a long sleep can pass a smaller
+	``quota_max_wait``.
 	"""
 	last_exc = None
 	for attempt in range(attempts):
@@ -147,10 +160,31 @@ def _gmail_call(request, attempts=3):
 				flush=True,
 			)
 			if attempt < attempts - 1:
-				delay = (2.0 if _is_gmail_quota_error(exc) else 0.5)
-				delay += attempt * 1.5
+				if _is_gmail_quota_error(exc):
+					# Wait out the rest of this minute's per-user unit window
+					# so the next attempt starts in a fresh quota window.
+					delay = _seconds_until_next_gmail_window(quota_max_wait)
+				else:
+					delay = 0.5 + attempt * 1.5
+				print(
+					f"[GMAIL] backoff {delay:.1f}s before retry "
+					f"(quota={_is_gmail_quota_error(exc)})",
+					flush=True,
+				)
 				time.sleep(delay)
 	raise last_exc
+
+
+def _seconds_until_next_gmail_window(max_wait):
+	"""Seconds until the next Gmail per-user unit window boundary.
+
+	Gmail resets its per-user unit window every minute (at ``:00`` of each
+	minute). Sleep at most ``max_wait`` so the delay stays under the Vercel
+	function cap, waking early so the request can still finish.
+	"""
+	now_second = int(time.time() % 60)
+	seconds_to_boundary = 60 - now_second
+	return max(0.0, min(float(seconds_to_boundary), float(max_wait)))
 
 
 def _message_text(payload):

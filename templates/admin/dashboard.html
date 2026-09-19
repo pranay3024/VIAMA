@@ -936,7 +936,7 @@ onclick="clearFilters()">
     <span class="{% if survey.video_upload_late %}video-upload-late{% endif %}">
         {{ survey.display_video_upload_time.strftime('%d %b %Y') }}
         <br>
-        {{ survey.display_video_upload_time.strftime('%I:%M %p') }}
+        {{ survey.display_video_upload_time.strftime('%H:%M') }}
     </span>
 
 {% elif survey.video_upload_late %}

@@ -569,16 +569,14 @@ def recording():
 
     # -----------------------------------
     # DISPLAY START TIME
+    #
+    # ``start_time`` is stored as IST wall-clock (see core/config.py
+    # COLUMN_SEMANTICS: IST_WALL), so there is no +5:30 to add here.
+    # Adding it would render IST+5:30, i.e. 5h30m ahead of the real
+    # start time.  The date happens to stay correct, the time was wrong.
     # -----------------------------------
 
-    display_time = None
-
-    if survey.start_time:
-
-        display_time = (
-            survey.start_time +
-            timedelta(hours=5, minutes=30)
-        )
+    display_time = survey.start_time
 
     return render_template(
         "captain/recording.html",

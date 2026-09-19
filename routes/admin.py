@@ -88,14 +88,24 @@ def manual_delayed_survey_update(survey_id):
             )
             survey.defect_report_sent_confidence = 1.0
 
-        if not survey.extracted_survey_end_date or not survey.defect_report_sent_at:
-            raise ValueError("Both manual dates are required.")
-
-        survey.defect_report_delay_days = defect_report_delay_days(
-            survey.extracted_survey_end_date,
-            survey.defect_report_sent_at.date(),
-        )
+        # Save whichever manual date(s) were actually provided. Each input in
+        # the manual-correction column must work on its own - an admin who only
+        # corrects one date expects that one change to persist, not to be forced
+        # to fill both. The delay is only recomputed when BOTH values are
+        # available; if just one was corrected, keep the previous value.
         survey.defect_report_match_status = "manual"
+
+        if survey.extracted_survey_end_date and survey.defect_report_sent_at:
+            survey.defect_report_delay_days = defect_report_delay_days(
+                survey.extracted_survey_end_date,
+                survey.defect_report_sent_at.date(),
+            )
+
+        # If neither date was submitted there is nothing to do - surface it so
+        # the (otherwise silent) save still tells the admin it was a no-op.
+        if not end_date_value and not sent_at_value:
+            raise ValueError("No manual dates were provided.")
+
         db.session.commit()
     except Exception as exc:
         db.session.rollback()

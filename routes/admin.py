@@ -72,10 +72,17 @@ def manual_delayed_survey_update(survey_id):
         return redirect("/")
 
     survey = Survey.query.get_or_404(survey_id)
+    start_date_value = request.form.get("manual_start_date", "").strip()
     end_date_value = request.form.get("manual_end_date", "").strip()
     sent_at_value = request.form.get("manual_sent_at", "").strip()
 
     try:
+        if start_date_value:
+            survey.extracted_survey_start_date = datetime.strptime(
+                start_date_value, "%Y-%m-%d"
+            ).date()
+            survey.survey_start_date_confidence = 1.0
+
         if end_date_value:
             survey.extracted_survey_end_date = datetime.strptime(
                 end_date_value, "%Y-%m-%d"
@@ -101,9 +108,9 @@ def manual_delayed_survey_update(survey_id):
                 survey.defect_report_sent_at.date(),
             )
 
-        # If neither date was submitted there is nothing to do - surface it so
+        # If no date was submitted there is nothing to do - surface it so
         # the (otherwise silent) save still tells the admin it was a no-op.
-        if not end_date_value and not sent_at_value:
+        if not start_date_value and not end_date_value and not sent_at_value:
             raise ValueError("No manual dates were provided.")
 
         db.session.commit()

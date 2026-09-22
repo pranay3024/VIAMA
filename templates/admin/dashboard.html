@@ -2004,7 +2004,7 @@ function showCaptainReason(button) {
 }
 </script>
 
-<script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 
 <script>
 
@@ -2064,17 +2064,25 @@ function exportDashboardToExcel() {
         "Defect Report"
     ];
 
-    const data = [headers];
+    const workbook = new ExcelJS.Workbook();
 
-    // Keep track of upload cells that are shown red (delayed) in the UI so the
-    // same red formatting can be re-applied in the exported worksheet.
-    // COLUMN INDEX -> matched late CSS class.
-    const redColumnClasses = {
-        7: ".pdf-upload-late",     // PDF Upload Time
-        8: ".video-upload-late"    // Video Upload Time
-    };
+    const worksheet = workbook.addWorksheet("Survey Dashboard");
 
-    const redSourceCells = [];
+    worksheet.addRow(headers);
+
+    worksheet.getRow(1).font = { bold: true };
+
+    // Late/delayed upload cells are shown red in the dashboard. The table
+    // marks them with the late CSS classes (timestamp present but past the
+    // deadline) or renders an inline red "Delayed" span (no upload time
+    // recorded and the deadline was missed). Both are re-applied as red bold
+    // text on the two upload-time columns so the exported sheet stays
+    // colour-consistent with the page. (xlsx/builds that strip cell styles
+    // cannot do this; exceljs writes the font colour into the file.)
+    const COL_PDF_UPLOAD = 7;
+    const COL_VIDEO_UPLOAD = 8;
+
+    let addedRows = 0;
 
     rows.forEach(function(row) {
 
@@ -2086,109 +2094,79 @@ function exportDashboardToExcel() {
             return;
         }
 
-        const rowData = [];
+        const values = [];
 
         for (let i = 0; i < 14; i++) {
 
-            let value = cells[i]
+            values.push(cells[i]
                 .innerText
                 .replace(/\n+/g, " ")
                 .replace(/\s+/g, " ")
-                .trim();
-
-            // A red/delayed upload cell is either the timestamp span carrying
-            // the late class or the inline red "Delayed" placeholder (recorded
-            // when no upload time exists but the deadline was missed).
-            if (redColumnClasses.hasOwnProperty(i)) {
-                const isLate = cells[i]
-                    .querySelector(redColumnClasses[i]) !== null;
-                if (isLate || value === "Delayed") {
-                    redSourceCells.push({
-                        worksheetRow: data.length + 1, // 1-based worksheet row once pushed
-                        column: i
-                    });
-                }
-            }
-
-            rowData.push(value);
+                .trim());
         }
 
-        data.push(rowData);
+        const excelRow = worksheet.addRow(values);
+
+        addedRows += 1;
+
+        const lateColumns = [
+            { index: COL_PDF_UPLOAD, cls: ".pdf-upload-late" },
+            { index: COL_VIDEO_UPLOAD, cls: ".video-upload-late" }
+        ];
+
+        lateColumns.forEach(function(colInfo) {
+
+            const isLateTimestamp = cells[colInfo.index]
+                .querySelector(colInfo.cls) !== null;
+
+            const isDelayedPlaceholder =
+                values[colInfo.index] === "Delayed";
+
+            if (isLateTimestamp || isDelayedPlaceholder) {
+
+                excelRow.getCell(colInfo.index + 1).font = {
+                    color: { argb: "FFFF0000" },
+                    bold: true
+                };
+            }
+        });
     });
 
-    if (data.length === 1) {
+    if (!addedRows) {
         alert("No surveys found to export.");
         return;
     }
 
     // ==========================================
-    // CREATE EXCEL WORKBOOK
-    // ==========================================
-
-    const worksheet = XLSX.utils.aoa_to_sheet(data);
-
-    // ==========================================
-    // RE-APPLY RED DELAYED FORMATTING
-    // ==========================================
-    // Matches the dashboard's red "Delayed" PDF/Video upload cells so they keep
-    // the red text in the exported file. Only the two upload-time columns are
-    // touched; every other cell is left as plain data.
-
-    redSourceCells.forEach(function(entry) {
-
-        const addr = XLSX.utils.encode_cell({
-            r: entry.worksheetRow - 1,
-            c: entry.column
-        });
-
-        if (worksheet[addr]) {
-
-            worksheet[addr].s = {
-                font: {
-                    color: { rgb: "FFFF0000" },
-                    bold: true
-                }
-            };
-        }
-    });
-
-    const workbook = XLSX.utils.book_new();
-
-    XLSX.utils.book_append_sheet(
-        workbook,
-        worksheet,
-        "Survey Dashboard"
-    );
-
-    // ==========================================
     // COLUMN WIDTHS
     // ==========================================
 
-    worksheet["!cols"] = [
-        { wch: 7 },    // S.No.
-        { wch: 20 },   // UPC
-        { wch: 12 },   // Section
-        { wch: 8 },    // Cycle
-        { wch: 18 },   // Actual Survey Day
-        { wch: 25 },   // Start Time
-        { wch: 25 },   // End Time
-        { wch: 22 },   // PDF Upload
-        { wch: 22 },   // Video Upload
-        { wch: 25 },   // Captain
-        { wch: 35 },   // Status
-        { wch: 25 },   // Survey Form
-        { wch: 25 },   // Raw Video
-        { wch: 25 }    // Defect Report
+    const widths = [
+        7,     // S.No.
+        20,    // UPC
+        12,    // Section
+        8,     // Cycle
+        18,    // Actual Survey Day
+        25,    // Start Time
+        25,    // End Time
+        22,    // PDF Upload
+        22,    // Video Upload
+        25,    // Captain
+        35,    // Status
+        25,    // Survey Form
+        25,    // Raw Video
+        25     // Defect Report
     ];
+
+    widths.forEach(function(width, index) {
+        worksheet.getColumn(index + 1).width = width;
+    });
 
     // ==========================================
     // FREEZE HEADER ROW
     // ==========================================
 
-    worksheet["!freeze"] = {
-        xSplit: 0,
-        ySplit: 1
-    };
+    worksheet.views = [{ state: "frozen", ySplit: 1 }];
 
     // ==========================================
     // FILE NAME
@@ -2201,10 +2179,38 @@ function exportDashboardToExcel() {
         String(today.getMonth() + 1).padStart(2, "0") + "-" +
         String(today.getDate()).padStart(2, "0");
 
-    XLSX.writeFile(
-        workbook,
-        "VIAMA_Survey_Dashboard_" + dateString + ".xlsx"
-    );
+    workbook.xlsx.writeBuffer().then(function(buffer) {
+
+        const blob = new Blob(
+            [buffer],
+            {
+                type:
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            }
+        );
+
+        const url = URL.createObjectURL(blob);
+
+        const link = document.createElement("a");
+
+        link.href = url;
+
+        link.download = "VIAMA_Survey_Dashboard_" + dateString + ".xlsx";
+
+        document.body.appendChild(link);
+
+        link.click();
+
+        document.body.removeChild(link);
+
+        URL.revokeObjectURL(url);
+
+    }).catch(function(error) {
+
+        console.error("Excel export failed:", error);
+
+        alert("Excel export failed. Please try again.");
+    });
 
 }
 

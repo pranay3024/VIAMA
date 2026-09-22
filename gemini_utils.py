@@ -100,6 +100,44 @@ class SurveyFormFields(BaseModel):
 MIN_SURVEY_DATE = date(2026, 6, 1)
 MAX_SURVEY_DATE = date.today()
 
+# A field survey runs at most 2-3 days, so the handwritten start and end
+# dates on one form are never more than a few days apart. A wider gap means
+# one reading is wrong (usually a misread month/day on a blurry form) and is
+# used to trigger a focused re-read instead of storing the bad value.
+MAX_START_END_GAP_DAYS = 3
+
+
+def _dates_consistent(start_iso, end_iso):
+    """True unless both dates are known and more than the survey window apart."""
+    if not start_iso or not end_iso:
+        return True
+    gap = abs((date.fromisoformat(end_iso) - date.fromisoformat(start_iso)).days)
+    return gap <= MAX_START_END_GAP_DAYS
+
+
+def _enhance_header(png_bytes):
+    """Contrast-boost and sharpen an enlarged date-header crop.
+
+    Zooming a blurry scan further cannot invent detail the scan never had;
+    autocontrast plus an unsharp mask recovers the soft edges of a blurred
+    pen stroke, which is what the vision model keys digit boundaries on.
+    Best-effort: any failure returns the original bytes untouched.
+    """
+    try:
+        from PIL import Image, ImageFilter, ImageOps
+
+        image = Image.open(io.BytesIO(png_bytes)).convert("RGB")
+        image = ImageOps.autocontrast(image)
+        image = image.filter(
+            ImageFilter.UnsharpMask(radius=2, percent=150, threshold=3)
+        )
+        buffer = io.BytesIO()
+        image.save(buffer, format="PNG")
+        return buffer.getvalue()
+    except Exception as exc:
+        print(f"[GEMINI SURVEY FORM] header enhancement skipped: {exc}", flush=True)
+        return png_bytes
+
 
 def _valid_date(value):
     if not isinstance(value, str):
@@ -171,7 +209,7 @@ def _get_first_page_images(pdf_bytes):
             clip=header_clip,
             alpha=False,
         )
-        return full_page.tobytes("png"), header.tobytes("png")
+        return full_page.tobytes("png"), _enhance_header(header.tobytes("png"))
     except Exception as exc:
         print(f"[GEMINI SURVEY DATES] Page rendering issue: {exc}", flush=True)
         return pdf_bytes, pdf_bytes
@@ -236,9 +274,10 @@ Required JSON format:
 }
 
 Rules:
-- Read only the date beside the Survey End Date/To label. Ignore Survey Start Date completely.
+- Read only the date beside the Survey End Date/To label. Never copy the Survey Start Date as the end date.
 - Read every handwritten digit in the Survey End Date row independently; never copy the Survey Start Date.
 - The end date may be different from the start date. Do not assume they are equal or consecutive.
+- The survey runs at most 2-3 days, so the end date is always within 2-3 days of the start date shown next to it. If the date you read is more than 3 days away from the start date, re-read the end-date digits - you have most likely misread a month or day digit (common on blurry strokes).
 - If any end-date digit is ambiguous, return the end date with confidence below 0.85 so the record is flagged for review rather than silently guessed.
 - Inspect the enlarged header crop carefully, including handwritten digits.
 - A vertical separator stroke or bar before a date is not the digit 1. For example, read `| 3/08/2026` as `03/08/2026`, never `31/08/2026`.
@@ -408,6 +447,7 @@ def _get_pdf_page_images(pdf_bytes, max_pages=8, scale=1.5):
                 clip=header_clip,
                 alpha=False,
             ).tobytes("png")
+            header = _enhance_header(header)
         return images, header
     except Exception as exc:
         print(f"[GEMINI SURVEY FORM] Page rendering issue: {exc}", flush=True)
@@ -470,8 +510,12 @@ def extract_survey_form_fields_from_pdf(pdf_bytes):
 
     Returns a dict with keys: start_date, start_confidence, end_date,
     end_confidence, ae_ie_sc_name, piu_name, contractor_agency. Only dates are
-    handwritten; the rest are printed. No retry call is made - this is the one
-    and only Gemini request for a form, keeping the credit budget predictable.
+    handwritten; the rest are printed. In the normal case this costs exactly
+    one Gemini request. A second, focused re-read is made ONLY when the start
+    and end dates contradict the survey window (more than
+    MAX_START_END_GAP_DAYS apart) - the main cause is a misread month on a
+    blurry form - so the budget stays predictable and wrong dates are never
+    stored silently.
     """
     text_end_date = _extract_end_date_from_pdf_text(pdf_bytes)
 
@@ -507,7 +551,9 @@ Rules:
 - The form may write dates split by vertical bars, e.g. "31 | 08 | 026". Treat each "|" as a plain separator between day, month and year, never as a digit. A vertical stroke before a date is not the digit 1 - read "| 3/08/2026" as "03/08/2026", never "31/08/2026".
 - For numeric dates with an ambiguous day/month order, use day-first order (DD/MM/YYYY) for this Indian form.
 - Read every handwritten digit of the start and end date independently; never assume they are equal or consecutive.
+- The survey runs at most 2-3 days, so start_date and end_date are always within 0-3 days of each other (they may be the same day). After reading both, check the gap: if it exceeds 3 days, one field is misread (usually a misread month or day digit on a blurry stroke) - re-read that field digit-by-digit before answering.
 - If any date digit is ambiguous, lower its confidence below 0.85 so the record is flagged rather than guessed. Return null for a date that cannot be read confidently or is missing/blurry.
+- If the Survey End Date is supplied to you as a known value (from the form's own text layer it cannot be misread), trust it exactly for end_date and read start_date so the pair is within 0-3 days of each other.
 - For ae_ie_sc_name, piu_name and contractor_agency copy the printed value exactly as shown (keep the original spelling/case). Return null if a field is missing or unreadable.
 - Do not guess, repair, or infer unclear values.
 - Confidence values must be between 0.0 and 1.0 and reflect visual certainty only.
@@ -518,6 +564,12 @@ Rules:
         response_mime_type="application/json",
         response_schema=SurveyFormFields,
     )
+
+    if text_end_date:
+        prompt = prompt + (
+            "\nKnown Survey End Date (verified from the form's text layer, "
+            f"authoritative): {text_end_date}\n"
+        )
 
     contents = ["COMPLETE SURVEY FORM PAGE 1:"]
     contents.append(types.Part.from_bytes(data=images[0], mime_type="image/png"))
@@ -539,14 +591,126 @@ Rules:
     fields = {
         "start_date": _valid_date(normalized.get("start_date")),
         "start_confidence": _coerce_confidence(normalized.get("start_confidence")),
-        "end_date": _valid_date(normalized.get("end_date")) or text_end_date,
+        "end_date": _valid_date(normalized.get("end_date")),
         "end_confidence": _coerce_confidence(normalized.get("end_confidence")),
         "ae_ie_sc_name": _clean_text(normalized.get("ae_ie_sc_name")),
         "piu_name": _clean_text(normalized.get("piu_name")),
         "contractor_agency": _clean_text(normalized.get("contractor_agency")),
     }
 
+    # The form's printed text layer is the most trustworthy end-date source a
+    # scan has - it cannot be misread the way handwriting can. Prefer it over
+    # the vision reading whenever it is present.
+    if text_end_date:
+        fields["end_date"] = text_end_date
+        fields["end_confidence"] = 1.0
+
+    # Blurry scans frequently misread a month or day digit. The survey window
+    # (start/end at most MAX_START_END_GAP_DAYS apart) then catches the
+    # impossible pair and a single focused re-read fixes it instead of storing
+    # a wrong date.
+    if not _dates_consistent(fields["start_date"], fields["end_date"]):
+        fields = _repair_inconsistent_dates(
+            fields, images, header_bytes, text_end_date, config
+        )
+
     print(f"[GEMINI SURVEY FORM] parsed result: {fields}", flush=True)
+    return fields
+
+
+def _repair_inconsistent_dates(fields, images, header_bytes, text_end_date, config):
+    """Attempt one focused re-read of a start/end pair >3 days apart.
+
+    Such a gap cannot be a real NHAI field survey (they run 2-3 days max), so
+    a blur misread a digit - most often the month. One extra Gemini call
+    re-reads the handwritten dates with the window rule explicit. If the pair
+    is still impossible afterwards, the lower-confidence field is dropped
+    (ties keep the end date, which drives the defect-report delay and has the
+    printed-text fallback) so a wrong value is never silently persisted.
+    """
+    start, end = fields["start_date"], fields["end_date"]
+    print(
+        f"[GEMINI SURVEY FORM] inconsistent date pair start={start} end={end} "
+        f"gap > {MAX_START_END_GAP_DAYS}d - focused re-read",
+        flush=True,
+    )
+
+    if text_end_date:
+        anchor = (
+            "The Survey End Date is already verified from the form's text "
+            f"layer as {end}. Keep end_date = {end} and re-read ONLY the "
+            f"handwritten Survey Start Date so the pair is within "
+            f"{MAX_START_END_GAP_DAYS} days."
+        )
+    else:
+        anchor = (
+            "No date is externally verified. Re-read BOTH handwritten dates "
+            "digit by digit from the enlarged header."
+        )
+
+    prompt = f"""
+Return only JSON: {{"start_date": "", "start_confidence": 0.0, "end_date": "", "end_confidence": 0.0}}
+
+The dates extracted in the previous pass were start={start} and end={end}.
+On this NHAI road-survey form a survey lasts at most 2-3 days, so the Survey
+Start Date and Survey End Date are never more than {MAX_START_END_GAP_DAYS} days
+apart. One of the two readings is therefore wrong - typically a misread month
+or day digit on a blurry pen stroke (e.g. "08" for "09").
+
+{anchor}
+
+Rules:
+- Use DD/MM/YYYY for numeric dates. A short 3-digit year "026" means 2026. Reject any year before 2026.
+- A vertical bar or stroke before a date is a separator, never the digit 1 ("| 3/09/2026" is "03/09/2026", not "31/09/2026").
+- Read every handwritten digit independently. If a digit is still ambiguous, lower its confidence below 0.85.
+- Confidence values must be between 0.0 and 1.0 and reflect visual certainty only.
+"""
+
+    retry_response = _safe_generate(
+        [
+            "FOCUSED DATE-PAIR RE-READ:",
+            types.Part.from_bytes(data=header_bytes, mime_type="image/png"),
+            types.Part.from_bytes(data=images[0], mime_type="image/png"),
+            prompt,
+        ],
+        config,
+    )
+
+    retry_data = _parse_gemini_response(retry_response) or {}
+    corrected = {
+        "start_date": _valid_date(retry_data.get("start_date")),
+        "start_confidence": _coerce_confidence(retry_data.get("start_confidence")),
+        "end_date": _valid_date(retry_data.get("end_date")),
+        "end_confidence": _coerce_confidence(retry_data.get("end_confidence")),
+    }
+    print(f"[GEMINI SURVEY FORM] re-read result: {corrected}", flush=True)
+
+    if corrected["start_date"]:
+        fields["start_date"] = corrected["start_date"]
+        fields["start_confidence"] = corrected["start_confidence"]
+    if corrected["end_date"] and not text_end_date:
+        fields["end_date"] = corrected["end_date"]
+        fields["end_confidence"] = corrected["end_confidence"]
+
+    if _dates_consistent(fields["start_date"], fields["end_date"]):
+        return fields
+
+    # Still impossible after the re-read: never persist a pair that cannot be
+    # true. Keep the more trustworthy field; ties keep the end date.
+    print(
+        "[GEMINI SURVEY FORM] date pair still inconsistent after re-read - "
+        "dropping the lower-confidence field",
+        flush=True,
+    )
+    if text_end_date:
+        fields["start_date"] = None
+        fields["start_confidence"] = None
+    elif (fields["start_confidence"] or 0) > (fields["end_confidence"] or 0):
+        fields["end_date"] = None
+        fields["end_confidence"] = None
+    else:
+        fields["start_date"] = None
+        fields["start_confidence"] = None
     return fields
 
 

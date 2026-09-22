@@ -2066,6 +2066,16 @@ function exportDashboardToExcel() {
 
     const data = [headers];
 
+    // Keep track of upload cells that are shown red (delayed) in the UI so the
+    // same red formatting can be re-applied in the exported worksheet.
+    // COLUMN INDEX -> matched late CSS class.
+    const redColumnClasses = {
+        7: ".pdf-upload-late",     // PDF Upload Time
+        8: ".video-upload-late"    // Video Upload Time
+    };
+
+    const redSourceCells = [];
+
     rows.forEach(function(row) {
 
         const cells = Array.from(
@@ -2086,6 +2096,20 @@ function exportDashboardToExcel() {
                 .replace(/\s+/g, " ")
                 .trim();
 
+            // A red/delayed upload cell is either the timestamp span carrying
+            // the late class or the inline red "Delayed" placeholder (recorded
+            // when no upload time exists but the deadline was missed).
+            if (redColumnClasses.hasOwnProperty(i)) {
+                const isLate = cells[i]
+                    .querySelector(redColumnClasses[i]) !== null;
+                if (isLate || value === "Delayed") {
+                    redSourceCells.push({
+                        worksheetRow: data.length + 1, // 1-based worksheet row once pushed
+                        column: i
+                    });
+                }
+            }
+
             rowData.push(value);
         }
 
@@ -2102,6 +2126,31 @@ function exportDashboardToExcel() {
     // ==========================================
 
     const worksheet = XLSX.utils.aoa_to_sheet(data);
+
+    // ==========================================
+    // RE-APPLY RED DELAYED FORMATTING
+    // ==========================================
+    // Matches the dashboard's red "Delayed" PDF/Video upload cells so they keep
+    // the red text in the exported file. Only the two upload-time columns are
+    // touched; every other cell is left as plain data.
+
+    redSourceCells.forEach(function(entry) {
+
+        const addr = XLSX.utils.encode_cell({
+            r: entry.worksheetRow - 1,
+            c: entry.column
+        });
+
+        if (worksheet[addr]) {
+
+            worksheet[addr].s = {
+                font: {
+                    color: { rgb: "FFFF0000" },
+                    bold: true
+                }
+            };
+        }
+    });
 
     const workbook = XLSX.utils.book_new();
 

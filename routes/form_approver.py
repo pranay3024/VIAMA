@@ -129,6 +129,7 @@ def dashboard():
     week = request.args.get("week", "").strip()
     day = request.args.get("day", "").strip()
     status = request.args.get("status", "").strip()
+    section_no = request.args.get("section_no", "").strip()
 
     # Preserved when the approve / reject buttons submit (hidden inputs).
     filter_args = {
@@ -138,6 +139,7 @@ def dashboard():
         "week": week,
         "day": day,
         "status": status,
+        "section_no": section_no,
     }
 
     utc_now = datetime.utcnow()
@@ -151,7 +153,7 @@ def dashboard():
     # Week defaults to the current project week, exactly like the admin
     # dashboard: an explicit week wins, any other active filter with no week
     # means "all weeks", and the untouched default view shows the current week.
-    other_filters_applied = any([state, team, cycle, day, status])
+    other_filters_applied = any([state, team, cycle, day, status, section_no])
     if week:
         try:
             week_no = int(week)
@@ -169,6 +171,9 @@ def dashboard():
 
     if team in _TEAM_STATES:
         query = query.filter(Survey.state.in_(_TEAM_STATES[team]))
+
+    if section_no:
+        query = query.filter(Survey.section_no == section_no)
 
     if cycle:
         try:
@@ -319,6 +324,29 @@ def dashboard():
         key=lambda value: (value is None, value or 0),
     )
 
+    def _section_sort_key(value):
+        try:
+            return (0, int(value))
+        except (TypeError, ValueError):
+            return (1, str(value or ""))
+
+    sections = sorted(
+        {
+            row[0]
+            for row in (
+                Survey.query.with_entities(Survey.section_no)
+                .filter(
+                    Survey.show_on_dashboard.is_(True),
+                    Survey.section_no.isnot(None),
+                )
+                .distinct()
+                .all()
+            )
+            if row[0]
+        },
+        key=_section_sort_key,
+    )
+
     success_message = session.pop("form_approver_success", None)
 
     return render_template(
@@ -326,6 +354,7 @@ def dashboard():
         all_surveys=all_surveys,
         states=states,
         cycles=cycles,
+        sections=sections,
         weeks=weeks,
         current_week_no=current_week_no,
         filter_args=filter_args,
@@ -356,7 +385,7 @@ def survey_form_approval(survey_id):
                 **{
                     key: value
                     for key, value in request.form.items()
-                    if key in ("state", "team", "cycle", "week", "day", "status")
+                    if key in ("state", "team", "cycle", "week", "day", "status", "section_no")
                     and value
                 },
             )
@@ -375,7 +404,7 @@ def survey_form_approval(survey_id):
                 **{
                     key: value
                     for key, value in request.form.items()
-                    if key in ("state", "team", "cycle", "week", "day", "status")
+                    if key in ("state", "team", "cycle", "week", "day", "status", "section_no")
                     and value
                 },
             )
@@ -397,7 +426,7 @@ def survey_form_approval(survey_id):
             **{
                 key: value
                 for key, value in request.form.items()
-                if key in ("state", "team", "cycle", "week", "day", "status")
+                if key in ("state", "team", "cycle", "week", "day", "status", "section_no")
                 and value
             },
         )

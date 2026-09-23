@@ -164,6 +164,28 @@
 
         </select>
 
+        <!-- Section No -->
+        <select name="section_no">
+
+            <option value="">
+                Section No
+            </option>
+
+            {% for section in sections %}
+
+            <option
+                value="{{ section }}"
+                {% if request.args.get("section_no") == section|string %}
+                selected
+                {% endif %}
+            >
+                {{ section }}
+            </option>
+
+            {% endfor %}
+
+        </select>
+
         <!-- Day -->
         <select name="day">
 

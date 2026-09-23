@@ -168,6 +168,12 @@ class Survey(db.Model):
     default=0
     )
 
+    # Role that last requested the PDF re-upload (admin / form_approver), so an
+    # admin can see who triggered it. NULL when nobody has requested one yet.
+    pdf_reupload_requested_by = db.Column(
+    db.String(30)
+    )
+
     ir_lhs_count = db.Column(
     db.Integer,
     default=0

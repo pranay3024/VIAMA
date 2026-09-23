@@ -1297,6 +1297,7 @@ def survey_media(survey_id):
                 "required": bool(survey.pdf_reupload_required),
                 "reason": survey.pdf_reupload_reason,
                 "count": survey.pdf_reupload_count or 0,
+                "requested_by": survey.pdf_reupload_requested_by,
             },
         }
     )
@@ -5255,6 +5256,7 @@ def admin_survey_details(survey_id):
                 "required": bool(survey.pdf_reupload_required),
                 "reason": survey.pdf_reupload_reason,
                 "count": survey.pdf_reupload_count or 0,
+                "requested_by": survey.pdf_reupload_requested_by,
             },
         }
     )

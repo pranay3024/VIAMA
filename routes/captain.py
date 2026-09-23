@@ -179,6 +179,8 @@ def checklist():
 
         existing_survey.pdf_reupload_reason = None
 
+        existing_survey.pdf_reupload_requested_by = None
+
         existing_survey.video_pending_start_time = None
 
         existing_survey.video_upload_time = None
@@ -1705,6 +1707,8 @@ def reupload_survey_pdf(survey_id):
         survey.pdf_reupload_required = False
 
         survey.pdf_reupload_reason = None
+
+        survey.pdf_reupload_requested_by = None
 
         db.session.commit()
 

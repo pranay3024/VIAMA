@@ -567,6 +567,7 @@ def admin_dashboard():
     pdf_delayed = status == "pdf_delayed"
     video_delayed = status == "video_delayed"
     stretch = request.args.get("stretch")
+    section_no = request.args.get("section_no")
     state = request.args.get("state")
     captain_name = request.args.get("captain_name")
     cycle = request.args.get("cycle")
@@ -580,6 +581,7 @@ def admin_dashboard():
     other_filters_applied = any([
      status,
      stretch,
+     section_no,
      state,
      captain_name,
      cycle,
@@ -655,6 +657,11 @@ def admin_dashboard():
             Survey.stretch_code.ilike(
                 f"%{stretch}%"
             )
+        )
+
+    if section_no:
+        query = query.filter(
+            Survey.section_no == section_no
         )
 
     if state:
@@ -924,6 +931,33 @@ def admin_dashboard():
     ).order_by(
         User.name
     ).all()
+
+# -----------------------------
+# SECTION NO DROPDOWN
+# -----------------------------
+
+    def _section_sort_key(value):
+        try:
+            return (0, int(value))
+        except (TypeError, ValueError):
+            return (1, str(value or ""))
+
+    sections = sorted(
+        {
+            row[0]
+            for row in (
+                db.session.query(Survey.section_no)
+                .filter(
+                    Survey.show_on_dashboard.is_(True),
+                    Survey.section_no.isnot(None),
+                )
+                .distinct()
+                .all()
+            )
+            if row[0]
+        },
+        key=_section_sort_key,
+    )
 
 # -----------------------------
 # PROJECT WEEK DROPDOWN
@@ -1420,6 +1454,7 @@ def admin_dashboard():
     all_surveys=all_surveys,
     states=states,
     captains=captains,
+    sections=sections,
     alerts=alerts,
     cycles=cycles,
     weeks=weeks,
@@ -1865,7 +1900,7 @@ def admin_schedules():
 )
 def request_pdf_reupload(survey_id):
 
-    if session.get("role") != "admin":
+    if session.get("role") not in ["admin", "form_approver"]:
         return redirect("/")
 
     survey = Survey.query.get_or_404(survey_id)
@@ -1874,6 +1909,7 @@ def request_pdf_reupload(survey_id):
     survey.survey_pdf_uploaded_at = None
 
     survey.pdf_reupload_reason = request.form["reason"]
+    survey.pdf_reupload_requested_by = session.get("role")
 
     survey.pdf_reupload_count += 1
 

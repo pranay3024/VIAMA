@@ -2606,6 +2606,7 @@ def complete_pdf_reupload(survey_id, pdf_url):
     survey.survey_pdf_uploaded_at = utc_now()
     survey.pdf_reupload_required = False
     survey.pdf_reupload_reason = None
+    survey.pdf_reupload_requested_by = None
     db.session.commit()
 
     try:

@@ -491,21 +491,38 @@ UP-Jharkhand
 
 </select>
 
-    <select name="captain_name">
+<select name="captain_name">
 
-    <option value="">
-    Captains
-    </option>
+        <option value="">
+        Captains
+        </option>
 
-    {% for captain in captains %}
+        {% for captain in captains %}
 
-    <option value="{{ captain.name }}">
-    {{ captain.name }}
-    </option>
+        <option value="{{ captain.name }}">
+        {{ captain.name }}
+        </option>
 
-    {% endfor %}
+        {% endfor %}
 
-    </select>
+        </select>
+
+        <select name="section_no">
+
+        <option value="">
+        Section No
+        </option>
+
+        {% for section in sections %}
+
+        <option value="{{ section }}"
+        {% if request.args.get("section_no") == section|string %}selected{% endif %}>
+        {{ section }}
+        </option>
+
+        {% endfor %}
+
+        </select>
 
     
 
@@ -1282,6 +1299,19 @@ onclick="clearFilters()">
             ">
                  PDF Re-upload Required
             </span>
+
+            {% if survey.pdf_reupload_requested_by == "form_approver" %}
+
+            <br>
+            <small style="
+                color:#b91c1c;
+                font-weight:600;
+                font-size:10px;
+            ">
+                Requested by Form Approver
+            </small>
+
+            {% endif %}
 
         </div>
 

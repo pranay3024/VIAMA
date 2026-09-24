@@ -523,6 +523,12 @@ def start_defect_delay_sync_if_ready(survey):
 
     The check is one-shot. Any existing status means the survey was
     already checked and must not start another automatic run.
+
+    The one exception is ``manual``: an admin who hand-corrected the
+    extracted survey dates gets that status, but it may still be missing
+    the defect-report sent date. A later Team Leader "Defect Report YES"
+    click must re-run the Gmail match for it so the delayed-report row
+    becomes ``matched`` instead of staying stuck on ``manual``.
     """
 
     if not (
@@ -543,7 +549,10 @@ def start_defect_delay_sync_if_ready(survey):
     # Queue the work and let the sweep process it outside the click request.
     # Gemini/Gmail are quota-limited and the team leader can complete up to 50
     # surveys in one batch.
-    if survey.defect_report_match_status is not None:
+    if (
+        survey.defect_report_match_status is not None
+        and survey.defect_report_match_status != "manual"
+    ):
         print(
             f"[DEBUG_FLOW] start_defect_delay_sync survey={survey.id} "
             f"ALREADY_PROCESSED status={survey.defect_report_match_status}",

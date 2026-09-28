@@ -66,6 +66,38 @@ admin_bp = Blueprint(
 log = logging.getLogger(__name__)
 
 
+def _completed_survey_criterion():
+    """The one definition of "a completed survey", as a SQLAlchemy criterion.
+
+    The report and the admin dashboard used to disagree (929 vs 901) because
+    each defined completion independently, with no shared helper. The report
+    filtered on the three team-leader sign-off flags
+    (task1/task2/survey_form_completed) and nothing else, which meant:
+
+      * 46 *cancelled* surveys counted as completed - and the report table
+        prints each row's own status column, so those rows visibly read
+        "cancelled" inside a table headed "Completed Surveys";
+      * 8 video_pending surveys counted as completed before their video
+        arrived;
+      * while 26 genuinely completed surveys were *excluded*, because the
+        team leader had not ticked every box even though the survey was done.
+
+    ``status == 'completed'`` is the criterion the rest of the system already
+    uses - regional.py, captain.py, form_approver.py and the /api/v1 endpoints
+    all key off it - and it is set when the survey video is uploaded
+    (routes/captain.py, core/engine.py). The sign-off flags are a stricter
+    subset about paperwork, not about whether the survey happened, so they
+    must not be the basis of a completed-survey count.
+
+    Deliberately not filtered on show_on_dashboard: of the 901 completed
+    surveys, 0 are hidden and 0 are soft-deleted, so adding that would change
+    nothing today while silently dropping legitimately completed work later.
+    """
+    from core.config import SURVEY_COMPLETED
+
+    return Survey.status == SURVEY_COMPLETED
+
+
 @admin_bp.route("/admin/delayed-surveys/manual/<int:survey_id>", methods=["POST"])
 def manual_delayed_survey_update(survey_id):
     if session.get("role") != "admin":
@@ -568,6 +600,9 @@ def admin_dashboard():
         role="captain"
     ).count()
 
+    # The Completed card reads from this same group-by. It counts
+    # status == 'completed', which is the definition _completed_survey_criterion()
+    # applies on the report page, so the two screens cannot drift apart again.
     status_totals = dict(
         db.session.query(
             Survey.status,
@@ -923,7 +958,12 @@ def admin_dashboard():
     ongoing_count = _status_counts.get("ongoing", 0)
     rescheduled_count = _status_counts.get("rescheduled", 0)
     cancelled_count = _status_counts.get("cancelled", 0)
-    completed_count = _status_counts.get("completed", 0)
+    # Deliberately NOT taken from _status_counts. That dict drops any row whose
+    # pdf_reupload_required is set, so using it here gave 822 instead of 901 - a
+    # completed survey would vanish from the completed count just because its
+    # PDF needs re-uploading. The rule is that a survey shown as Completed is
+    # counted, so this follows the same source as the rendered card.
+    completed_count = status_totals.get("completed", 0)
 
     # #region agent log
     _dbg("B", "admin.py:after_status_counts", "status count queries finished", {
@@ -1950,11 +1990,7 @@ def reports():
 
     from datetime import datetime, timedelta
 
-    query = Survey.query.filter(
-     Survey.task1_completed.is_(True),
-     Survey.task2_completed.is_(True),
-     Survey.survey_form_completed.is_(True)
-)
+    query = Survey.query.filter(_completed_survey_criterion())
 
     # --------------------------
     # FILTERS
@@ -2136,11 +2172,7 @@ def export_report():
     # SAME FILTERS AS REPORT PAGE
     # -------------------------
 
-    query = Survey.query.filter(
-     Survey.task1_completed.is_(True),
-     Survey.task2_completed.is_(True),
-     Survey.survey_form_completed.is_(True)
-)
+    query = Survey.query.filter(_completed_survey_criterion())
 
     week = request.args.get("week")
     cycle = request.args.get("cycle")

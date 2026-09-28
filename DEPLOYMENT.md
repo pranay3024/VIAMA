@@ -134,6 +134,65 @@ An admin can also re-run the sync on demand at any time by visiting
 
 ---
 
+## Rescheduled surveys auto-cancel after Sunday 15:00 IST
+
+A survey a captain pushed back stays **Rescheduled** so the team can see it is
+coming. Once **Sunday 15:00 IST of the week it was rescheduled in** passes without
+the survey being restarted, it becomes **Cancelled** automatically.
+
+The cutoff is derived from the row's own week, not from "now": rescheduled on
+Wednesday → that coming Sunday 15:00; rescheduled Sunday morning → 15:00 the same
+day; already overdue from a previous week → cancelled on the next run.
+
+**Two triggers, both already deployed with the code — no infra change needed:**
+
+| Trigger | What it covers |
+|---|---|
+| Dashboard load (`/admin`, `/regional`, `/form-approver`) | Correct the moment anybody looks |
+| `POST /api/v1/jobs/tick` | Quiet days when nobody logs in |
+
+There is deliberately **no in-process timer**. Vercel freezes the function the
+moment the response is written, so a background thread fires minutes late or never,
+and fails silently in production only.
+
+The dashboard trigger is what makes this work on the current Hobby plan, whose one
+daily cron slot is already used by `/cron/video-count-sync`. If you upgrade to Pro
+and want the job to run without anyone opening a dashboard, point a second cron at
+the tick endpoint — it runs every job, and `?only=` narrows it:
+
+```json
+{"path": "/api/v1/jobs/tick", "schedule": "0 9 * * *"}
+```
+
+`0 9 * * *` is 14:30 IST, which is after the 14:00 IST gate the `alerts` job
+applies. **Do not** repoint the existing 02:00 UTC cron at `/jobs/tick` instead:
+07:30 IST is before that gate, so the missed-survey engine would no-op every day.
+
+**Dry run — writes nothing:**
+
+```bash
+curl -s -X POST \
+  "https://viama-three.vercel.app/api/v1/jobs/tick?only=rescheduled_expiry&dry_run=true" \
+  -H "X-Cron-Secret: <CRON_SECRET>"
+```
+
+`would_cancel` is how many rows the next real run would flip.
+
+**Kill switch** — set `RESCHEDULED_EXPIRY=0` in Vercel and redeploy. The sweep
+returns `{"ran": false, "skipped": "disabled via RESCHEDULED_EXPIRY=0"}` and
+touches nothing, including the dashboard trigger. Set it back to `1` to resume.
+
+> **The first run after this shipped was large.** The Monday reset clears
+> `SurveyAssignment` but never touched `Survey.status`, so 116 rescheduled rows
+> dating back to the week of 2026-07-05 were still sitting in `rescheduled`
+> forever. They were cancelled on that first run, which is the intended
+> behaviour, but it is why the admin dashboard's Rescheduled count dropped
+> sharply. No rows were deleted — they remain visible under Cancelled, and the
+> captain's original reason is kept after
+> `Auto-cancelled: not started before Sunday 15:00 IST. Original reason: …`.
+
+---
+
 ## Troubleshooting
 
 | Symptom | Cause | Fix |
@@ -144,6 +203,7 @@ An admin can also re-run the sync on demand at any time by visiting
 | All rows `no_bucket_data` | Section numbering drift between the two systems | See "Known data issues" below |
 | `500` referencing `video_count_matched` | Migration didn't run on this database | `python migrate_video_count_check.py` |
 | Cron never fires | Env vars added but not redeployed, or Hobby daily cap already used | Redeploy; check Settings → Cron Jobs → last run |
+| Rescheduled survey never auto-cancelled | `RESCHEDULED_EXPIRY=0` is set, or it is already Sunday 15:00 IST and the sweep has not run | Check the tick's `rescheduled_expiry` result; `would_cancel: 0` with `candidates > 0` means the rows are still in date |
 
 ---
 

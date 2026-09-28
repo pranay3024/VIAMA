@@ -32,6 +32,19 @@ def regional_dashboard():
     if session.get("role") != "regional_manager":
         return redirect("/")
 
+    # A rescheduled survey auto-cancels after Sunday 15:00 IST of the week it
+    # was rescheduled in. Swept here so this screen never shows a RESCHEDULED
+    # badge for a survey that has already expired. Safe to call on every load -
+    # it is idempotent, and it never raises. This screen reads captain_status off
+    # the assignment (routes/regional.py:274 below), which is why the sweep has to
+    # move the assignment as well as the survey.
+    try:
+        from core.engine import expire_rescheduled_surveys
+
+        expire_rescheduled_surveys()
+    except Exception:
+        pass
+
     user = User.query.get(session["user_id"])
 
     # -----------------------------------

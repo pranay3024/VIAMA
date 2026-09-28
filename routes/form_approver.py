@@ -123,6 +123,17 @@ def dashboard():
     if _require_role():
         return redirect("/")
 
+    # A rescheduled survey auto-cancels after Sunday 15:00 IST of the week it was
+    # rescheduled in. Swept before the query below so the RESCHEDULED filter
+    # option cannot return a survey that has already expired. Idempotent, never
+    # raises.
+    try:
+        from core.engine import expire_rescheduled_surveys
+
+        expire_rescheduled_surveys()
+    except Exception:
+        pass
+
     state = request.args.get("state", "").strip()
     team = request.args.get("team", "").strip()
     cycle = request.args.get("cycle", "").strip()

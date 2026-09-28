@@ -27,10 +27,12 @@ if not api_key:
 
 client = genai.Client(api_key=api_key)
 
-# Cheap flash-lite model: date extraction is a low-complexity vision task, so
-# the full flash tier (gemini-3.6-flash) is overkill and costs ~2.5x more on
-# input. Override any time via GEMINI_MODEL if accuracy demands it.
+# The primary model handles the normal form read. Missing or conflicting dates
+# escalate to the stronger model because handwriting and page layout vary.
 MODEL_ID = (os.getenv("GEMINI_MODEL") or "gemini-3.5-flash-lite").strip()
+DATE_RETRY_MODEL_ID = (
+    os.getenv("GEMINI_DATE_MODEL") or "gemini-3.6-flash"
+).strip()
 
 _date_cache = {}
 
@@ -41,7 +43,7 @@ _date_cache = {}
 _EXTRACT_LOCK = threading.Lock()
 
 
-def _safe_generate(contents, config):
+def _safe_generate(contents, config, model_id=MODEL_ID):
     """Call generate_content with retries on transient transport errors."""
     import httpx
     from http.client import RemoteDisconnected
@@ -51,13 +53,13 @@ def _safe_generate(contents, config):
         started = time.time()
         try:
             response = client.models.generate_content(
-                model=MODEL_ID,
+                model=model_id,
                 contents=contents,
                 config=config,
             )
             print(
                 f"[GEMINI_CALL] ts={datetime.utcnow().isoformat()} "
-                f"model={MODEL_ID} ok=True attempt={attempt + 1} "
+                f"model={model_id} ok=True attempt={attempt + 1} "
                 f"elapsed={time.time() - started:.1f}s",
                 flush=True,
             )
@@ -73,7 +75,7 @@ def _safe_generate(contents, config):
             last_exc = exc
             print(
                 f"[GEMINI_CALL] ts={datetime.utcnow().isoformat()} "
-                f"model={MODEL_ID} ok=False attempt={attempt + 1} "
+                f"model={model_id} ok=False attempt={attempt + 1} "
                 f"elapsed={time.time() - started:.1f}s err={exc}",
                 flush=True,
             )
@@ -418,11 +420,7 @@ def extract_survey_dates_from_drive(view_url):
 
 
 def _get_pdf_page_images(pdf_bytes, max_pages=8, scale=1.5):
-    """Render up to ``max_pages`` PNG pages plus an enlarged page-1 date header.
-
-    Called once per survey form so one Gemini request can read every field
-    (handwritten dates in the header plus the printed project details).
-    """
+    """Render form pages plus high-resolution views covering page 1."""
     try:
         document = fitz.open(stream=pdf_bytes, filetype="pdf")
         pages = min(len(document), max_pages)
@@ -433,25 +431,29 @@ def _get_pdf_page_images(pdf_bytes, max_pages=8, scale=1.5):
                 alpha=False,
             )
             images.append(pix.tobytes("png"))
-        header = None
+        date_views = []
         if pages:
             page = document[0]
-            header_clip = fitz.Rect(
-                0,
-                0,
-                page.rect.width,
-                page.rect.height * 0.30,
+            clips = (
+                fitz.Rect(0, 0, page.rect.width, page.rect.height * 0.55),
+                fitz.Rect(
+                    0,
+                    page.rect.height * 0.45,
+                    page.rect.width,
+                    page.rect.height,
+                ),
             )
-            header = page.get_pixmap(
-                matrix=fitz.Matrix(3, 3),
-                clip=header_clip,
-                alpha=False,
-            ).tobytes("png")
-            header = _enhance_header(header)
-        return images, header
+            for clip in clips:
+                date_view = page.get_pixmap(
+                    matrix=fitz.Matrix(3, 3),
+                    clip=clip,
+                    alpha=False,
+                ).tobytes("png")
+                date_views.append(_enhance_header(date_view))
+        return images, date_views
     except Exception as exc:
         print(f"[GEMINI SURVEY FORM] Page rendering issue: {exc}", flush=True)
-        return [pdf_bytes], pdf_bytes
+        return [pdf_bytes], [pdf_bytes]
 
 
 def _parse_gemini_response(response):
@@ -506,56 +508,48 @@ def _clean_text(value):
 
 
 def extract_survey_form_fields_from_pdf(pdf_bytes):
-    """Extract ALL survey-form fields in a SINGLE Gemini call.
+    """Extract all survey-form fields and repair missing or invalid dates."""
 
-    Returns a dict with keys: start_date, start_confidence, end_date,
-    end_confidence, ae_ie_sc_name, piu_name, contractor_agency. Only dates are
-    handwritten; the rest are printed. In the normal case this costs exactly
-    one Gemini request. A second, focused re-read is made ONLY when the start
-    and end dates contradict the survey window (more than
-    MAX_START_END_GAP_DAYS apart) - the main cause is a misread month on a
-    blurry form - so the budget stays predictable and wrong dates are never
-    stored silently.
-    """
     text_end_date = _extract_end_date_from_pdf_text(pdf_bytes)
 
-    images, header_bytes = _get_pdf_page_images(pdf_bytes)
+    images, date_views = _get_pdf_page_images(pdf_bytes)
 
     prompt = """
 Do not output any reasoning, chain of thought, explanations, or preamble. Output ONLY the extracted fields directly in JSON.
 
-Extract from this NHAI road-survey form the following fields:
-1. start_date - the handwritten Survey Start Date / From date (usually in the top header).
+Extract these fields from this NHAI road-survey form:
+1. start_date - the handwritten Survey Start Date / From date.
 2. start_confidence - visual certainty of the start date (0.0 to 1.0).
-3. end_date - the handwritten Survey End Date / To date (usually in the top header).
+3. end_date - the handwritten Survey End Date / To date.
 4. end_confidence - visual certainty of the end date (0.0 to 1.0).
-5. ae_ie_sc_name - the printed name/designation of the AE/IE/SC (Assistant Engineer / In-charge Engineer / Sectional Engineer / Engineer-in-Charge) who checked the form.
-6. piu_name - the printed PIU (Project Implementation Unit) name.
+5. ae_ie_sc_name - the printed name/designation of the AE/IE/SC who checked the form.
+6. piu_name - the printed PIU name.
 7. contractor_agency - the printed Contractor / O&M Agency name.
 
 Required JSON format:
 {
-  "start_date": "",
+  "start_date": null,
   "start_confidence": 0.0,
-  "end_date": "",
+  "end_date": null,
   "end_confidence": 0.0,
-  "ae_ie_sc_name": "",
-  "piu_name": "",
-  "contractor_agency": ""
+  "ae_ie_sc_name": null,
+  "piu_name": null,
+  "contractor_agency": null
 }
 
-Rules:
-- The project began in June 2026 and continues to the present. Reject any year before 2026. Never output 2020, 2021, 2022, 2023, 2024 or 2025.
-- A short 3-digit year like "026" means 2026.
-- Accept any clearly written date format (e.g. 4 September 2026, 04/09/2026, 2026-09-04).
-- The form may write dates split by vertical bars, e.g. "31 | 08 | 026". Treat each "|" as a plain separator between day, month and year, never as a digit. A vertical stroke before a date is not the digit 1 - read "| 3/08/2026" as "03/08/2026", never "31/08/2026".
-- For numeric dates with an ambiguous day/month order, use day-first order (DD/MM/YYYY) for this Indian form.
-- Read every handwritten digit of the start and end date independently; never assume they are equal or consecutive.
-- The survey runs at most 2-3 days, so start_date and end_date are always within 0-3 days of each other (they may be the same day). After reading both, check the gap: if it exceeds 3 days, one field is misread (usually a misread month or day digit on a blurry stroke) - re-read that field digit-by-digit before answering.
-- If any date digit is ambiguous, lower its confidence below 0.85 so the record is flagged rather than guessed. Return null for a date that cannot be read confidently or is missing/blurry.
-- If the Survey End Date is supplied to you as a known value (from the form's own text layer it cannot be misread), trust it exactly for end_date and read start_date so the pair is within 0-3 days of each other.
-- For ae_ie_sc_name, piu_name and contractor_agency copy the printed value exactly as shown (keep the original spelling/case). Return null if a field is missing or unreadable.
-- Do not guess, repair, or infer unclear values.
+Date-reading rules:
+- The handwritten dates may be in the top header, the middle of the form, or the bottom sign-off area. They are not guaranteed to be in the top 30 percent. Inspect every supplied view of page 1 and locate the printed row labels before reading the writing.
+- Survey Start Date / From means start_date. Survey End Date / To means end_date. Never copy one row's date into the other row and never use a date from another page.
+- Read every handwritten digit independently. Faint, small, or imperfect handwriting is still a date to transcribe; do not return null merely because the writing is handwritten or low contrast. If a digit is uncertain, return the best visual reading and set that date's confidence below 0.85.
+- Use null for a date only when its labelled row has no readable date at all. When a date is null, set its confidence to 0.0.
+- The project began in June 2026. Reject a year before 2026. A short year "026" means 2026.
+- Accept formats such as 4 September 2026, 04/09/2026, 2026-09-04, 04-09-026, and dates separated by vertical bars. Treat a bar or stroke as a separator, not as the digit 1.
+- For numeric dates with an ambiguous day/month order, use day-first DD/MM/YYYY for this Indian form.
+- The start and end dates may be equal, but must be within 0-3 days. Use this only as a consistency check; do not change a clearly visible digit to force the rule.
+
+Printed-field rules:
+- Copy ae_ie_sc_name, piu_name, and contractor_agency exactly as printed, preserving spelling and case.
+- Use null for a printed field that is absent or unreadable.
 - Confidence values must be between 0.0 and 1.0 and reflect visual certainty only.
 """
 
@@ -573,8 +567,9 @@ Rules:
 
     contents = ["COMPLETE SURVEY FORM PAGE 1:"]
     contents.append(types.Part.from_bytes(data=images[0], mime_type="image/png"))
-    contents.append("ENLARGED DATE HEADER:")
-    contents.append(types.Part.from_bytes(data=header_bytes, mime_type="image/png"))
+    for index, date_view in enumerate(date_views, start=1):
+        contents.append(f"HIGH-RESOLUTION PAGE 1 VIEW {index}:")
+        contents.append(types.Part.from_bytes(data=date_view, mime_type="image/png"))
     for index in range(1, len(images)):
         contents.append(f"ADDITIONAL SURVEY FORM PAGE {index + 1}:")
         contents.append(types.Part.from_bytes(data=images[index], mime_type="image/png"))
@@ -605,104 +600,159 @@ Rules:
         fields["end_date"] = text_end_date
         fields["end_confidence"] = 1.0
 
-    # Blurry scans frequently misread a month or day digit. The survey window
-    # (start/end at most MAX_START_END_GAP_DAYS apart) then catches the
-    # impossible pair and a single focused re-read fixes it instead of storing
-    # a wrong date.
-    if not _dates_consistent(fields["start_date"], fields["end_date"]):
+    needs_date_repair = (
+        not fields["start_date"]
+        or not fields["end_date"]
+        or not _dates_consistent(fields["start_date"], fields["end_date"])
+    )
+    if needs_date_repair:
         fields = _repair_inconsistent_dates(
-            fields, images, header_bytes, text_end_date, config
+            fields, images, date_views, text_end_date, config
         )
 
     print(f"[GEMINI SURVEY FORM] parsed result: {fields}", flush=True)
     return fields
 
 
-def _repair_inconsistent_dates(fields, images, header_bytes, text_end_date, config):
-    """Attempt one focused re-read of a start/end pair >3 days apart.
-
-    Such a gap cannot be a real NHAI field survey (they run 2-3 days max), so
-    a blur misread a digit - most often the month. One extra Gemini call
-    re-reads the handwritten dates with the window rule explicit. If the pair
-    is still impossible afterwards, the lower-confidence field is dropped
-    (ties keep the end date, which drives the defect-report delay and has the
-    printed-text fallback) so a wrong value is never silently persisted.
-    """
-    start, end = fields["start_date"], fields["end_date"]
+def _repair_inconsistent_dates(fields, images, date_views, text_end_date, config):
+    start = fields.get("start_date")
+    end = fields.get("end_date")
+    missing_start = not start
+    missing_end = not end
+    inconsistent = bool(
+        start and end and not _dates_consistent(start, end)
+    )
     print(
-        f"[GEMINI SURVEY FORM] inconsistent date pair start={start} end={end} "
-        f"gap > {MAX_START_END_GAP_DAYS}d - focused re-read",
+        f"[GEMINI SURVEY FORM] date re-read start={start} end={end} "
+        f"missing_start={missing_start} missing_end={missing_end} "
+        f"inconsistent={inconsistent}",
         flush=True,
     )
 
     if text_end_date:
         anchor = (
-            "The Survey End Date is already verified from the form's text "
-            f"layer as {end}. Keep end_date = {end} and re-read ONLY the "
-            f"handwritten Survey Start Date so the pair is within "
-            f"{MAX_START_END_GAP_DAYS} days."
+            f"The verified Survey End Date is {end}. Keep end_date exactly "
+            f"as {end} and re-read the Survey Start Date independently."
+        )
+    elif start and missing_end:
+        anchor = (
+            f"The first pass read the Survey Start Date as {start}. Keep that "
+            "reading unless the pixels clearly contradict it, and re-read the "
+            "Survey End Date independently."
+        )
+    elif end and missing_start:
+        anchor = (
+            f"The first pass read the Survey End Date as {end}. Keep that "
+            "reading unless the pixels clearly contradict it, and re-read the "
+            "Survey Start Date independently."
         )
     else:
         anchor = (
-            "No date is externally verified. Re-read BOTH handwritten dates "
-            "digit by digit from the enlarged header."
+            "Re-read both handwritten dates independently from their printed "
+            "row labels."
         )
 
     prompt = f"""
-Return only JSON: {{"start_date": "", "start_confidence": 0.0, "end_date": "", "end_confidence": 0.0}}
+Return only JSON with these keys: start_date, start_confidence, end_date, end_confidence.
 
-The dates extracted in the previous pass were start={start} and end={end}.
-On this NHAI road-survey form a survey lasts at most 2-3 days, so the Survey
-Start Date and Survey End Date are never more than {MAX_START_END_GAP_DAYS} days
-apart. One of the two readings is therefore wrong - typically a misread month
-or day digit on a blurry pen stroke (e.g. "08" for "09").
+This is a focused re-read of an NHAI road-survey form. The date rows may be
+anywhere on page 1, including the bottom sign-off area. Locate the printed
+labels first: Survey Start Date / From is start_date and Survey End Date / To
+is end_date. The previous pass returned start={start} and end={end}.
 
 {anchor}
 
-Rules:
-- Use DD/MM/YYYY for numeric dates. A short 3-digit year "026" means 2026. Reject any year before 2026.
-- A vertical bar or stroke before a date is a separator, never the digit 1 ("| 3/09/2026" is "03/09/2026", not "31/09/2026").
-- Read every handwritten digit independently. If a digit is still ambiguous, lower its confidence below 0.85.
-- Confidence values must be between 0.0 and 1.0 and reflect visual certainty only.
+Read the actual handwriting in the high-resolution views. Faint or imperfect
+handwriting is still a date; return the best visual transcription and a
+confidence below 0.85 if a digit is uncertain. Do not return null merely
+because the writing is handwritten, small, or low contrast. Use null only when
+the labelled row has no readable date. Read the day, month, and year digits
+independently. Use DD/MM/YYYY for numeric dates, treat 026 as 2026, and treat
+vertical bars or strokes as separators rather than digits. The two dates must
+be within {MAX_START_END_GAP_DAYS} days, but do not alter a visible digit just
+to satisfy that check.
 """
 
-    retry_response = _safe_generate(
+    retry_config = types.GenerateContentConfig(
+        max_output_tokens=2048,
+        response_mime_type="application/json",
+        response_schema=SurveyFormFields,
+        thinking_config=types.ThinkingConfig(thinking_budget=0),
+    )
+    contents = ["FOCUSED FULL-PAGE DATE RE-READ:"]
+    for index, date_view in enumerate(date_views, start=1):
+        contents.append(f"HIGH-RESOLUTION PAGE 1 VIEW {index}:")
+        contents.append(types.Part.from_bytes(data=date_view, mime_type="image/png"))
+    contents.extend(
         [
-            "FOCUSED DATE-PAIR RE-READ:",
-            types.Part.from_bytes(data=header_bytes, mime_type="image/png"),
+            "COMPLETE PAGE 1 FOR LABEL CONTEXT:",
             types.Part.from_bytes(data=images[0], mime_type="image/png"),
             prompt,
-        ],
-        config,
+        ]
     )
+
+    try:
+        retry_response = _safe_generate(
+            contents,
+            retry_config,
+            model_id=DATE_RETRY_MODEL_ID,
+        )
+    except Exception as exc:
+        print(
+            f"[GEMINI SURVEY FORM] stronger date model failed: {exc}; "
+            "using the primary model",
+            flush=True,
+        )
+        retry_response = _safe_generate(contents, config)
 
     retry_data = _parse_gemini_response(retry_response) or {}
     corrected = {
         "start_date": _valid_date(retry_data.get("start_date")),
-        "start_confidence": _coerce_confidence(retry_data.get("start_confidence")),
+        "start_confidence": _coerce_confidence(
+            retry_data.get("start_confidence")
+        ),
         "end_date": _valid_date(retry_data.get("end_date")),
-        "end_confidence": _coerce_confidence(retry_data.get("end_confidence")),
+        "end_confidence": _coerce_confidence(
+            retry_data.get("end_confidence")
+        ),
     }
     print(f"[GEMINI SURVEY FORM] re-read result: {corrected}", flush=True)
 
-    if corrected["start_date"]:
+    if missing_start and corrected["start_date"]:
         fields["start_date"] = corrected["start_date"]
         fields["start_confidence"] = corrected["start_confidence"]
-    if corrected["end_date"] and not text_end_date:
+    if missing_end and corrected["end_date"] and not text_end_date:
         fields["end_date"] = corrected["end_date"]
         fields["end_confidence"] = corrected["end_confidence"]
+    if inconsistent:
+        if corrected["start_date"]:
+            fields["start_date"] = corrected["start_date"]
+            fields["start_confidence"] = corrected["start_confidence"]
+        if corrected["end_date"] and not text_end_date:
+            fields["end_date"] = corrected["end_date"]
+            fields["end_confidence"] = corrected["end_confidence"]
+
+    if text_end_date:
+        fields["end_date"] = text_end_date
+        fields["end_confidence"] = 1.0
+
+    if not fields["start_date"]:
+        fields["start_confidence"] = None
+    if not fields["end_date"]:
+        fields["end_confidence"] = None
 
     if _dates_consistent(fields["start_date"], fields["end_date"]):
         return fields
 
-    # Still impossible after the re-read: never persist a pair that cannot be
-    # true. Keep the more trustworthy field; ties keep the end date.
     print(
         "[GEMINI SURVEY FORM] date pair still inconsistent after re-read - "
         "dropping the lower-confidence field",
         flush=True,
     )
-    if text_end_date:
+    if text_end_date or (start and missing_end):
+        fields["end_date"] = None
+        fields["end_confidence"] = None
+    elif end and missing_start:
         fields["start_date"] = None
         fields["start_confidence"] = None
     elif (fields["start_confidence"] or 0) > (fields["end_confidence"] or 0):
@@ -714,37 +764,69 @@ Rules:
     return fields
 
 
+def _has_complete_survey_dates(fields):
+    return bool(
+        fields.get("start_date")
+        and fields.get("end_date")
+        and _dates_consistent(fields["start_date"], fields["end_date"])
+    )
+
+
 def extract_survey_form_fields_from_drive(view_url):
-    """Download a survey form from Drive and extract all fields in one call."""
-    if view_url in _form_fields_cache:
+    """Download a survey form from Drive and extract all fields."""
+    cached = _form_fields_cache.get(view_url)
+    if cached is not None and _has_complete_survey_dates(cached):
         print("[GEMINI SURVEY FORM] using cached validated form fields", flush=True)
-        return _form_fields_cache[view_url]
+        return cached
+    if view_url in _form_fields_cache:
+        _form_fields_cache.pop(view_url, None)
 
     with _EXTRACT_LOCK:
+        cached = _form_fields_cache.get(view_url)
+        if cached is not None and _has_complete_survey_dates(cached):
+            print(
+                "[GEMINI SURVEY FORM] using cached validated form fields",
+                flush=True,
+            )
+            return cached
         print("[GEMINI SURVEY FORM] downloading survey form from Drive", flush=True)
         pdf_bytes = download_file_from_drive(view_url)
-        print(f"[GEMINI SURVEY FORM] downloaded PDF bytes: {len(pdf_bytes)}", flush=True)
+        print(
+            f"[GEMINI SURVEY FORM] downloaded PDF bytes: {len(pdf_bytes)}",
+            flush=True,
+        )
 
         fields = extract_survey_form_fields_from_pdf(pdf_bytes)
-        _form_fields_cache[view_url] = fields
+        if _has_complete_survey_dates(fields):
+            _form_fields_cache[view_url] = fields
+        else:
+            print(
+                "[GEMINI SURVEY FORM] incomplete result not cached; a later "
+                "attempt will re-read the PDF",
+                flush=True,
+            )
         return fields
 
 
 def apply_survey_form_fields(survey, fields):
-    """Assign extracted form fields onto a Survey object (does not commit).
-
-    Only non-empty dates are written, so a field Gemini could not read stays
-    None and is never overwritten by a stale value.
-    """
-    if fields.get("start_date"):
-        survey.extracted_survey_start_date = date.fromisoformat(fields["start_date"])
+    """Assign extracted form fields onto a Survey object without committing."""
+    manual = getattr(survey, "defect_report_match_status", None) == "manual"
+    if not manual and fields.get("start_date"):
+        survey.extracted_survey_start_date = date.fromisoformat(
+            fields["start_date"]
+        )
         survey.survey_start_date_confidence = fields.get("start_confidence")
-    if fields.get("end_date"):
+    if not manual and fields.get("end_date"):
         survey.extracted_survey_end_date = date.fromisoformat(fields["end_date"])
         survey.survey_end_date_confidence = fields.get("end_confidence")
-    survey.extracted_ae_ie_sc_name = fields.get("ae_ie_sc_name")
-    survey.extracted_piu_name = fields.get("piu_name")
-    survey.extracted_contractor_agency = fields.get("contractor_agency")
+    for field in (
+        "ae_ie_sc_name",
+        "piu_name",
+        "contractor_agency",
+    ):
+        value = fields.get(field)
+        if value is not None:
+            setattr(survey, f"extracted_{field}", value)
 
 
 _form_fields_cache = {}

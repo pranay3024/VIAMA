@@ -388,6 +388,27 @@ def admin_dashboard():
     if session.get("role") != "admin":
      return redirect("/")
 
+    # =====================================================
+    # EXPIRE OVERDUE RESCHEDULED SURVEYS
+    #
+    # A rescheduled survey is cancelled automatically once
+    # Sunday 15:00 IST of the week it was rescheduled in has
+    # passed. Run here - before any of the queries below - so
+    # the page the admin is looking at is already correct, and
+    # so a quiet day still gets fixed the next time somebody
+    # opens this screen. The same sweep also runs from
+    # POST /api/v1/jobs/tick for the case where nobody logs in.
+    # Idempotent, and it swallows its own errors, so a failure
+    # here can never take the dashboard down with it.
+    # =====================================================
+
+    try:
+        from core.engine import expire_rescheduled_surveys
+
+        expire_rescheduled_surveys()
+    except Exception:
+        pass
+
     from datetime import datetime, timedelta
     # #region agent log
     import json as _dbg_json, time as _dbg_time

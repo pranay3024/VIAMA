@@ -4768,8 +4768,8 @@ _ = (parse_int, request)
 # /api/v1/jobs - scheduled maintenance.
 #
 # ``POST /jobs/tick`` is a single entrypoint that decides internally what is due:
-# drain webhooks, run the missed-survey engine, do the Monday reset, purge expired
-# audit rows and idempotency keys.
+# drain webhooks, run the missed-survey engine, expire overdue rescheduled surveys,
+# do the Monday reset, purge expired audit rows and idempotency keys.
 #
 # One endpoint rather than five because Vercel's Hobby plan allows only two cron
 # jobs at daily granularity - consolidating keeps the whole thing inside one slot
@@ -4824,6 +4824,11 @@ def tick():
     if should("alerts"):
         results["missed_engine"] = _safely(lambda: _alerts(dry_run))
 
+    if should("rescheduled_expiry"):
+        results["rescheduled_expiry"] = _safely(
+            lambda: _rescheduled_expiry(dry_run)
+        )
+
     if should("weekly_reset"):
         results["weekly_reset"] = _safely(lambda: _weekly_reset(dry_run))
 
@@ -4874,6 +4879,20 @@ def _alerts(dry_run):
             "hour_ist": now.hour,
         }
     return run_missed_engine(dry_run=dry_run)
+
+
+def _rescheduled_expiry(dry_run):
+    """
+    Cancel rescheduled surveys that passed their Sunday-15:00-IST deadline.
+
+    Unlike the other jobs here this one has no hour gate.  A reschedule can be
+    made at any time in the week, so the sweep has to be willing to run at any
+    hour - the per-row deadline comparison inside the engine is what decides
+    whether anything is due, not the time of day the tick happens to arrive.
+    """
+    from core.engine import expire_rescheduled_surveys
+
+    return expire_rescheduled_surveys(dry_run=dry_run)
 
 
 def _weekly_reset(dry_run):
@@ -4943,6 +4962,15 @@ def list_jobs():
                     "name": "alerts",
                     "does": "Runs the missed-survey engine and persists status changes.",
                     "frequency": f"a few times a day after {ALERT_CUTOFF_HOUR_PRIMARY}:00 IST",
+                },
+                {
+                    "name": "rescheduled_expiry",
+                    "does": (
+                        "Cancels rescheduled surveys whose Sunday-15:00-IST "
+                        "deadline has passed. Also runs on every dashboard load, "
+                        "so it is not dependent on this job firing."
+                    ),
+                    "frequency": "any hour; it no-ops unless a deadline has passed",
                 },
                 {
                     "name": "weekly_reset",

@@ -47,6 +47,17 @@ SURVEY_COMPLETED = "completed"
 #: predicate uses a positive ``status.in_([...])`` list, a cancelled survey
 #: simply stops matching and no template needed changing.
 SURVEY_CANCELLED = "cancelled"
+#: A survey a captain explicitly pushed back instead of starting.  The portal has
+#: used this string for a long time (routes/captain.py, routes/admin.py,
+#: routes/regional.py, routes/form_approver.py) but it was never named here, so
+#: it fell out of the label map and out of the transition map below.
+#:
+#: Note it is deliberately *not* in ``SURVEY_STATUSES``: that tuple is the
+#: "counts as an active survey" set, and the portal's missed-survey engine
+#: (routes/admin.py:1381-1389) already includes "rescheduled" in its own list
+#: while ``ACTIVE_SURVEY_STATUSES`` below does not.  Unifying those two is a
+#: behaviour change of its own, so it is left alone here.
+SURVEY_RESCHEDULED = "rescheduled"
 
 #: Display / sort order used by the admin dashboard.
 SURVEY_STATUSES = (
@@ -62,6 +73,7 @@ SURVEY_STATUS_LABELS = {
     SURVEY_VIDEO_PENDING: "Video Pending",
     SURVEY_COMPLETED: "Completed",
     SURVEY_CANCELLED: "Cancelled",
+    SURVEY_RESCHEDULED: "Rescheduled",
 }
 
 #: "A survey exists for this section this week" - routes/admin.py:453-458,
@@ -79,7 +91,31 @@ ALLOWED_STATUS_TRANSITIONS = {
     SURVEY_VIDEO_PENDING: {SURVEY_COMPLETED},
     SURVEY_COMPLETED: set(),
     SURVEY_CANCELLED: set(),
+    # Back to ongoing is the captain re-clicking CONTINUE on a rescheduled survey
+    # (routes/captain.py:149-218).  Cancelled is the Sunday-15:00 auto-expiry in
+    # core/engine.py:expire_rescheduled_surveys.  Without this key the lookup
+    # returned an empty set and the API refused to leave "rescheduled" at all.
+    SURVEY_RESCHEDULED: {SURVEY_ONGOING, SURVEY_CANCELLED},
 }
+
+# ---------------------------------------------------------------------------
+# Rescheduled-survey expiry
+# ---------------------------------------------------------------------------
+
+#: A rescheduled survey stays rescheduled until this time on the Sunday of the
+#: week it was rescheduled in; after that it auto-cancels.  15:00 IST leaves the
+#: rest of Sunday for the captain to still turn up, and lands before the
+#: Monday-00:00 week rollover that clears the assignment.
+RESCHEDULED_EXPIRY_HOUR = 15
+RESCHEDULED_EXPIRY_MINUTE = 0
+
+#: Prefix put in front of the captain's own reason when the sweep cancels a
+#: survey, so the dashboards' "View Reason" button explains the status change
+#: instead of silently showing text about a reschedule that no longer applies.
+RESCHEDULED_EXPIRED_NOTE = (
+    "Auto-cancelled: not started before Sunday "
+    f"{RESCHEDULED_EXPIRY_HOUR:02d}:{RESCHEDULED_EXPIRY_MINUTE:02d} IST."
+)
 
 # ---------------------------------------------------------------------------
 # Assignment status
@@ -437,6 +473,28 @@ def week_start_sunday(dt=None):
     days_since_sunday = (dt.weekday() + 1) % 7
     return (dt - timedelta(days=days_since_sunday)).replace(
         hour=0, minute=0, second=0, microsecond=0
+    )
+
+
+def rescheduled_expiry_deadline(ist_dt=None):
+    """
+    The moment a rescheduled survey stops being rescheduled and becomes cancelled.
+
+    That is ``RESCHEDULED_EXPIRY_HOUR:RESCHEDULED_EXPIRY_MINUTE`` on the Sunday
+    of the Mon-Sun week that contains ``ist_dt`` - the same Mon-00:00-to-Mon-00:00
+    week window routes/captain.py:2175-2207 uses to decide which survey row a
+    reschedule belongs to.  Taking the week from the argument rather than from
+    "now" is the whole point: a survey rescheduled on Wednesday gets until that
+    coming Sunday, one rescheduled on Sunday morning gets until 15:00 the same
+    day, and an already-overdue row from a previous week expires immediately.
+
+    ``ist_dt`` is naive IST wall-clock, matching ``ist_now``.
+    """
+    ist_dt = ist_dt or ist_now()
+    return week_start_monday(ist_dt) + timedelta(
+        days=6,
+        hours=RESCHEDULED_EXPIRY_HOUR,
+        minutes=RESCHEDULED_EXPIRY_MINUTE,
     )
 
 

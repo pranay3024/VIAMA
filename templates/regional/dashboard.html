@@ -454,6 +454,15 @@ Generate
 <button
 type="button"
 class="search-btn"
+onclick="copyRegionalExtractList()">
+
+Extract List
+
+</button>
+
+<button
+type="button"
+class="search-btn"
 onclick="exportRegionalToExcel()">
 
 Extract to Excel
@@ -499,7 +508,10 @@ Extract to Excel
 
     {% for survey in all_surveys %}
 
-    <tr>
+    <tr
+    data-extract="{{ survey.section_no }}_Cycle{{ survey.cycle_no }}"
+    data-status="{{ survey.status }}"
+    data-pdf-reupload="{{ 'true' if survey.pdf_reupload_required else 'false' }}">
     
     <td>{{ loop.index }}</td>
 
@@ -1176,6 +1188,162 @@ document.addEventListener("visibilitychange", function () {
     }
 
 });
+
+</script>
+
+<script>
+
+function copyRegionalExtractList() {
+
+    const activeFilter =
+        new URLSearchParams(window.location.search).get("status") || "";
+
+    const rows = Array.from(
+        document.querySelectorAll("tr[data-extract]")
+    );
+
+    // Delayed filters collapse to a single heading.
+
+    if (activeFilter === "pdf_delayed" || activeFilter === "video_delayed") {
+
+        const items = rows
+            .map(function (row) { return row.getAttribute("data-extract"); })
+            .filter(function (e) { return e; });
+
+        if (items.length === 0) {
+            alert("\u26a0\ufe0f No surveys found.");
+            return;
+        }
+
+        const heading = activeFilter === "pdf_delayed"
+            ? "*Survey Form Delayed*"
+            : "*Video Upload Delayed*";
+
+        let output = heading + " - " + items.length + "\n";
+
+        items.forEach(function (item) {
+            output += item + "\n";
+        });
+
+        navigator.clipboard.writeText(output.trim())
+            .then(function () {
+                alert("\u2705 Extract List copied!");
+            })
+            .catch(function () {
+                alert("\u26a0\ufe0f Failed to copy Extract List.");
+            });
+
+        return;
+    }
+
+    const statusOrder = {
+        "pdf": 1,
+        "groundwork_completed": 2,
+        "video_uploaded_pending_form": 3,
+        "video_pending": 4,
+        "ongoing": 5,
+        "rescheduled": 6,
+        "cancelled": 7,
+        "completed": 8
+    };
+
+    const headings = {
+        "pdf": "*PDF Re-upload Required*",
+        "groundwork_completed": "*Groundwork Completed - Video and Form Pending*",
+        "video_uploaded_pending_form": "*Video Uploaded - Form Pending*",
+        "video_pending": "*Video Pending*",
+        "ongoing": "*Survey Started But Not Completed*",
+        "rescheduled": "*Rescheduled*",
+        "cancelled": "*Cancelled*",
+        "completed": "*Completed*"
+    };
+
+    // PDF re-upload wins over whatever Survey.status says, same as admin.
+
+    function getDisplayStatus(row) {
+
+        const status = (
+            row.getAttribute("data-status") || ""
+        ).trim().toLowerCase();
+
+        if (row.getAttribute("data-pdf-reupload") === "true") {
+            return "pdf";
+        }
+
+        if (status in statusOrder) {
+            return status;
+        }
+
+        return null;
+    }
+
+    const groups = {};
+
+    Object.keys(statusOrder).forEach(function (status) {
+        groups[status] = [];
+    });
+
+    rows.forEach(function (row) {
+
+        const extract = row.getAttribute("data-extract");
+
+        if (!extract) {
+            return;
+        }
+
+        const displayStatus = getDisplayStatus(row);
+
+        if (!displayStatus) {
+            return;
+        }
+
+        groups[displayStatus].push(extract);
+    });
+
+    const ordered = Object.keys(statusOrder)
+        .sort(function (a, b) { return statusOrder[a] - statusOrder[b]; });
+
+    const populated = ordered.filter(function (status) {
+        return groups[status].length > 0;
+    });
+
+    if (populated.length === 0) {
+        alert("\u26a0\ufe0f No surveys found.");
+        return;
+    }
+
+    let output = "";
+
+    populated.forEach(function (status) {
+
+        const items = groups[status];
+
+        output += headings[status] + " - " + items.length + "\n";
+
+        items.forEach(function (item) {
+            output += item + "\n";
+        });
+
+        output += "\n";
+    });
+
+    output += "\n*Summary*\n\n";
+
+    populated.forEach(function (status) {
+        output += headings[status] + " - " + groups[status].length + "\n";
+    });
+
+    navigator.clipboard.writeText(output.trim())
+
+        .then(function () {
+            alert("\u2705 Extract List copied!");
+        })
+
+        .catch(function () {
+            alert("\u26a0\ufe0f Failed to copy Extract List.");
+        });
+
+}
 
 </script>
 

@@ -1155,8 +1155,57 @@ font-size:16px;
 
 
 .survey-table{
-    width:100%;
-    table-layout:fixed;
+    width:max-content;
+    min-width:100%;
+    table-layout:auto;
+    border-collapse:separate;
+    border-spacing:0;
+}
+
+/* ===========================
+   DASHBOARD COLUMN WIDTHS
+   ===========================
+   table-layout:fixed above ignores the per-column min-width the table cells
+   declare, which made the Status badges and the Captain name spill over their
+   neighbours. With auto layout the browser sizes each column from its own
+   content instead. The width/min-width/max-width declarations in the markup are
+   now cleared so one stale inline value cannot reintroduce the overlap - they
+   are per-browser guesses, and the auto layout is what actually keeps the
+   columns apart. Mirrors static/css/admin.css:1393-1398. */
+
+.survey-table th,
+.survey-table td{
+    width:auto !important;
+    min-width:unset !important;
+    max-width:none !important;
+}
+
+/* A long captain name wraps instead of pushing into the Status column. */
+
+.survey-table td.captain-cell{
+    white-space:normal !important;
+    overflow-wrap:break-word;
+    word-break:break-word;
+    max-width:180px !important;
+    min-width:120px !important;
+}
+
+/* ===========================
+   LATE UPLOAD INDICATORS
+   ===========================
+   Used by the PDF / Video upload time columns so the dashboard, the Excel
+   export and the other role dashboards all render a late upload the same way.
+   Matches static/css/admin.css:1496-1505. */
+
+.video-upload-late{
+    font-size:15px;
+    color:red;
+    font-weight:700;
+}
+
+.pdf-upload-late{
+    color:red;
+    font-weight:bold;
 }
 
 .stats > a{

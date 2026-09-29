@@ -296,6 +296,9 @@ def regional_dashboard():
     # PREPARE DISPLAY DATA
     # -----------------------------------
 
+    ist_offset = timedelta(hours=5, minutes=30)
+    now_ist = (datetime.utcnow() + ist_offset).replace(tzinfo=None)
+
     for survey in all_surveys:
 
         if survey.start_time:
@@ -308,56 +311,49 @@ def regional_dashboard():
         else:
             survey.display_end_time = None
 
+        # Upload lateness for both the PDF and the raw video. Deadline is next
+        # day 1:00 PM IST, matching the admin (routes/admin.py:1282, 1317) and
+        # form_approver (routes/form_approver.py:294, 312) dashboards so all
+        # three flag the same survey as delayed.
+        #
+        # A missing upload counts as late once the deadline has passed, not
+        # only when an upload landed late - otherwise the "Delayed" marker in
+        # the template would never render for a captain who simply never
+        # uploaded.
         survey.pdf_upload_late = False
         survey.video_upload_late = False
+
         if survey.end_time:
             end_time_ist = (
-                survey.end_time + timedelta(hours=5, minutes=30)
+                survey.end_time + ist_offset
             ).replace(tzinfo=None)
+
             upload_deadline_ist = datetime.combine(
                 end_time_ist.date() + timedelta(days=1),
                 datetime.min.time(),
-            ) + timedelta(hours=14)
+            ) + timedelta(hours=13)
+
             if survey.survey_pdf_uploaded_at:
-                survey.pdf_upload_late = (
-                    survey.survey_pdf_uploaded_at
-                    + timedelta(hours=5, minutes=30)
-                ).replace(tzinfo=None) > upload_deadline_ist
+                pdf_upload_time_ist = (
+                    survey.survey_pdf_uploaded_at + ist_offset
+                ).replace(tzinfo=None)
+
+                if pdf_upload_time_ist > upload_deadline_ist:
+                    survey.pdf_upload_late = True
+
+            elif now_ist > upload_deadline_ist:
+                survey.pdf_upload_late = True
+
             if survey.video_upload_time:
-                survey.video_upload_late = (
-                    survey.video_upload_time
-                    + timedelta(hours=5, minutes=30)
-                ).replace(tzinfo=None) > upload_deadline_ist
+                video_upload_time_ist = (
+                    survey.video_upload_time + ist_offset
+                ).replace(tzinfo=None)
 
-        if (
-            survey.status == "video_pending"
-            and survey.video_pending_start_time
-        ):
-            survey.upload_duration_minutes = int(
-                (
-                    datetime.utcnow() -
-                    survey.video_pending_start_time
-                ).total_seconds() / 60
-            )
+                if video_upload_time_ist > upload_deadline_ist:
+                    survey.video_upload_late = True
 
-            survey.upload_status_text = "Upload Pending"
-
-        elif (
-            survey.video_pending_start_time
-            and survey.video_upload_time
-        ):
-            survey.upload_duration_minutes = int(
-                (
-                    survey.video_upload_time -
-                    survey.video_pending_start_time
-                ).total_seconds() / 60
-            )
-
-            survey.upload_status_text = "Upload Duration"
-
-        else:
-            survey.upload_duration_minutes = 0
-            survey.upload_status_text = ""
+            elif now_ist > upload_deadline_ist:
+                survey.video_upload_late = True
 
     # -----------------------------------
     # REGIONAL MISSED SURVEY LOGIC

@@ -374,6 +374,15 @@ Generate
 
 </button>
 
+<button
+type="button"
+class="search-btn"
+onclick="exportRegionalToExcel()">
+
+Extract to Excel
+
+</button>
+
 </form>
 
 <div class="table-wrapper">
@@ -400,15 +409,11 @@ Generate
 
 <th>PDF<br>Upload Time</th>
 
-<th style="width:160px;">Captain</th>
+<th>Captain</th>
 
-<th style="width:180px;">Status</th>
+<th>Status</th>
 
-<th style="width:90px;">Survey Duration</th>
-
-<th style="width:90px;">Upload Duration</th>
-
-<th style="width:80px;">View</th>
+<th>View</th>
 
 
 
@@ -483,10 +488,16 @@ Generate
 
 {% if survey.video_upload_time %}
 
-    <small style="font-size: 15px; line-height: 1.3;{% if survey.video_upload_late %}color:red;font-weight:bold;{% endif %}">
+    <span class="{% if survey.video_upload_late %}video-upload-late{% endif %}">
         {{ (survey.video_upload_time + timedelta(hours=5, minutes=30)).strftime('%d %b %Y') }}<br>
         {{ (survey.video_upload_time + timedelta(hours=5, minutes=30)).strftime('%I:%M %p') }}
-    </small>
+    </span>
+
+{% elif survey.video_upload_late %}
+
+    <span style="color:red;font-weight:bold;">
+        Delayed
+    </span>
 
 {% else %}
 
@@ -497,26 +508,34 @@ Generate
 </td>
 
 <td>
+
 {% if survey.survey_pdf_uploaded_at %}
-    <small style="font-size:15px;line-height:1.3;{% if survey.pdf_upload_late %}color:red;font-weight:bold;{% endif %}">
+
+    <span class="{% if survey.pdf_upload_late %}pdf-upload-late{% endif %}">
         {{ (survey.survey_pdf_uploaded_at + timedelta(hours=5, minutes=30)).strftime('%d %b %Y') }}<br>
         {{ (survey.survey_pdf_uploaded_at + timedelta(hours=5, minutes=30)).strftime('%I:%M %p') }}
-    </small>
+    </span>
+
 {% elif survey.pdf_upload_late %}
-    <span style="color:red;font-weight:bold;">Delayed</span>
+
+    <span style="color:red;font-weight:bold;">
+        Delayed
+    </span>
+
 {% else %}
+
     -
+
 {% endif %}
+
 </td>
 
-    <td style="max-width:160px;
-white-space:nowrap;
-overflow:hidden;
-text-overflow:ellipsis;">
+    <td class="captain-cell">
     {{ survey.captain_name }}
 </td>
 
 <td style="min-width:220px; text-align:center; vertical-align:middle;">
+
 
     {% set s_status = (survey.status|string|trim|lower) %}
     {% set c_status = (survey.captain_status|string|trim|lower) %}
@@ -841,49 +860,6 @@ text-overflow:ellipsis;">
 
 </td>
 
-<td>
-
-    {% if survey.status in ["ongoing", "groundwork_completed"] %}
-
-    <span
-        class="live-duration"
-        data-start="{{ survey.start_time.strftime('%Y-%m-%dT%H:%M:%S') }}">
-        0h 0m
-    </span>
-
-    {% elif survey.start_time and survey.end_time %}
-
-    {% set total_mins = (
-        (survey.end_time - survey.start_time).total_seconds() / 60
-    )|int %}
-
-    {{ total_mins // 60 }}h {{ total_mins % 60 }}m
-
-    {% else %}
-
-    -
-
-    {% endif %}
-
-</td>
-
-
-
-    <td>
-
-    {% if survey.upload_duration_minutes>0 %}
-
-    {{ survey.upload_duration_minutes//60 }}h
-    {{ survey.upload_duration_minutes%60 }}m
-
-    {% else %}
-
-    -
-
-    {% endif %}
-
-    </td>
-
     <td style="text-align:center;">
 
     <a 
@@ -905,84 +881,217 @@ text-overflow:ellipsis;">
 
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
+
 <script>
 
-function updateLiveDurations() {
+function exportRegionalToExcel() {
 
-    document
-    .querySelectorAll(".live-duration")
-    .forEach(function(el) {
+    const table = document.querySelector(".survey-table");
 
-        const startString = el.dataset.start;
+    if (!table) {
+        alert("Dashboard table not found.");
+        return;
+    }
 
-        if (!startString) {
+    const rows = Array.from(
+        table.querySelectorAll("tbody tr")
+    );
+
+    if (!rows.length) {
+        alert("No surveys found to export.");
+        return;
+    }
+
+    // ==========================================
+    // COLUMNS TO EXPORT
+    // 0  S.No.
+    // 1  UPC Code
+    // 2  Section
+    // 3  Cycle
+    // 4  Section length
+    // 5  Start Time
+    // 6  End Time
+    // 7  Video Upload Time
+    // 8  PDF Upload Time
+    // 9  Captain
+    // 10 Status
+    // 11 View
+    //
+    // Mirrors the columns rendered on screen, so the sheet always matches the
+    // filters currently applied. Update the count below if the table changes.
+    // ==========================================
+
+    const COLUMN_COUNT = 12;
+
+    const headers = [
+        "S.No.",
+        "UPC Code",
+        "Section",
+        "Cycle",
+        "Section length",
+        "Start Time",
+        "End Time",
+        "Video Upload Time",
+        "PDF Upload Time",
+        "Captain",
+        "Status",
+        "View"
+    ];
+
+    const workbook = new ExcelJS.Workbook();
+
+    const worksheet = workbook.addWorksheet("Regional Survey Report");
+
+    worksheet.addRow(headers);
+
+    worksheet.getRow(1).font = { bold: true };
+
+    // A late upload is shown red on the page either as a timestamp carrying the
+    // late CSS class, or as an inline red "Delayed" span when nothing was
+    // uploaded and the deadline was missed. Both are re-applied as red bold
+    // text here so the sheet stays colour-consistent with the dashboard.
+    const COL_VIDEO_UPLOAD = 7;
+    const COL_PDF_UPLOAD = 8;
+
+    let addedRows = 0;
+
+    rows.forEach(function(row) {
+
+        const cells = Array.from(
+            row.querySelectorAll("td")
+        );
+
+        if (cells.length < COLUMN_COUNT) {
             return;
         }
 
-        // Database timestamp is treated as IST
-        const start = new Date(
-            startString + "+05:30"
-        );
+        const values = [];
 
-        const now = new Date();
+        for (let i = 0; i < COLUMN_COUNT; i++) {
 
-        let diffMs = now - start;
-
-        // Never show negative duration
-        if (diffMs < 0) {
-            diffMs = 0;
+            values.push(cells[i]
+                .innerText
+                .replace(/\n+/g, " ")
+                .replace(/\s+/g, " ")
+                .trim());
         }
 
-        const totalMinutes = Math.floor(
-            diffMs / 60000
+        const excelRow = worksheet.addRow(values);
+
+        addedRows += 1;
+
+        [
+            { index: COL_VIDEO_UPLOAD, cls: ".video-upload-late" },
+            { index: COL_PDF_UPLOAD, cls: ".pdf-upload-late" }
+        ].forEach(function(colInfo) {
+
+            const isLateTimestamp = cells[colInfo.index]
+                .querySelector(colInfo.cls) !== null;
+
+            const isDelayedPlaceholder =
+                values[colInfo.index] === "Delayed";
+
+            if (isLateTimestamp || isDelayedPlaceholder) {
+
+                excelRow.getCell(colInfo.index + 1).font = {
+                    color: { argb: "FFFF0000" },
+                    bold: true
+                };
+            }
+        });
+    });
+
+    if (!addedRows) {
+        alert("No surveys found to export.");
+        return;
+    }
+
+    // ==========================================
+    // COLUMN WIDTHS
+    // ==========================================
+
+    const widths = [
+        7,     // S.No.
+        20,    // UPC
+        12,    // Section
+        10,    // Cycle
+        15,    // Section length
+        25,    // Start Time
+        25,    // End Time
+        22,    // Video Upload
+        22,    // PDF Upload
+        25,    // Captain
+        35,    // Status
+        10     // View
+    ];
+
+    widths.forEach(function(width, index) {
+        worksheet.getColumn(index + 1).width = width;
+    });
+
+    // ==========================================
+    // FREEZE HEADER ROW
+    // ==========================================
+
+    worksheet.views = [{ state: "frozen", ySplit: 1 }];
+
+    // ==========================================
+    // FILE NAME
+    // ==========================================
+
+    const today = new Date();
+
+    const dateString =
+        today.getFullYear() + "-" +
+        String(today.getMonth() + 1).padStart(2, "0") + "-" +
+        String(today.getDate()).padStart(2, "0");
+
+    workbook.xlsx.writeBuffer().then(function(buffer) {
+
+        const blob = new Blob(
+            [buffer],
+            {
+                type:
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            }
         );
 
-        const hrs = Math.floor(
-            totalMinutes / 60
-        );
+        const url = URL.createObjectURL(blob);
 
-        const mins = totalMinutes % 60;
+        const link = document.createElement("a");
 
-        el.innerHTML =
-            hrs + "h " +
-            mins + "m";
+        link.href = url;
 
-        // Red after 8 hours
-        if (totalMinutes > 480) {
+        link.download = "VIAMA_Regional_Report_" + dateString + ".xlsx";
 
-            el.style.color = "red";
-            el.style.fontWeight = "700";
+        document.body.appendChild(link);
 
-        } else {
+        link.click();
 
-            el.style.color = "";
-            el.style.fontWeight = "";
+        document.body.removeChild(link);
 
-        }
+        URL.revokeObjectURL(url);
 
+    }).catch(function(error) {
+
+        console.error("Excel export failed:", error);
+
+        alert("Excel export failed. Please try again.");
     });
 
 }
 
 
-// Run immediately
-updateLiveDurations();
-
-
-// Update every minute
-setInterval(
-    updateLiveDurations,
-    60000
-);
-
-
 // Refresh dashboard every 5 minutes
+
 setInterval(function () {
     window.location.reload();
 }, 300000);
 
 
 // Refresh when user comes back to the tab
+
 document.addEventListener("visibilitychange", function () {
 
     if (!document.hidden) {
@@ -1068,71 +1177,6 @@ Cancel
 </div>
 
 </div>
-
-<script>
-
-function updateLiveDurations() {
-
-    document
-        .querySelectorAll(".live-duration")
-        .forEach(function(el) {
-
-            const startString = el.dataset.start;
-
-            if (!startString) {
-                el.innerHTML = "-";
-                return;
-            }
-
-            // Convert ISO IST datetime into timestamp
-            const startTime = new Date(startString).getTime();
-
-            // Current time
-            const now = Date.now();
-
-            // Difference in minutes
-            const totalMinutes = Math.floor(
-                (now - startTime) / 60000
-            );
-
-            // Safety: never show negative duration
-            if (totalMinutes < 0) {
-                el.innerHTML = "0h 0m";
-                return;
-            }
-
-            const hrs = Math.floor(
-                totalMinutes / 60
-            );
-
-            const mins = totalMinutes % 60;
-
-            el.innerHTML =
-                hrs + "h " +
-                mins + "m";
-
-            // Red after 8 hours
-            if (totalMinutes > 480) {
-
-                el.style.color = "red";
-                el.style.fontWeight = "700";
-
-            }
-
-        });
-
-}
-
-// Run immediately
-updateLiveDurations();
-
-// Update every minute
-setInterval(
-    updateLiveDurations,
-    60000
-);
-
-</script>
 
 <script>
 function showCaptainReason(button) {

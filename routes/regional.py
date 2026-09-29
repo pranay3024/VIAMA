@@ -93,6 +93,11 @@ def regional_dashboard():
     from_date = request.args.get("from_date")
     to_date = request.args.get("to_date")
 
+    # Shared by the "PDF Delayed" / "Video Delayed" sweeps below and by the
+    # per-row lateness flags further down, so both agree on the deadline.
+    ist_offset = timedelta(hours=5, minutes=30)
+    now_ist = (datetime.utcnow() + ist_offset).replace(tzinfo=None)
+
     filtered_query = Survey.query.filter(
         Survey.state.in_(state_list),
         Survey.show_on_dashboard == True
@@ -108,10 +113,40 @@ def regional_dashboard():
             Survey.captain_name == captain
         )
 
+    # Mirrors routes/admin.py:671-709. Most options are a plain status column
+    # match, but three of them are not stored in Survey.status:
+    #   pdf_reupload_required -> a flag column
+    #   pdf_delayed           -> PDF never uploaded and the deadline has passed
+    #   video_delayed         -> video never uploaded and the deadline passed
+    # The two "delayed" ones still need the deadline swept in Python afterwards,
+    # since the column cannot express "past the deadline".
     if status:
-        filtered_query = filtered_query.filter(
-            Survey.status == status
-        )
+
+        if status == "pdf_reupload_required":
+
+            filtered_query = filtered_query.filter(
+                Survey.pdf_reupload_required.is_(True)
+            )
+
+        elif status == "pdf_delayed":
+
+            filtered_query = filtered_query.filter(
+                Survey.end_time.isnot(None),
+                Survey.survey_pdf_uploaded_at.is_(None)
+            )
+
+        elif status == "video_delayed":
+
+            filtered_query = filtered_query.filter(
+                Survey.end_time.isnot(None),
+                Survey.video_upload_time.is_(None)
+            )
+
+        else:
+
+            filtered_query = filtered_query.filter(
+                Survey.status == status
+            )
 
     cycle_no = safe_int(cycle)
 
@@ -258,6 +293,28 @@ def regional_dashboard():
     Survey.start_time.desc()
 
 ).all()
+
+    # "PDF Delayed" / "Video Delayed" cannot be expressed in the WHERE clause,
+    # because they mean "the upload never happened AND the deadline has since
+    # passed". The column filters above narrow to the missing uploads; this
+    # sweep then drops the ones whose deadline has not been reached yet. Same
+    # 1:00 PM IST next-day deadline as routes/admin.py:1135.
+    if status in ("pdf_delayed", "video_delayed"):
+
+        def deadline_passed(survey):
+            end_time_ist = (
+                survey.end_time + ist_offset
+            ).replace(tzinfo=None)
+            deadline_ist = datetime.combine(
+                end_time_ist.date() + timedelta(days=1),
+                datetime.min.time(),
+            ) + timedelta(hours=13)
+            return now_ist > deadline_ist
+
+        all_surveys = [
+            survey for survey in all_surveys
+            if deadline_passed(survey)
+        ]
 
     assignment_rows = SurveyAssignment.query.filter(
         SurveyAssignment.state.in_(state_list)

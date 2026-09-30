@@ -293,6 +293,66 @@ class Survey(db.Model):
     
 
 
+class SurveyPdfVersion(db.Model):
+    """One row per survey-form PDF the captain has uploaded.
+
+    ``Survey.end_survey_pdf`` only ever holds the latest file and the captain's
+    re-upload used to delete the previous copy from Drive, so an approver had no
+    way to see what the form said before a correction was requested. Every
+    upload now appends a row here and the older Drive files are left in place,
+    which is what the survey details page renders.
+
+    No foreign key, consistent with the rest of this schema (core/models.py:18).
+    """
+
+    __tablename__ = "survey_pdf_versions"
+
+    id = db.Column(db.Integer, primary_key=True)
+
+    survey_id = db.Column(db.Integer, nullable=False, index=True)
+
+    pdf_url = db.Column(db.Text, nullable=False)
+
+    uploaded_at = db.Column(db.DateTime, nullable=True)
+
+    version_no = db.Column(db.Integer, default=1, nullable=False)
+
+    uploaded_by_role = db.Column(db.String(30), nullable=True)
+
+    uploaded_by_email = db.Column(db.String(150), nullable=True)
+
+    is_current = db.Column(db.Boolean, default=False)
+
+    reupload_reason = db.Column(db.Text, nullable=True)
+
+    created_at = db.Column(
+        db.DateTime,
+        default=datetime.utcnow
+    )
+
+    __table_args__ = (
+        db.Index(
+            "ix_survey_pdf_versions_survey_version",
+            "survey_id",
+            "version_no"
+        ),
+    )
+
+    def as_dict(self, index=None):
+        """The shape templates/core render a version in."""
+
+        return {
+            "index": index,
+            "version_no": self.version_no,
+            "url": self.pdf_url,
+            "uploaded_at": self.uploaded_at,
+            "uploaded_by_role": self.uploaded_by_role,
+            "uploaded_by_email": self.uploaded_by_email,
+            "is_current": bool(self.is_current),
+            "reupload_reason": self.reupload_reason,
+        }
+
+
 class SurveyAssignment(db.Model):
     __tablename__ = "survey_assignments"
 

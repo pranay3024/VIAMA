@@ -149,28 +149,119 @@ style="width:100%;border-radius:12px;">
 📄 Duly Signed & Stamped Survey Form
 </h3>
 
-{% if survey.end_survey_pdf %}
+{% if pdf_versions %}
+
+{% if pdf_versions | length > 1 %}
+
+<p
+style="margin-top:8px;color:#666;font-size:14px;">
+
+{{ pdf_versions | length }} PDFs on record
+(the latest one is marked
+<b>Current</b>).
+
+</p>
+
+{% endif %}
+
+{% for pdf in pdf_versions %}
+
+<div
+style="
+ background:#fff;
+ border:1px solid #e5e7eb;
+ {% if pdf.is_current %}
+ border-left:5px solid #16a34a;
+ {% else %}
+ border-left:5px solid #d1d5db;
+ {% endif %}
+ border-radius:10px;
+ padding:12px;
+ margin-top:12px;">
+
+<p
+style="margin:0 0 8px 0;">
+
+{% if pdf.is_reupload %}
+
+<b>📄 Re-uploaded Survey PDF #{{ pdf.version_no - 1 }}</b>
+
+{% else %}
+
+<b>📄 Original Survey PDF</b>
+
+{% endif %}
+
+{% if pdf.is_current %}
+
+<span
+style="
+ background:#16a34a;
+ color:#fff;
+ font-size:12px;
+ padding:2px 8px;
+ border-radius:10px;
+ margin-left:6px;
+ vertical-align:middle;">
+
+Current
+
+</span>
+
+{% endif %}
+
+</p>
+
+<p
+style="margin:0 0 10px 0;color:#555;font-size:14px;">
+
+⏰ Uploaded at:
+
+<b>
+{{ pdf.uploaded_at.strftime('%d %b %Y, %I:%M %p')
+if pdf.uploaded_at else 'Not recorded' }}
+</b>
+
+</p>
+
+{% if pdf.reupload_reason %}
+
+<p
+style="margin:0 0 10px 0;color:#555;font-size:14px;">
+
+<b>Re-upload requested because:</b>
+
+{{ pdf.reupload_reason }}
+
+</p>
+
+{% endif %}
 
 <a
-href="{{ survey.end_survey_pdf }}"
+href="{{ pdf.url }}"
 target="_blank"
+rel="noopener"
 class="view-btn">
 
 📄 View Survey PDF
 
 </a>
 
-<br><br>
+</div>
+
+{% endfor %}
+
+<br>
 
 {% if survey.pdf_reupload_required %}
 
 <div
 style="
-background:#fff3cd;
-padding:12px;
-border-radius:10px;
-border:1px solid #ffc107;
-margin-top:10px;">
+ background:#fff3cd;
+ padding:12px;
+ border-radius:10px;
+ border:1px solid #ffc107;
+ margin-top:10px;">
 
 <b>⏳ Waiting for captain to upload corrected PDF</b>
 

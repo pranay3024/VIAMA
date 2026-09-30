@@ -2585,8 +2585,19 @@ def request_pdf_reupload(survey_id, reason):
             details=[{"field": "reason", "issue": "required, non-empty"}],
         )
     survey.pdf_reupload_required = True
-    survey.survey_pdf_uploaded_at = None
+    # survey_pdf_uploaded_at is deliberately preserved - the details page shows
+    # that timestamp next to the current PDF.
     survey.pdf_reupload_reason = reason.strip()
+
+    # Mirrors routes/admin.py, which stores the role that raised the request so
+    # the details page can say who asked for it. Best effort: a service token
+    # that names no user leaves it blank rather than failing the request.
+    try:
+        actor = resolve_actor(required=False)
+    except Exception:
+        actor = None
+
+    survey.pdf_reupload_requested_by = getattr(actor, "role", None)
     survey.pdf_reupload_count = (survey.pdf_reupload_count or 0) + 1
     db.session.commit()
     return survey
@@ -2595,6 +2606,7 @@ def request_pdf_reupload(survey_id, reason):
 def complete_pdf_reupload(survey_id, pdf_url):
     """routes/captain.py:1074-1146"""
     from extensions import db
+    from utils import pdf_versions
 
     survey = lock_survey(survey_id)
     if not survey.pdf_reupload_required:
@@ -2602,8 +2614,17 @@ def complete_pdf_reupload(survey_id, pdf_url):
             message="No PDF re-upload was requested for this survey.",
             code="reupload_not_requested",
         )
+    reupload_reason = survey.pdf_reupload_reason
     survey.end_survey_pdf = pdf_url
     survey.survey_pdf_uploaded_at = utc_now()
+    pdf_versions.record_version(
+        survey,
+        pdf_url,
+        uploaded_at=survey.survey_pdf_uploaded_at,
+        uploaded_by_role="captain",
+        uploaded_by_email=survey.captain_email,
+        reupload_reason=reupload_reason,
+    )
     survey.pdf_reupload_required = False
     survey.pdf_reupload_reason = None
     survey.pdf_reupload_requested_by = None

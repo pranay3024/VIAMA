@@ -17,6 +17,7 @@ import os
 from utils.image_compressor import compress_image
 from utils.visibility import exclude_deleted
 from utils.request_params import safe_count, safe_int
+from utils import pdf_versions
 
 
 
@@ -847,6 +848,16 @@ def complete_survey():
             survey.end_survey_pdf = pdf_url
             survey.survey_pdf_uploaded_at = datetime.utcnow()
 
+            # Keep the original PDF on record so the approver can still compare
+            # it against any later re-upload (utils/pdf_versions.py).
+            pdf_versions.record_version(
+                survey,
+                pdf_url,
+                uploaded_at=survey.survey_pdf_uploaded_at,
+                uploaded_by_role="captain",
+                uploaded_by_email=survey.captain_email,
+            )
+
             # -----------------------------------
             # UPDATE SURVEY STATUS
             # -----------------------------------
@@ -1581,18 +1592,25 @@ def reupload_survey_pdf(survey_id):
 
         # -----------------------------------
         # SAVE OLD PDF URL
+        #
+        # The previous PDF is deliberately NOT deleted from Drive any more:
+        # approvers need to keep seeing the copy they asked to correct.
+        # utils/pdf_versions.record_version appends this URL to the survey's
+        # PDF history so the details page can list both.
         # -----------------------------------
 
         old_pdf_url = survey.end_survey_pdf
+
+        # Keep the reason for this re-upload; it is cleared further down but
+        # the history row still wants it.
+
+        reupload_reason = survey.pdf_reupload_reason
 
         # -----------------------------------
         # GOOGLE DRIVE
         # -----------------------------------
 
-        from google_drive import (
-            upload_file_to_drive,
-            delete_file_from_drive
-        )
+        from google_drive import upload_file_to_drive
 
         from config_drive import PDF_FOLDER_ID
 
@@ -1653,49 +1671,19 @@ def reupload_survey_pdf(survey_id):
             )
 
         # -----------------------------------
-        # DELETE OLD PDF FROM GOOGLE DRIVE
+        # KEEP THE OLD PDF
+        #
+        # The re-upload request is about replacing what approvers look at, not
+        # about destroying the previous submission, so the earlier Drive file
+        # is left in place. It is still recorded in the survey's PDF history
+        # below, which is what the details page renders.
         # -----------------------------------
 
         if old_pdf_url:
-
-            try:
-
-                import re
-
-                match = re.search(
-                    r"/d/([a-zA-Z0-9_-]+)",
-                    old_pdf_url
-                )
-
-                if match:
-
-                    old_file_id = match.group(1)
-
-                    delete_file_from_drive(
-                        old_file_id
-                    )
-
-                    print(
-                        "OLD PDF DELETED:",
-                        old_file_id
-                    )
-
-                else:
-
-                    print(
-                        "OLD PDF FILE ID NOT FOUND:",
-                        old_pdf_url
-                    )
-
-            except Exception as e:
-
-                # Do NOT fail the re-upload
-                # if old PDF deletion fails.
-
-                print(
-                    "OLD PDF DELETE ERROR:",
-                    e
-                )
+            print(
+                "OLD PDF RETAINED:",
+                old_pdf_url
+            )
 
         # -----------------------------------
         # UPDATE DATABASE
@@ -1703,6 +1691,18 @@ def reupload_survey_pdf(survey_id):
 
         survey.end_survey_pdf = new_pdf_url
         survey.survey_pdf_uploaded_at = datetime.utcnow()
+
+        # Append this upload to the PDF history so the original stays visible
+        # alongside the corrected copy.
+
+        pdf_versions.record_version(
+            survey,
+            new_pdf_url,
+            uploaded_at=survey.survey_pdf_uploaded_at,
+            uploaded_by_role="captain",
+            uploaded_by_email=survey.captain_email,
+            reupload_reason=reupload_reason,
+        )
 
         survey.pdf_reupload_required = False
 

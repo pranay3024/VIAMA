@@ -19,6 +19,7 @@ from utils.auto_sync import (
     MAX_AUTO_EXTRACT_ATTEMPTS,
     extract_survey_end_date_if_missing,
 )
+from utils import pdf_versions
     
 
 from utils.email_templates import (
@@ -1855,11 +1856,56 @@ def survey_details_admin(survey_id):
             timedelta(hours=5, minutes=30)
         )
 
+    # Every PDF the captain has uploaded for this survey, oldest first, so the
+    # page lists the original at the top and each re-upload below it with its
+    # own timestamp. Falls back to the single latest PDF for surveys uploaded
+    # before the history table existed.
+    survey_pdf_versions = pdf_versions.ensure_history(survey)
+
+    pdf_version_rows = []
+
+    for position, version in enumerate(survey_pdf_versions):
+        uploaded_at = version.uploaded_at
+
+        if uploaded_at:
+            uploaded_at = uploaded_at + timedelta(
+                hours=5,
+                minutes=30
+            )
+
+        is_last = position == len(survey_pdf_versions) - 1
+
+        pdf_version_rows.append(
+            {
+                "version_no": position + 1,
+                "is_reupload": position > 0,
+                "url": version.pdf_url,
+                "uploaded_at": uploaded_at,
+                "is_current": is_last,
+                "reupload_reason": version.reupload_reason,
+            }
+        )
+
+    # Nothing on record but the column is populated (history table missing, or
+    # the backfill was rolled back) - still show the one PDF we have.
+    if not pdf_version_rows and survey.end_survey_pdf:
+        pdf_version_rows.append(
+            {
+                "version_no": 1,
+                "is_reupload": False,
+                "url": survey.end_survey_pdf,
+                "uploaded_at": display_end_time,
+                "is_current": True,
+                "reupload_reason": None,
+            }
+        )
+
     return render_template(
         "admin/survey_details.html",
         survey=survey,
         display_start_time=display_start_time,
-        display_end_time=display_end_time
+        display_end_time=display_end_time,
+        pdf_versions=pdf_version_rows
     )
 
 
@@ -1995,7 +2041,12 @@ def request_pdf_reupload(survey_id):
     survey = Survey.query.get_or_404(survey_id)
 
     survey.pdf_reupload_required = True
-    survey.survey_pdf_uploaded_at = None
+
+    # NOTE: survey_pdf_uploaded_at is intentionally left alone. It used to be
+    # nulled here, which threw away the time the current PDF was uploaded -
+    # and the details page needs that timestamp to sit in front of the file.
+    # The current PDF also stays on record (end_survey_pdf is not cleared) so
+    # the approver can compare it against the corrected copy.
 
     survey.pdf_reupload_reason = request.form["reason"]
     survey.pdf_reupload_requested_by = session.get("role")

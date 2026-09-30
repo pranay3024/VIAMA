@@ -54,6 +54,7 @@ from core.config import (
 from core.engine import ok
 from core.engine import BadRequest, Forbidden, NotFound, ValidationError
 from core.config import ASSUMED_SEMANTICS, COLUMN_SEMANTICS, ist_now_aware, iso, utc_now
+from utils import pdf_versions
 from core.config import current_week_number, week_detail, week_list
 
 
@@ -1299,6 +1300,15 @@ def survey_media(survey_id):
                 "count": survey.pdf_reupload_count or 0,
                 "requested_by": survey.pdf_reupload_requested_by,
             },
+            # Every survey-form PDF ever uploaded, oldest first - the same set
+            # the survey details page renders for admin / regional / form
+            # approver. Empty until the history table is migrated.
+            "pdf_versions": [
+                version.as_dict(index=position)
+                for position, version in enumerate(
+                    pdf_versions.ensure_history(survey)
+                )
+            ],
         }
     )
 
@@ -2593,6 +2603,18 @@ def set_survey_media(survey_id, kind):
             )
 
     setattr(survey, kind, url)
+
+    if kind == "end_survey_pdf":
+        # Append to the survey's PDF history rather than replacing it outright,
+        # so the details page still lists the copy that was replaced
+        # (utils/pdf_versions.py).
+        pdf_versions.record_version(
+            survey,
+            url,
+            uploaded_at=utc_now(),
+            uploaded_by_role="api",
+        )
+
     commit("media")
     return ok(spec("survey").serialize(survey, Options.from_request()))
 

@@ -1,4 +1,4 @@
-﻿from flask import Blueprint, render_template, session, redirect, request
+﻿from flask import Blueprint, render_template, session, redirect, request, jsonify
 from datetime import datetime, timedelta
 from werkzeug.security import (
     check_password_hash,
@@ -7,6 +7,7 @@ from werkzeug.security import (
 from models.db_models import db
 
 from utils.request_params import safe_date, safe_int, safe_week
+from utils import schedules as schedule_views
 
 from sqlalchemy import case, and_, or_
 from sqlalchemy.orm import defer
@@ -532,27 +533,97 @@ def regional_schedules():
         for s in manager_states
     ]
 
-    schedules = SurveyAssignment.query.filter(
+    day, team, state = schedule_views.read_filters(
+        request.args
+    )
+
+    if state and state not in state_list:
+        state = None
+
+    query = SurveyAssignment.query.filter(
         SurveyAssignment.state.in_(state_list)
-    ).order_by(
-        SurveyAssignment.survey_day,
-        SurveyAssignment.section_no
-    ).all()
+    )
+
+    schedules = schedule_views.ordered(
+        schedule_views.apply_filters(
+            query,
+            day=day,
+            team=team,
+            state=state
+        )
+    )
 
     states = [
-        (state,)
-        for state in state_list
+        (state_name,)
+        for state_name in state_list
     ]
 
     return render_template(
         "regional/schedules.html",
         schedules=schedules,
+        cycles=schedule_views.live_cycles(schedules),
         states=states,
+        selected_day=day,
+        selected_team=team,
+        selected_state=state,
+        team_options=schedule_views.team_options(),
+        day_options=schedule_views.day_options(),
+        export_url="/regional/schedules/extract",
         monday_count=len([s for s in schedules if s.survey_day=="Monday"]),
         tuesday_count=len([s for s in schedules if s.survey_day=="Tuesday"]),
         wednesday_count=len([s for s in schedules if s.survey_day=="Wednesday"]),
         thursday_count=len([s for s in schedules if s.survey_day=="Thursday"]),
         friday_count=len([s for s in schedules if s.survey_day=="Friday"])
+    )
+
+
+@regional_bp.route("/regional/schedules/extract")
+def regional_schedules_extract():
+
+    if session.get("role") != "regional_manager":
+        return redirect("/")
+
+    user = User.query.get(
+        session["user_id"]
+    )
+
+    manager_states = RegionalManagerState.query.filter_by(
+        manager_email=user.email
+    ).all()
+
+    state_list = [
+        s.state
+        for s in manager_states
+    ]
+
+    day, team, state = schedule_views.read_filters(
+        request.args
+    )
+
+    if state and state not in state_list:
+        state = None
+
+    schedules = schedule_views.ordered(
+        schedule_views.apply_filters(
+            SurveyAssignment.query.filter(
+                SurveyAssignment.state.in_(state_list)
+            ),
+            day=day,
+            team=team,
+            state=state
+        )
+    )
+
+    rows = schedule_views.extract_rows(
+        schedules,
+        schedule_views.live_cycles(schedules)
+    )
+
+    return jsonify(
+        {
+            "text": schedule_views.extract_text(rows),
+            "count": len(rows)
+        }
     )
 
 

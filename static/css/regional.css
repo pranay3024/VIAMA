@@ -1214,6 +1214,67 @@ font-size:16px;
     color:inherit;
 }
 
+/* Matches static/css/admin.css - the schedules filter form pairs a green
+   "Extract" copy button next to the orange "Apply Filter" button. */
+
+.extract-btn{
+
+    height:42px;
+
+    padding:10px 30px;
+
+    font-size:14px;
+
+    font-weight:600;
+
+    color:white;
+
+    background:#16a34a;
+
+    border:none;
+
+    border-radius:12px;
+
+    cursor:pointer;
+
+}
+
+.extract-btn:hover{
+
+    background:#15803d;
+
+}
+
+.extract-btn:disabled{
+
+    opacity:.6;
+
+    cursor:progress;
+
+}
+
+.extract-note{
+
+    align-self:center;
+
+    font-size:14px;
+
+    font-weight:600;
+
+}
+
+.extract-note-ok{
+
+    color:#15803d;
+
+}
+
+.extract-note-failed{
+
+    color:#b91c1c;
+
+}
+
 
 .stat-card-link,
 .stat-card-link:visited,

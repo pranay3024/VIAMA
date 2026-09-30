@@ -3,10 +3,12 @@ from flask import render_template
 from flask import session
 from flask import redirect
 from flask import request
+from flask import jsonify
 from models.db_models import db
 from models.db_models import SurveyAssignment
 from sqlalchemy import case, and_, or_
 from utils.request_params import safe_date, safe_int, safe_week
+from utils import schedules as schedule_views
 import pytz
 
 from datetime import datetime, timedelta
@@ -445,10 +447,18 @@ def teamleader_schedules():
     if session.get("role") != "team_leader":
         return redirect("/")
 
-    schedules = SurveyAssignment.query.order_by(
-        SurveyAssignment.survey_day,
-        SurveyAssignment.section_no
-    ).all()
+    day, team, state = schedule_views.read_filters(
+        request.args
+    )
+
+    schedules = schedule_views.ordered(
+        schedule_views.apply_filters(
+            SurveyAssignment.query,
+            day=day,
+            team=team,
+            state=state
+        )
+    )
 
     states = db.session.query(
         SurveyAssignment.state
@@ -457,12 +467,51 @@ def teamleader_schedules():
     return render_template(
         "teamleader/schedules.html",
         schedules=schedules,
+        cycles=schedule_views.live_cycles(schedules),
         states=states,
+        selected_day=day,
+        selected_team=team,
+        selected_state=state,
+        team_options=schedule_views.team_options(),
+        day_options=schedule_views.day_options(),
+        export_url="/teamleader/schedules/extract",
         monday_count=len([s for s in schedules if s.survey_day=="Monday"]),
         tuesday_count=len([s for s in schedules if s.survey_day=="Tuesday"]),
         wednesday_count=len([s for s in schedules if s.survey_day=="Wednesday"]),
         thursday_count=len([s for s in schedules if s.survey_day=="Thursday"]),
         friday_count=len([s for s in schedules if s.survey_day=="Friday"])
+    )
+
+
+@teamleader_bp.route("/teamleader/schedules/extract")
+def teamleader_schedules_extract():
+
+    if session.get("role") != "team_leader":
+        return redirect("/")
+
+    day, team, state = schedule_views.read_filters(
+        request.args
+    )
+
+    schedules = schedule_views.ordered(
+        schedule_views.apply_filters(
+            SurveyAssignment.query,
+            day=day,
+            team=team,
+            state=state
+        )
+    )
+
+    rows = schedule_views.extract_rows(
+        schedules,
+        schedule_views.live_cycles(schedules)
+    )
+
+    return jsonify(
+        {
+            "text": schedule_views.extract_text(rows),
+            "count": len(rows)
+        }
     )
 
 

@@ -60,27 +60,27 @@ class="filter-btn">
 All
 </a>
 
-<a href="/admin/schedules?day=Monday"
+<a href="/admin/schedules?day=Monday&team={{ selected_team }}&state={{ selected_state }}"
 class="filter-btn">
 Monday
 </a>
 
-<a href="/admin/schedules?day=Tuesday"
+<a href="/admin/schedules?day=Tuesday&team={{ selected_team }}&state={{ selected_state }}"
 class="filter-btn">
 Tuesday
 </a>
 
-<a href="/admin/schedules?day=Wednesday"
+<a href="/admin/schedules?day=Wednesday&team={{ selected_team }}&state={{ selected_state }}"
 class="filter-btn">
 Wednesday
 </a>
 
-<a href="/admin/schedules?day=Thursday"
+<a href="/admin/schedules?day=Thursday&team={{ selected_team }}&state={{ selected_state }}"
 class="filter-btn">
 Thursday
 </a>
 
-<a href="/admin/schedules?day=Friday"
+<a href="/admin/schedules?day=Friday&team={{ selected_team }}&state={{ selected_state }}"
 class="filter-btn">
 Friday
 </a>
@@ -91,6 +91,46 @@ Friday
 method="GET"
 class="advanced-filter">
 
+<select name="team">
+
+<option value="">
+All Teams
+</option>
+
+{% for value, label in team_options %}
+
+<option
+value="{{ value }}"
+{% if selected_team==value %}
+selected
+{% endif %}>
+{{ label }}
+</option>
+
+{% endfor %}
+
+</select>
+
+<select name="day">
+
+<option value="">
+All Days
+</option>
+
+{% for value, label in day_options %}
+
+<option
+value="{{ value }}"
+{% if selected_day==value %}
+selected
+{% endif %}>
+{{ label }}
+</option>
+
+{% endfor %}
+
+</select>
+
 <select name="state">
 
 <option value="">
@@ -99,7 +139,11 @@ All States
 
 {% for state in states %}
 
-<option value="{{ state[0] }}">
+<option
+value="{{ state[0] }}"
+{% if selected_state==state[0] %}
+selected
+{% endif %}>
 {{ state[0] }}
 </option>
 
@@ -114,6 +158,22 @@ class="search-btn">
 Apply Filter
 
 </button>
+
+<button
+type="button"
+class="extract-btn"
+id="extract-btn"
+data-extract-url="{{ export_url }}">
+
+Extract
+
+</button>
+
+<span
+id="extract-note"
+class="extract-note">
+
+</span>
 
 </form>
 
@@ -132,6 +192,8 @@ color:#ff7a00;">
 
 <tr>
 <th>Section</th>
+<th>Cycle (This Week)</th>
+<th>Section_Cycle No</th>
 <th>Stretch</th>
 <th>State</th>
 <th>Captain</th>
@@ -149,6 +211,14 @@ color:#ff7a00;">
 
 <td>
 {{ schedule.section_no }}
+</td>
+
+<td>
+{{ cycles.get(schedule.id) }}
+</td>
+
+<td>
+<strong>{{ schedule.section_no }}_Cycle{{ cycles.get(schedule.id) }}</strong>
 </td>
 
 <td>
@@ -194,3 +264,9 @@ color:#ff7a00;">
 </table>
 
 </div>
+
+<script
+src="{{ url_for('static',
+filename='js/schedule_extract.js') }}">
+
+</script>

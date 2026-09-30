@@ -51,6 +51,7 @@ from utils.request_params import (
     safe_int,
     safe_week
 )
+from utils import schedules as schedule_views
 from utils.defect_report_delay import (
     build_defect_email_index,
     find_defect_report_email,
@@ -1887,37 +1888,22 @@ def admin_schedules():
     if session.get("role") != "admin":
         return redirect("/")
 
-    day = request.args.get("day")
-    state = request.args.get("state")
+    day, team, state = schedule_views.read_filters(
+        request.args
+    )
 
-    query = SurveyAssignment.query
+    query = schedule_views.apply_filters(
+        SurveyAssignment.query,
+        day=day,
+        team=team,
+        state=state
+    )
 
-    if day:
-        query = query.filter_by(
-            survey_day=day
-        )
+    schedules = schedule_views.ordered(query)
 
-    if state:
-        query = query.filter_by(
-            state=state
-        )
-
-    from sqlalchemy import case
-
-    day_order = case(
-    (SurveyAssignment.survey_day == "Monday", 1),
-    (SurveyAssignment.survey_day == "Tuesday", 2),
-    (SurveyAssignment.survey_day == "Wednesday", 3),
-    (SurveyAssignment.survey_day == "Thursday", 4),
-    (SurveyAssignment.survey_day == "Friday", 5),
-    else_=6
-)
-
-    schedules = query.order_by(
-    day_order,
-    SurveyAssignment.state,
-    SurveyAssignment.section_no
-).all()
+    cycles = schedule_views.live_cycles(
+        schedules
+    )
 
     states = SurveyAssignment.query.with_entities(
         SurveyAssignment.state
@@ -1946,12 +1932,51 @@ def admin_schedules():
     return render_template(
         "admin/schedules.html",
         schedules=schedules,
+        cycles=cycles,
         states=states,
+        selected_day=day,
+        selected_team=team,
+        selected_state=state,
+        team_options=schedule_views.team_options(),
+        day_options=schedule_views.day_options(),
+        export_url="/admin/schedules/extract",
         monday_count=monday_count,
         tuesday_count=tuesday_count,
         wednesday_count=wednesday_count,
         thursday_count=thursday_count,
         friday_count=friday_count
+    )
+
+
+@admin_bp.route("/admin/schedules/extract")
+def admin_schedules_extract():
+
+    if session.get("role") != "admin":
+        return redirect("/")
+
+    day, team, state = schedule_views.read_filters(
+        request.args
+    )
+
+    schedules = schedule_views.ordered(
+        schedule_views.apply_filters(
+            SurveyAssignment.query,
+            day=day,
+            team=team,
+            state=state
+        )
+    )
+
+    rows = schedule_views.extract_rows(
+        schedules,
+        schedule_views.live_cycles(schedules)
+    )
+
+    return jsonify(
+        {
+            "text": schedule_views.extract_text(rows),
+            "count": len(rows)
+        }
     )
 
 

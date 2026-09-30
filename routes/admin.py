@@ -67,6 +67,11 @@ admin_bp = Blueprint(
 
 log = logging.getLogger(__name__)
 
+#: First project week the defect-delay report covers. Surveying only started
+#: being tracked from Week 7 (week_window(7) == 2026-08-03), so earlier weeks
+#: are neither offered by the picker nor matched by the query.
+DELAY_REPORT_FIRST_WEEK = 7
+
 
 def _completed_survey_criterion():
     """The one definition of "a completed survey", as a SQLAlchemy criterion.
@@ -152,12 +157,14 @@ def manual_delayed_survey_update(survey_id):
         db.session.rollback()
         log.exception("Manual defect delay update failed for survey %s", survey_id)
 
-    # Keep whatever is still being filtered on. There is no `week` here any more
-    # - the delay report is pinned to the current week (delayed_surveys below).
+    # Keep whatever is still being filtered on, otherwise saving a manual date
+    # silently jumps the admin back to the current week.
+    week_param = request.args.get("week")
     team_param = request.args.get("team")
     state_param = request.args.get("state")
     return redirect(url_for(
         "admin.delayed_surveys",
+        week=week_param or None,
         team=team_param or None,
         state=state_param or None,
     ))
@@ -292,18 +299,36 @@ def delayed_surveys():
     }
 
     # ------------------------------------------------------------
-    # CURRENT WEEK ONLY
+    # WEEK FILTER (Week 7 onwards)
     #
-    # This report exists to chase defect reports for the week being surveyed
-    # right now, so it is pinned to the live project week instead of opening on
-    # every survey from Week 7 onwards. The arithmetic is the app's own
-    # (PROJECT_START + 7-day steps, utils/schedules.py:122) so the week shown
-    # here always matches the week numbered on the dashboards. A `?week=` in the
-    # URL is ignored - the week picker is gone.
+    # The report opens on the live project week, because that is what is being
+    # chased day to day, but every week from DELAY_REPORT_FIRST_WEEK onwards is
+    # selectable so an earlier week can be reopened and its outstanding defect
+    # reports chased too.
+    #
+    # The arithmetic is the app's own (PROJECT_START + 7-day steps,
+    # core/config.py:679) so the week shown here always matches the week
+    # numbered on the dashboards. DELAY_REPORT_FIRST_WEEK == 7 lines up with
+    # week_window(7) == 2026-08-03, the same anchor the filter used before the
+    # picker was dropped.
+    #
+    # A week outside that range - a future week, week 1, or junk in the URL -
+    # falls back to the current week rather than widening or erroring.
     # ------------------------------------------------------------
 
     current_week_no = schedule_views.current_week_number()
-    week_start, week_end = schedule_views.week_window(current_week_no)
+
+    first_week = min(DELAY_REPORT_FIRST_WEEK, current_week_no)
+    week_options = list(range(first_week, current_week_no + 1))
+
+    requested_week = safe_week(request.args.get("week"))
+    selected_week = (
+        requested_week
+        if requested_week in week_options
+        else current_week_no
+    )
+
+    week_start, week_end = schedule_views.week_window(selected_week)
 
     # A survey appears in the delay report as soon as its survey form reaches
     # the portal and Gemini extracts the dates (status is "video pending" or
@@ -358,7 +383,7 @@ def delayed_surveys():
     ).all()
 
     print(
-        f"[DEBUG_FLOW] delayed-surveys page: week={current_week_no} "
+        f"[DEBUG_FLOW] delayed-surveys page: week={selected_week} "
         f"{len(delayed)} rows; "
         f"missing_start={sum(1 for s in delayed if not s.extracted_survey_start_date)} "
         f"missing_end={sum(1 for s in delayed if not s.extracted_survey_end_date)} "
@@ -398,6 +423,8 @@ def delayed_surveys():
         "admin/delayed_surveys.html",
         delayed_surveys=delayed,
         current_week_no=current_week_no,
+        selected_week=selected_week,
+        week_options=week_options,
         week_start=week_start,
         # Inclusive last day, so the header reads as a date range rather than
         # spilling onto the Monday that starts next week.

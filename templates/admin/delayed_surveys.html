@@ -9,7 +9,7 @@
         <div class="nav-left">
             <div class="welcome-text">
                 <h2>Delayed Defect Reports</h2>
-                <p>Current week only. Surveys appear once the form is uploaded; the sent date fills in when all TL conditions are ticked</p>
+                <p>Week {{ selected_week }} by default. Surveys appear once the form is uploaded; the sent date fills in when all TL conditions are ticked</p>
             </div>
         </div>
         <div style="display:flex;gap:15px;align-items:center;">
@@ -20,6 +20,14 @@
 
     <div class="dashboard-content">
         <form method="get" style="display:flex;align-items:center;gap:10px;margin-bottom:15px;flex-wrap:wrap;">
+            <label for="delay-week">Week</label>
+            <select id="delay-week" name="week">
+                {% for week in week_options %}
+                    <option value="{{ week }}" {% if selected_week == week %}selected{% endif %}>
+                        Week {{ week }}{% if week == current_week_no %} (current){% endif %}
+                    </option>
+                {% endfor %}
+            </select>
             <label for="delay-team">Team</label>
             <select id="delay-team" name="team">
                 <option value="">All Teams</option>
@@ -40,7 +48,7 @@
 
         <div style="background:#fff3cd;border:1px solid #ffc107;border-radius:10px;padding:12px;margin-bottom:15px;">
             <p style="margin:0;font-weight:bold;">
-                Current week only &mdash; Week {{ current_week_no }}
+                Week {{ selected_week }}{% if selected_week == current_week_no %} (current week){% endif %} &mdash;
                 ({{ week_start.strftime('%d/%m/%Y') }} to {{ week_end_display.strftime('%d/%m/%Y') }})
             </p>
             <p style="margin:6px 0 0 0;color:#555;">
@@ -106,7 +114,7 @@
                         <td style="color:red;font-weight:bold;">{{ survey.defect_report_delay_days if survey.defect_report_delay_days is not none else '-' }}</td>
                         <td>{{ survey.defect_report_match_status if survey.defect_report_match_status else '-' }}</td>
                                                 <td>
-                            <form method="post" action="{{ url_for('admin.manual_delayed_survey_update', survey_id=survey.id) }}">
+                            <form method="post" action="{{ url_for('admin.manual_delayed_survey_update', survey_id=survey.id, week=selected_week, team=selected_team or None, state=selected_state or None) }}">
                                 <input type="date" name="manual_start_date" value="{{ survey.extracted_survey_start_date.isoformat() if survey.extracted_survey_start_date else '' }}" title="Manual survey start date">
                                 <input type="date" name="manual_end_date" value="{{ survey.extracted_survey_end_date.isoformat() if survey.extracted_survey_end_date else '' }}" title="Manual survey end date">
                                <input type="date" name="manual_sent_at" value="{{ survey.defect_report_sent_at.strftime('%Y-%m-%d') if survey.defect_report_sent_at else '' }}" title="Manual defect report sent date">
@@ -115,7 +123,7 @@
                         </td>
                     </tr>
                 {% else %}
-                    <tr><td colspan="17">No surveys with a survey form in Week {{ current_week_no }}.</td></tr>
+                    <tr><td colspan="17">No surveys with a survey form in Week {{ selected_week }}.</td></tr>
                 {% endfor %}
                 </tbody>
             </table>

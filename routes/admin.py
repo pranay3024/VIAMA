@@ -152,13 +152,12 @@ def manual_delayed_survey_update(survey_id):
         db.session.rollback()
         log.exception("Manual defect delay update failed for survey %s", survey_id)
 
-    # Maintain the current week filter query parameter if it exists
-    week_param = request.args.get("week")
+    # Keep whatever is still being filtered on. There is no `week` here any more
+    # - the delay report is pinned to the current week (delayed_surveys below).
     team_param = request.args.get("team")
     state_param = request.args.get("state")
     return redirect(url_for(
         "admin.delayed_surveys",
-        week=week_param or None,
         team=team_param or None,
         state=state_param or None,
     ))
@@ -284,9 +283,6 @@ def delayed_surveys():
     # GET -> Display delayed surveys
     # ============================================================
 
-    selected_week = safe_int(
-        request.args.get("week")
-    )
     selected_team = request.args.get("team", "").strip()
     selected_state = request.args.get("state", "").strip()
     team_states = {
@@ -294,6 +290,20 @@ def delayed_surveys():
         "Godbole": ("ODISHA",),
         "Aspizo": ("UP", "UTTAR PRADESH", "JHARKHAND"),
     }
+
+    # ------------------------------------------------------------
+    # CURRENT WEEK ONLY
+    #
+    # This report exists to chase defect reports for the week being surveyed
+    # right now, so it is pinned to the live project week instead of opening on
+    # every survey from Week 7 onwards. The arithmetic is the app's own
+    # (PROJECT_START + 7-day steps, utils/schedules.py:122) so the week shown
+    # here always matches the week numbered on the dashboards. A `?week=` in the
+    # URL is ignored - the week picker is gone.
+    # ------------------------------------------------------------
+
+    current_week_no = schedule_views.current_week_number()
+    week_start, week_end = schedule_views.week_window(current_week_no)
 
     # A survey appears in the delay report as soon as its survey form reaches
     # the portal and Gemini extracts the dates (status is "video pending" or
@@ -306,7 +316,8 @@ def delayed_surveys():
 
     delayed_query = exclude_deleted(Survey.query, Survey).filter(
         Survey.end_survey_pdf.isnot(None),
-        Survey.start_time >= datetime(2026, 8, 3),
+        Survey.start_time >= week_start,
+        Survey.start_time < week_end,
         Survey.status.isnot(None),
         Survey.status != "cancelled",
     )
@@ -323,21 +334,9 @@ def delayed_surveys():
         )
         delayed_query = delayed_query.filter(Survey.state.in_(state_values))
 
+    # Totals come from the same week-scoped query as the table below, so the
+    # headline can never disagree with the rows it is describing.
     summary_surveys = delayed_query.all()
-
-    # ------------------------------------------------------------
-    # Week filter
-    # ------------------------------------------------------------
-    if selected_week is not None and selected_week >= 7:
-
-        week_start = datetime(2026, 8, 3) + timedelta(
-            days=(selected_week - 7) * 7
-        )
-
-        delayed_query = delayed_query.filter(
-            Survey.start_time >= week_start,
-            Survey.start_time < week_start + timedelta(days=7),
-        )
 
     # ------------------------------------------------------------
     # Ordering: forms whose defect report has not been sent yet come first,
@@ -359,7 +358,8 @@ def delayed_surveys():
     ).all()
 
     print(
-        f"[DEBUG_FLOW] delayed-surveys page: {len(delayed)} rows; "
+        f"[DEBUG_FLOW] delayed-surveys page: week={current_week_no} "
+        f"{len(delayed)} rows; "
         f"missing_start={sum(1 for s in delayed if not s.extracted_survey_start_date)} "
         f"missing_end={sum(1 for s in delayed if not s.extracted_survey_end_date)} "
         f"missing_status={sum(1 for s in delayed if s.defect_report_match_status is None)}",
@@ -385,17 +385,10 @@ def delayed_surveys():
             if survey.video_upload_time else None
         )
 
-    week_totals = {week: 0 for week in range(7, 53)}
-    for survey in summary_surveys:
-        if not survey.start_time or not survey.defect_report_delay_days:
-            continue
-        survey_week = 7 + (
-            (survey.start_time.date() - datetime(2026, 8, 3).date()).days // 7
-        )
-        if survey_week in week_totals:
-            week_totals[survey_week] += survey.defect_report_delay_days
-
-    total_delay_days = sum(week_totals.values())
+    total_delay_days = sum(
+    survey.defect_report_delay_days or 0
+    for survey in summary_surveys
+)
 
     # ============================================================
     # Render page
@@ -404,8 +397,12 @@ def delayed_surveys():
     return render_template(
         "admin/delayed_surveys.html",
         delayed_surveys=delayed,
-        week_totals=week_totals or {},
-        total_delay_days=total_delay_days or 0,
+        current_week_no=current_week_no,
+        week_start=week_start,
+        # Inclusive last day, so the header reads as a date range rather than
+        # spilling onto the Monday that starts next week.
+        week_end_display=week_end - timedelta(days=1),
+        total_delay_days=total_delay_days,
         selected_team=selected_team,
         selected_state=selected_state,
         message=message,

@@ -220,25 +220,51 @@ def section_cycle_no(schedule, cycle):
 
 
 def extract_rows(schedules, cycles):
-    """``[{"section_no": ..., "cycle_no": ...}, ...]`` in the displayed order."""
+    """
+    ``[{"section_no", "cycle_no", "label"}, ...]`` in the displayed order.
+
+    ``label`` is the combined value the admin Extract button copies -
+    ``N/02026/07005/AS_Cycle8`` - built by :func:`section_cycle_no` so the copied
+    text cannot drift from the ``Section_Cycle No`` column on screen.
+    """
     return [
         {
             "section_no": schedule.section_no,
             "cycle_no": cycles.get(schedule.id, 1),
+            "label": section_cycle_no(
+                schedule,
+                cycles.get(schedule.id, 1)
+            ),
         }
         for schedule in schedules
     ]
 
 
-def extract_text(rows):
+def extract_text(rows, combined=False):
     """
-    Tab-separated, one assignment per line.
+    One assignment per line, ready to paste.
 
-    Tabs rather than commas so the text lands in Excel / Sheets as two columns
-    instead of one, and so a section number containing a comma cannot shift the
-    cycle into the wrong field.
+    ``combined=True``  -> ``N/02026/07005/AS_Cycle8``, a single column.  This is
+                          what the admin Extract button uses, matching the
+                          ``Section_Cycle No`` column and the extract keys the
+                          rest of the app already sends out
+                          (routes/admin.py:1179, routes/admin.py:1735).
+
+    ``combined=False`` -> ``N/02026/07005/AS`` + TAB + ``8``, two columns.  Tabs
+                          rather than commas so it lands in Excel / Sheets as
+                          two cells, and so a section number containing a comma
+                          cannot shift the cycle into the wrong field.
     """
+    if combined:
+        return "\n".join(
+            row["label"]
+            for row in rows
+        )
+
     return "\n".join(
-        "{}\t{}".format(row["section_no"], row["cycle_no"])
+        "{}\t{}".format(
+            row["section_no"],
+            row["cycle_no"]
+        )
         for row in rows
     )

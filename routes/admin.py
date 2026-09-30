@@ -1974,7 +1974,10 @@ def admin_schedules_extract():
 
     return jsonify(
         {
-            "text": schedule_views.extract_text(rows),
+            "text": schedule_views.extract_text(
+                rows,
+                combined=True
+            ),
             "count": len(rows)
         }
     )

@@ -621,6 +621,9 @@ def regional_schedules_extract():
 
     return jsonify(
         {
+            # Two columns here on purpose. Only the admin Extract button copies
+            # the combined "N/02026/07005/AS_Cycle8" form; regional keeps
+            # section and cycle separate so they land in separate cells.
             "text": schedule_views.extract_text(rows),
             "count": len(rows)
         }

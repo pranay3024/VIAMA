@@ -2059,9 +2059,10 @@ function copyVideoUploadExtract() {
  * Per-row flags set in the template:
  *   data-form-received  - the captain's PDF is on the survey
  *   data-form-approved  - the approver has said yes
- * A row is copied only when received and not approved. Note the schema cannot
- * tell "not yet reviewed" from "rejected" - both read false - so forms sent
- * back for correction are included.
+ *   data-pdf-reupload   - a corrected form has been requested and is pending
+ * A row is copied only when received, not approved, and not waiting on a
+ * re-upload. Note the schema cannot tell "not yet reviewed" from "rejected" -
+ * both read false - so forms sent back for correction are still included.
  */
 function copyPendingApprovalExtract() {
 
@@ -2088,6 +2089,13 @@ function copyPendingApprovalExtract() {
         }
 
         if (row.getAttribute("data-form-approved") === "true") {
+            return;
+        }
+
+        // Awaiting a corrected PDF, not awaiting approval. The form the
+        // approver would look at is not the one that should be judged, so
+        // these are left out of the list until the captain sends the new one.
+        if (row.getAttribute("data-pdf-reupload") === "true") {
             return;
         }
 

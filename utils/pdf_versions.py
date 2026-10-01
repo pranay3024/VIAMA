@@ -14,13 +14,35 @@ has a PDF but no history rows, and every function here fails open: if the table
 has not been migrated yet, the portal still shows the single latest PDF rather
 than a 500. Run ``python migrate_survey_pdf_versions.py`` to create and backfill
 the table.
+
+One upload must produce one history row. An upload is slow (pikepdf, then Drive,
+then a Gemini pass), so a double tap, a stuck refresh button or a browser retry
+resends the same multipart body, and each resend used to leave another copy in
+Drive and another row for the details page to list - nine "PDFs" for one scan.
+``fingerprint`` hashes the bytes the captain picked and ``is_same_as_current``
+lets a route drop that resend before it reaches Drive.
 """
 
+import hashlib
 import logging
 
 from sqlalchemy import func
 
 log = logging.getLogger(__name__)
+
+
+def fingerprint(pdf_bytes):
+    """Stable MD5 of the file the captain picked.
+
+    Taken *before* ``pdf_utils.optimize_pdf``: pikepdf stamps a fresh
+    modification date on every run, so hashing its output would give a different
+    digest for the same upload every time.
+    """
+
+    if not pdf_bytes:
+        return None
+
+    return hashlib.md5(pdf_bytes).hexdigest()
 
 
 def _model():
@@ -60,6 +82,50 @@ def next_version_no(survey_id):
         return 1
 
 
+def is_same_as_current(survey, pdf_bytes):
+    """True when ``pdf_bytes`` is already this survey's current PDF.
+
+    Call this before uploading to Drive: a resend of the form is then dropped
+    instead of leaving an orphaned Drive file and a duplicate history row.
+    Returns False when there is nothing to compare against, including rows
+    uploaded before ``migrate_pdf_version_content_hash.py`` ran.
+    """
+
+    survey_id = getattr(survey, "id", None)
+
+    if not survey_id:
+        return False
+
+    digest = fingerprint(pdf_bytes)
+
+    if not digest:
+        return False
+
+    try:
+        from extensions import db
+
+        model = _model()
+
+        match = model.query.filter(
+            model.survey_id == survey_id,
+            model.content_hash == digest,
+        ).first()
+
+        return match is not None
+
+    except Exception:
+
+        _rollback()
+
+        log.warning(
+            "pdf duplicate check unavailable for survey %s",
+            survey_id,
+            exc_info=True,
+        )
+
+        return False
+
+
 def record_version(
     survey,
     pdf_url,
@@ -68,6 +134,7 @@ def record_version(
     uploaded_by_email=None,
     reupload_reason=None,
     version_no=None,
+    content_hash=None,
 ):
     """Append a row for ``pdf_url`` and mark it as the current PDF.
 
@@ -103,6 +170,7 @@ def record_version(
             uploaded_by_email=uploaded_by_email,
             is_current=True,
             reupload_reason=reupload_reason,
+            content_hash=content_hash,
         )
 
         db.session.add(version)

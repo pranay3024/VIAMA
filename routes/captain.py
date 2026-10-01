@@ -828,6 +828,36 @@ def complete_survey():
 
             pdf_bytes = pdf.read()
 
+            # -----------------------------------
+            # DROP A RESUBMITTED FORM
+            #
+            # This POST is slow (pikepdf, then Drive, then a Gemini pass), so a
+            # double tap or a browser retry resends the same file. Without this
+            # the resend leaves another copy in Drive and another row in the PDF
+            # history, and the admin details page lists the same scan several
+            # times for one upload. Fingerprint the file the captain picked and
+            # skip it when it is already the current PDF.
+            # -----------------------------------
+
+            if pdf_versions.is_same_as_current(
+                survey,
+                pdf_bytes
+            ):
+
+                print(
+                    f"[DEBUG_FLOW] complete_survey survey={survey.id} "
+                    "ignoring resubmitted PDF - already the current version",
+                    flush=True,
+                )
+
+                session.pop("survey_id", None)
+
+                return redirect("/captain-home")
+
+            content_hash = pdf_versions.fingerprint(
+                pdf_bytes
+            )
+
             pdf_bytes = optimize_pdf(pdf_bytes)
 
             pdf_filename = (
@@ -856,6 +886,7 @@ def complete_survey():
                 uploaded_at=survey.survey_pdf_uploaded_at,
                 uploaded_by_role="captain",
                 uploaded_by_email=survey.captain_email,
+                content_hash=content_hash,
             )
 
             # -----------------------------------
@@ -1622,6 +1653,40 @@ def reupload_survey_pdf(survey_id):
 
         pdf_bytes = pdf.read()
 
+        # -----------------------------------
+        # DROP A RESUBMITTED RE-UPLOAD
+        #
+        # The Drive upload plus the Gemini pass below takes long enough that a
+        # captain tapping again, or a browser retrying the POST, sends the same
+        # file twice. The second copy would sit in Drive and add a second row to
+        # the history, so the details page would list the same scan again. A
+        # genuinely corrected PDF has a different fingerprint and goes through.
+        # -----------------------------------
+
+        if pdf_versions.is_same_as_current(
+            survey,
+            pdf_bytes
+        ):
+
+            print(
+                f"[DEBUG_FLOW] reupload survey={survey.id} "
+                "ignoring resubmitted PDF - already the current version",
+                flush=True,
+            )
+
+            flash(
+                "Survey PDF re-uploaded successfully.",
+                "success"
+            )
+
+            return redirect(
+                "/pending-uploads"
+            )
+
+        content_hash = pdf_versions.fingerprint(
+            pdf_bytes
+        )
+
         pdf_bytes = optimize_pdf(pdf_bytes)
 
         # -----------------------------------
@@ -1702,6 +1767,7 @@ def reupload_survey_pdf(survey_id):
             uploaded_by_role="captain",
             uploaded_by_email=survey.captain_email,
             reupload_reason=reupload_reason,
+            content_hash=content_hash,
         )
 
         survey.pdf_reupload_required = False

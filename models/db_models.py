@@ -325,6 +325,12 @@ class SurveyPdfVersion(db.Model):
 
     reupload_reason = db.Column(db.Text, nullable=True)
 
+    # MD5 of the file the captain picked, before pdf_utils.optimize_pdf rewrote
+    # it. Upload is slow enough that a double tap / browser retry resends the
+    # same bytes, and the history must not gain a second row for one file.
+    # NULL for rows written before this column existed.
+    content_hash = db.Column(db.String(32), nullable=True)
+
     created_at = db.Column(
         db.DateTime,
         default=datetime.utcnow

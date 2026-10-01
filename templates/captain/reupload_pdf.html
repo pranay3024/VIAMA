@@ -48,7 +48,8 @@ PDF RE-UPLOAD
 
 <form
 method="POST"
-enctype="multipart/form-data">
+enctype="multipart/form-data"
+id="reuploadForm">
 
 <label
 for="survey_pdf"
@@ -90,33 +91,47 @@ UPLOAD PDF
 
 const input =
 document.getElementById(
-"survey_pdf"
+    "survey_pdf"
 );
 
 const btn =
 document.getElementById(
-"uploadBtn"
+    "uploadBtn"
 );
 
 const file =
 document.getElementById(
-"filename"
+    "filename"
 );
 
 input.addEventListener(
-"change",
-function(){
+    "change",
+    function(){
 
-if(this.files.length){
+    if(this.files.length){
 
-file.innerHTML =
-this.files[0].name;
+        file.innerHTML =
+        this.files[0].name;
 
-btn.disabled = false;
+        btn.disabled = false;
 
-}
+    }
 
 });
+
+document
+.getElementById("reuploadForm")
+.addEventListener(
+    "submit",
+    function(){
+
+    btn.disabled = true;
+
+    btn.innerHTML =
+    "UPLOADING…";
+
+    }
+);
 
 </script>
 

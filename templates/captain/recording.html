@@ -418,7 +418,7 @@ document
         "groundwork_completed",
         "video_uploaded_pending_form"
     ].includes(surveyStatus)
-){
+    ){
     e.preventDefault();
 
     alert(
@@ -427,6 +427,14 @@ document
 
     return false;
 }
+
+    // Finishing takes long enough (upload, then the form is read) that a
+    // second tap would POST the same file again, and one upload must produce
+    // one entry in the survey's PDF history. Stop the button once the POST is
+    // on its way; routes/captain.py also drops an identical resend.
+    document
+    .getElementById("nextBtn")
+    .disabled = true;
 
 });
 

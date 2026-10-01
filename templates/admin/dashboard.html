@@ -2114,7 +2114,9 @@ function copyPendingApprovalExtract() {
         return;
     }
 
-    let output = labels.join("\n");
+    let output =
+        "*Survey form received but pending got approval*\n\n"
+        + labels.join("\n");
 
     // Only worth mentioning when the two numbers differ.
     if (surveyCount !== labels.length) {

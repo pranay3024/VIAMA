@@ -788,6 +788,19 @@ onclick="clearFilters()">
     Export to Excel
 </button>
 
+    <!-- Reads the rows already on screen, so it follows the Week / State /
+    Cycle / Status / Section filters above, like the two Extract buttons
+    beside it. -->
+    <button
+    type="button"
+    class="search-btn"
+    onclick="copyPendingApprovalExtract()"
+    >
+
+     Pending Approval Extract
+
+</button>
+
 </div>
     </form>
     
@@ -856,6 +869,9 @@ onclick="clearFilters()">
 
 <tr
     data-extract="{{ survey.section_no }}_Cycle{{ survey.cycle_no }}"
+    data-pending-label="{{ survey.section_no | trim }}_{{ survey.cycle_no }}"
+    data-form-received="{{ 'true' if survey.end_survey_pdf else 'false' }}"
+    data-form-approved="{{ 'true' if survey.survey_form_approved else 'false' }}"
     data-status="{{ survey.status }}"
     data-pdf-reupload="{{ 'true' if survey.pdf_reupload_required else 'false' }}"
     data-video-upload-time="{{ survey.display_video_upload_time.strftime('%d/%m/%Y %I:%M %p') if survey.display_video_upload_time else '' }}">
@@ -2023,6 +2039,100 @@ function copyVideoUploadExtract() {
         })
         .catch(function() {
             alert("Failed to copy video upload extract.");
+        });
+}
+
+// ===============================
+// PENDING APPROVAL EXTRACT
+// ===============================
+
+/*
+ * Copies Section_No_Cycle_No (e.g. 147_15) for every survey whose form has been
+ * received but is not approved yet.
+ *
+ * Reads the rendered table instead of calling an endpoint, which is what makes
+ * it respect the Week / State / Cycle / Status / Section filters: the server has
+ * already applied them, so these rows ARE the selected week. A separate query
+ * would report every survey ever taken - 886 forms are received and unapproved
+ * across all time, against 21 in the current week.
+ *
+ * Per-row flags set in the template:
+ *   data-form-received  - the captain's PDF is on the survey
+ *   data-form-approved  - the approver has said yes
+ * A row is copied only when received and not approved. Note the schema cannot
+ * tell "not yet reviewed" from "rejected" - both read false - so forms sent
+ * back for correction are included.
+ */
+function copyPendingApprovalExtract() {
+
+    const rows = Array.from(
+        document.querySelectorAll("tr[data-pending-label]")
+    );
+
+    if (!rows.length) {
+        alert("No surveys found.");
+        return;
+    }
+
+    // De-duplicated, table order kept. A section surveyed twice in one cycle is
+    // two rows with the same label, and printing it twice looks like a bug in a
+    // list that gets pasted onwards.
+    const seen = {};
+    const labels = [];
+    let surveyCount = 0;
+
+    rows.forEach(function (row) {
+
+        if (row.getAttribute("data-form-received") !== "true") {
+            return;
+        }
+
+        if (row.getAttribute("data-form-approved") === "true") {
+            return;
+        }
+
+        surveyCount += 1;
+
+        const label = row.getAttribute("data-pending-label");
+
+        if (seen[label]) {
+            return;
+        }
+
+        seen[label] = true;
+
+        labels.push(label);
+
+    });
+
+    if (!labels.length) {
+        // Rows are on screen, so the filter did match something - every one is
+        // either approved or has no form uploaded yet.
+        alert(
+            "No forms pending approval in this filter."
+        );
+        return;
+    }
+
+    let output = labels.join("\n");
+
+    // Only worth mentioning when the two numbers differ.
+    if (surveyCount !== labels.length) {
+        output +=
+            "\n\n(" + surveyCount + " surveys, "
+            + labels.length + " distinct Section_No_Cycle_No)";
+    }
+
+    navigator.clipboard.writeText(output)
+        .then(function() {
+            alert(
+                "✅ Pending approval extract copied!\n\n"
+                + labels.length
+                + (labels.length === 1 ? " entry" : " entries")
+            );
+        })
+        .catch(function() {
+            alert("⚠️ Failed to copy pending approval extract.");
         });
 }
 

@@ -218,6 +218,45 @@ body{
 
 }
 
+/*
+ * A disabled .main-btn used to keep its full orange gradient and shadow, so on
+ * the FINISH SURVEY / UPLOAD PDF pages - which both start disabled until a file
+ * is chosen - nothing looked unavailable. That is part of why a captain tapped
+ * a submit that was already done.
+ */
+.main-btn:disabled{
+
+    background:#cbd5e1;
+
+    color:#f8fafc;
+
+    box-shadow:none;
+
+    cursor:not-allowed;
+
+    opacity:0.85;
+
+}
+
+/* In-flight upload: distinguishable from the plain disabled state above so the
+   captain can tell "working" from "not ready yet". */
+.main-btn.is-uploading{
+
+    background:
+    linear-gradient(
+        135deg,
+        #2563eb,
+        #1d4ed8
+    );
+
+    color:white;
+
+    cursor:progress;
+
+    opacity:1;
+
+}
+
 .preview-image{
     width:100%;
     margin-top:15px;
@@ -747,6 +786,184 @@ select{
     color:#374151;
 
 }
+
+
+/* =========================================
+   PDF UPLOAD PROGRESS
+
+   Used by templates/captain/recording.html and reupload_pdf.html via
+   static/js/pdf_upload_progress.js.
+
+   Separate from the .progress-bar above on purpose: that one drives the
+   checklist steps, and sharing the class would let a checklist render inherit
+   the indeterminate stripe and the error tint below.
+   ========================================= */
+
+.pdf-upload-panel{
+
+    margin-top:15px;
+
+}
+
+.pdf-upload-bar{
+
+    width:100%;
+
+    height:14px;
+
+    background:#e5e7eb;
+
+    border-radius:999px;
+
+    overflow:hidden;
+
+    /* The stripe is driven by keyframes, so the fill's width transition
+    would fight it. */
+    position:relative;
+
+}
+
+.pdf-upload-fill{
+
+    width:0%;
+
+    height:100%;
+
+    border-radius:999px;
+
+    background:
+    linear-gradient(
+        90deg,
+        #22c55e,
+        #16a34a
+    );
+
+    transition:width 0.25s ease-out;
+
+}
+
+/*
+ * Bytes are on the server and pikepdf / Drive / Gemini are running. There is
+ * no signal for that work, so the bar shows motion rather than a percentage
+ * that would sit frozen at 100% and read as "stuck".
+ */
+.pdf-upload-bar.is-indeterminate .pdf-upload-fill{
+
+    width:100%!important;
+
+    background-image:
+    linear-gradient(
+        115deg,
+        rgba(255,255,255,0) 25%,
+        rgba(255,255,255,0.45) 50%,
+        rgba(255,255,255,0) 75%
+    ),
+    linear-gradient(
+        90deg,
+        #22c55e,
+        #16a34a
+    );
+
+    background-size:
+    220% 100%,
+    100% 100%;
+
+    background-position:
+    100% 0,
+    0 0;
+
+    animation:pdf-upload-sweep 1.1s linear infinite;
+
+}
+
+@keyframes pdf-upload-sweep{
+
+    from{
+        background-position:
+        100% 0,
+        0 0;
+    }
+
+    to{
+        background-position:
+        -120% 0,
+        0 0;
+    }
+
+}
+
+.pdf-upload-caption{
+
+    margin-top:8px;
+
+    text-align:center;
+
+    font-weight:600;
+
+    font-size:0.9rem;
+
+    color:#374151;
+
+    /* The caption updates every second while the server works; keep it from
+    reflowing the button above it. */
+    min-height:1.2em;
+
+}
+
+.pdf-upload-panel.is-error .pdf-upload-bar{
+
+    background:#fee2e2;
+
+}
+
+.pdf-upload-panel.is-error .pdf-upload-fill{
+
+    background:
+    linear-gradient(
+        90deg,
+        #ef4444,
+        #dc2626
+    );
+
+}
+
+.pdf-upload-panel.is-error .pdf-upload-caption{
+
+    color:#b91c1c;
+
+}
+
+.pdf-upload-panel.is-done .pdf-upload-fill{
+
+    background:
+    linear-gradient(
+        90deg,
+        #16a34a,
+        #15803d
+    );
+
+}
+
+/* Respect a reduced-motion preference: the moving stripe is decoration, and
+   the elapsed-seconds caption already says the upload is in progress. */
+@media (prefers-reduced-motion: reduce){
+
+    .pdf-upload-bar.is-indeterminate .pdf-upload-fill{
+
+        animation:none;
+
+        opacity:0.75;
+
+    }
+
+    .pdf-upload-fill{
+
+        transition:none;
+
+    }
+
+}
+
 #start_btn:disabled{
 
     background:#9ca3af;

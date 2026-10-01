@@ -81,6 +81,29 @@ UPLOAD PDF
 
 </button>
 
+<!-- Progress + single-upload lock live in static/js/pdf_upload_progress.js.
+Shown only while the POST is in flight. -->
+<div
+id="pdfUploadPanel"
+class="pdf-upload-panel"
+hidden>
+
+<div
+id="pdfUploadBar"
+class="pdf-upload-bar">
+
+<div
+id="pdfUploadFill"
+class="pdf-upload-fill"></div>
+
+</div>
+
+<div
+id="pdfUploadCaption"
+class="pdf-upload-caption"></div>
+
+</div>
+
 </form>
 
 </div>
@@ -104,6 +127,12 @@ document.getElementById(
     "filename"
 );
 
+function updateButton(){
+
+    btn.disabled = !input.files.length;
+
+}
+
 input.addEventListener(
     "change",
     function(){
@@ -113,11 +142,20 @@ input.addEventListener(
         file.innerHTML =
         this.files[0].name;
 
-        btn.disabled = false;
-
     }
 
+    updateButton();
+
 });
+
+// The progress uploader resets the button through this after a failed upload.
+window.surveyFormRefresh = updateButton;
+
+</script>
+
+<script src="{{ url_for('static', filename='js/pdf_upload_progress.js') }}"></script>
+
+<script>
 
 document
 .getElementById("reuploadForm")
@@ -125,10 +163,16 @@ document
     "submit",
     function(){
 
-    btn.disabled = true;
+    // Fallback only. pdf_upload_progress.js owns the button while a POST is in
+    // flight, which is what stops a second tap uploading the same PDF twice.
+    if (!window.pdfUploadProgressReady) {
 
-    btn.innerHTML =
-    "UPLOADING…";
+        btn.disabled = true;
+
+        btn.innerHTML =
+        "UPLOADING…";
+
+    }
 
     }
 );

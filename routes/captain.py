@@ -4,6 +4,7 @@ from flask import session
 from flask import redirect
 from models.db_models import SurveyAssignment
 from flask import request
+from flask import jsonify
 from extensions import db
 from models.db_models import Survey
 from models.db_models import SurveySchedule 
@@ -33,6 +34,72 @@ from werkzeug.security import (
     check_password_hash,
     generate_password_hash
 )
+
+
+# =========================================
+# PDF UPLOAD RESPONSES
+#
+# Finishing a survey or re-uploading its form takes 5-10s once the bytes have
+# arrived: pikepdf, then Drive, then a Gemini pass. static/js/pdf_upload_progress.js
+# posts the form over XHR so the captain can watch it and cannot start a second
+# upload by tapping again.
+#
+# Those requests must not be answered with a redirect - the script needs to
+# know whether the save worked so it can say so before navigating. A plain form
+# post (JavaScript off, or an old cached page) must keep redirecting exactly as
+# before, so the two are told apart by the header the script sets.
+# =========================================
+
+
+def _is_xhr():
+    """True when the request came from the progress uploader."""
+    return request.headers.get("X-Requested-With") == "XMLHttpRequest"
+
+
+def _pdf_upload_done(redirect_to, message):
+    """
+    Finish a PDF upload.
+
+    Answers the progress uploader with JSON so it can confirm the save and show
+    a done state before following ``redirect_to``. A normal post gets the
+    redirect it always got.
+
+    ``message`` is also flashed on the normal path, and returned on the XHR path
+    where the script renders it itself.
+    """
+
+    if _is_xhr():
+        return jsonify({
+            "ok": True,
+            "redirect": redirect_to,
+            "message": message,
+        })
+
+    flash(message, "success")
+
+    return redirect(redirect_to)
+
+
+def _pdf_upload_failed(redirect_to, message, category="warning"):
+    """
+    Report a rejected PDF upload.
+
+    On the XHR path the message travels in the response so the captain sees it
+    under the progress bar without losing the form they filled in. It is
+    deliberately NOT flashed there: nothing navigates away, so a flash would
+    sit in the session and resurface on whatever page they open next.
+    """
+
+    if _is_xhr():
+        return jsonify({
+            "ok": False,
+            "message": message,
+            "redirect": redirect_to,
+        })
+
+    flash(message, category)
+
+    return redirect(redirect_to)
 
 @captain_bp.route("/captain")
 def captain_dashboard():
@@ -776,18 +843,18 @@ def complete_survey():
             "video_uploaded_pending_form"
 ]:
 
-                flash(
-                    "Please click 'Complete Groundwork' before finishing the survey.",
-                    "warning"
+                return _pdf_upload_failed(
+                    "/recording",
+                    "Please click 'Complete Groundwork' before finishing the survey."
                 )
-
-                return redirect("/recording")
 
             pdf = request.files.get("survey_pdf")
 
             if not pdf:
-                flash("Please upload the survey PDF.", "warning")
-                return redirect("/recording")
+                return _pdf_upload_failed(
+                    "/recording",
+                    "Please upload the survey PDF."
+                )
 
             # -----------------------------------
             # PDF VALIDATION
@@ -799,24 +866,20 @@ def complete_survey():
 
             if size > 50 * 1024 * 1024:
 
-                flash(
-                    "PDF size cannot exceed 50 MB.",
-                    "warning"
+                return _pdf_upload_failed(
+                    "/recording",
+                    "PDF size cannot exceed 50 MB."
                 )
-
-                return redirect("/recording")
 
             if (
                 pdf.mimetype != "application/pdf"
                 or not pdf.filename.lower().endswith(".pdf")
             ):
 
-                flash(
-                    "Only PDF files are allowed.",
-                    "warning"
+                return _pdf_upload_failed(
+                    "/recording",
+                    "Only PDF files are allowed."
                 )
-
-                return redirect("/recording")
 
             # -----------------------------------
             # UPLOAD PDF
@@ -852,7 +915,10 @@ def complete_survey():
 
                 session.pop("survey_id", None)
 
-                return redirect("/captain-home")
+                return _pdf_upload_done(
+                    "/captain-home",
+                    "This PDF is already the current one."
+                )
 
             content_hash = pdf_versions.fingerprint(
                 pdf_bytes
@@ -960,7 +1026,10 @@ def complete_survey():
 
             session.pop("survey_id", None)
 
-            return redirect("/captain-home")
+            return _pdf_upload_done(
+                "/captain-home",
+                "Survey form uploaded. Thank you!"
+            )
 
     return redirect("/captain-home")
 
@@ -1574,12 +1643,9 @@ def reupload_survey_pdf(survey_id):
         pdf = request.files.get("survey_pdf")
 
         if not pdf:
-            flash(
-                "Please select a PDF.",
-                "warning"
-            )
-            return redirect(
-                f"/reupload-survey-pdf/{survey_id}"
+            return _pdf_upload_failed(
+                f"/reupload-survey-pdf/{survey_id}",
+                "Please select a PDF."
             )
 
         # -----------------------------------
@@ -1591,13 +1657,9 @@ def reupload_survey_pdf(survey_id):
             or not pdf.filename.lower().endswith(".pdf")
         ):
 
-            flash(
-                "Only PDF files are allowed.",
-                "warning"
-            )
-
-            return redirect(
-                f"/reupload-survey-pdf/{survey_id}"
+            return _pdf_upload_failed(
+                f"/reupload-survey-pdf/{survey_id}",
+                "Only PDF files are allowed."
             )
 
         # -----------------------------------
@@ -1612,13 +1674,9 @@ def reupload_survey_pdf(survey_id):
 
         if size > 50 * 1024 * 1024:
 
-            flash(
-                "PDF size cannot exceed 50 MB.",
-                "warning"
-            )
-
-            return redirect(
-                f"/reupload-survey-pdf/{survey_id}"
+            return _pdf_upload_failed(
+                f"/reupload-survey-pdf/{survey_id}",
+                "PDF size cannot exceed 50 MB."
             )
 
         # -----------------------------------
@@ -1674,13 +1732,9 @@ def reupload_survey_pdf(survey_id):
                 flush=True,
             )
 
-            flash(
-                "Survey PDF re-uploaded successfully.",
-                "success"
-            )
-
-            return redirect(
-                "/pending-uploads"
+            return _pdf_upload_done(
+                "/pending-uploads",
+                "That PDF is already the current one - nothing to re-upload."
             )
 
         content_hash = pdf_versions.fingerprint(
@@ -1726,13 +1780,10 @@ def reupload_survey_pdf(survey_id):
                 e
             )
 
-            flash(
+            return _pdf_upload_failed(
+                f"/reupload-survey-pdf/{survey_id}",
                 "PDF upload failed. Please try again.",
-                "danger"
-            )
-
-            return redirect(
-                f"/reupload-survey-pdf/{survey_id}"
+                category="danger"
             )
 
         # -----------------------------------
@@ -1810,13 +1861,9 @@ def reupload_survey_pdf(survey_id):
         # SUCCESS
         # -----------------------------------
 
-        flash(
-            "Survey PDF re-uploaded successfully.",
-            "success"
-        )
-
-        return redirect(
-            "/pending-uploads"
+        return _pdf_upload_done(
+            "/pending-uploads",
+            "Survey PDF re-uploaded successfully."
         )
 
     # -----------------------------------

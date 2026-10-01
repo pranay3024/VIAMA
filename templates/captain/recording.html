@@ -294,9 +294,34 @@ disabled>
 FINISH SURVEY
 
 </button>
+
+<!-- Progress + single-upload lock live in static/js/pdf_upload_progress.js.
+Shown only while the POST is in flight. -->
+<div
+id="pdfUploadPanel"
+class="pdf-upload-panel"
+hidden>
+
+<div
+id="pdfUploadBar"
+class="pdf-upload-bar">
+
+<div
+id="pdfUploadFill"
+class="pdf-upload-fill"></div>
+
+</div>
+
+<div
+id="pdfUploadCaption"
+class="pdf-upload-caption"></div>
+
+</div>
 </form>
 
 </div>
+
+<script src="{{ url_for('static', filename='js/pdf_upload_progress.js') }}"></script>
 
 <script>
 
@@ -393,6 +418,21 @@ checks.forEach(
 
 updateButton();
 
+// The progress uploader asks before it takes over the form, and this is the
+// rule it asks about - groundwork has to be done first.
+window.surveyFormBlocked = function () {
+
+    return ![
+        "groundwork_completed",
+        "video_uploaded_pending_form"
+    ].includes(surveyStatus);
+
+};
+
+// Hand the button back to updateButton() after a failed upload, so the label
+// and the enabled state go back to matching the checklist.
+window.surveyFormRefresh = updateButton;
+
 </script>
 
 <script>
@@ -413,12 +453,8 @@ document
 .getElementById("finishSurveyForm")
 .addEventListener("submit", function(e){
 
-   if (
-    ![
-        "groundwork_completed",
-        "video_uploaded_pending_form"
-    ].includes(surveyStatus)
-    ){
+    if (window.surveyFormBlocked()) {
+
     e.preventDefault();
 
     alert(
@@ -428,13 +464,14 @@ document
     return false;
 }
 
-    // Finishing takes long enough (upload, then the form is read) that a
-    // second tap would POST the same file again, and one upload must produce
-    // one entry in the survey's PDF history. Stop the button once the POST is
-    // on its way; routes/captain.py also drops an identical resend.
-    document
-    .getElementById("nextBtn")
-    .disabled = true;
+    // Fallback only. With pdf_upload_progress.js loaded it owns the button, so
+    // the double tap that used to produce duplicate Drive copies and duplicate
+    // history rows is already blocked there; this covers JS failing to load.
+    if (!window.pdfUploadProgressReady) {
+
+    nextBtn.disabled = true;
+
+    }
 
 });
 

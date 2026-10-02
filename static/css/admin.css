@@ -1270,6 +1270,42 @@ body{
 
 }
 
+/* Third action in the schedules filter form. An <a> to the unfiltered route,
+   so "Clear" and "Apply Filter" cannot disagree - clearing reloads the same
+   page with no query string. Grey fill so it reads as a reset, not an apply. */
+
+.clear-btn{
+
+    display:inline-flex;
+
+    align-items:center;
+
+    height:42px;
+
+    padding:10px 30px;
+
+    font-size:14px;
+
+    font-weight:600;
+
+    color:white;
+
+    background:#6b7280;
+
+    text-decoration:none;
+
+    border-radius:12px;
+
+    white-space:nowrap;
+
+}
+
+.clear-btn:hover{
+
+    background:#4b5563;
+
+}
+
 /* Inline result of the Extract click ("Copied 12 rows."). */
 
 .extract-note{
@@ -1565,4 +1601,10 @@ vertical-align:top;
 .pdf-upload-late {
     color: red;
     font-weight: bold;
+}
+
+/* Bucket video upload time that fell back to the captain-reported value. */
+.delay-warn {
+    color: #a35a00;
+    font-style: italic;
 }

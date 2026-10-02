@@ -33,7 +33,7 @@ def regional_dashboard():
     if session.get("role") != "regional_manager":
         return redirect("/")
 
-    # A rescheduled survey auto-cancels after Sunday 15:00 IST of the week it
+    # A rescheduled survey auto-cancels after Sunday 23:30 IST of the week it
     # was rescheduled in. Swept here so this screen never shows a RESCHEDULED
     # badge for a survey that has already expired. Safe to call on every load -
     # it is idempotent, and it never raises. This screen reads captain_status off
@@ -43,6 +43,20 @@ def regional_dashboard():
         from core.engine import expire_rescheduled_surveys
 
         expire_rescheduled_surveys()
+    except Exception:
+        pass
+
+    # Surveys nobody started get a "rescheduled" row of their own once their day
+    # is more than a working afternoon gone (15:00 IST the day after), which is
+    # what the sweep above then closes out at Sunday 23:30. Run here as well so a
+    # stretch that was quietly skipped is visible on this screen instead of only
+    # on the admin's. Idempotent, never raises. Not scoped to this manager's
+    # states, exactly like the expiry sweep above - it has to act on rows whoever
+    # owns them, and the scan limit is what bounds it.
+    try:
+        from core.engine import auto_reschedule_unstarted_surveys
+
+        auto_reschedule_unstarted_surveys()
     except Exception:
         pass
 

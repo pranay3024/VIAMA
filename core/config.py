@@ -92,7 +92,7 @@ ALLOWED_STATUS_TRANSITIONS = {
     SURVEY_COMPLETED: set(),
     SURVEY_CANCELLED: set(),
     # Back to ongoing is the captain re-clicking CONTINUE on a rescheduled survey
-    # (routes/captain.py:149-218).  Cancelled is the Sunday-15:00 auto-expiry in
+    # (routes/captain.py:149-218).  Cancelled is the Sunday-23:30 auto-expiry in
     # core/engine.py:expire_rescheduled_surveys.  Without this key the lookup
     # returned an empty set and the API refused to leave "rescheduled" at all.
     SURVEY_RESCHEDULED: {SURVEY_ONGOING, SURVEY_CANCELLED},
@@ -103,11 +103,19 @@ ALLOWED_STATUS_TRANSITIONS = {
 # ---------------------------------------------------------------------------
 
 #: A rescheduled survey stays rescheduled until this time on the Sunday of the
-#: week it was rescheduled in; after that it auto-cancels.  15:00 IST leaves the
-#: rest of Sunday for the captain to still turn up, and lands before the
-#: Monday-00:00 week rollover that clears the assignment.
-RESCHEDULED_EXPIRY_HOUR = 15
-RESCHEDULED_EXPIRY_MINUTE = 0
+#: week it was rescheduled in; after that it auto-cancels.  23:30 IST is the last
+#: moment of the week short of the Monday-00:00 rollover that clears the
+#: assignment, so it gives the captain the whole of Sunday rather than cutting
+#: the weekend off at mid-afternoon.
+#:
+#: Note the 30-minute margin to the rollover.  Nothing actually depends on it -
+#: ``rescheduled_expiry_deadline`` derives the deadline from the row's own anchor
+#: rather than from "now", so a sweep that first runs on Monday still finds last
+#: week's row overdue and cancels it.  The margin matters only for how much of the
+#: Sunday a reschedule created late on Sunday evening is worth: one created at
+#: 23:00 is cancelled half an hour later.
+RESCHEDULED_EXPIRY_HOUR = 23
+RESCHEDULED_EXPIRY_MINUTE = 30
 
 #: Prefix put in front of the captain's own reason when the sweep cancels a
 #: survey, so the dashboards' "View Reason" button explains the status change
@@ -115,6 +123,35 @@ RESCHEDULED_EXPIRY_MINUTE = 0
 RESCHEDULED_EXPIRED_NOTE = (
     "Auto-cancelled: not started before Sunday "
     f"{RESCHEDULED_EXPIRY_HOUR:02d}:{RESCHEDULED_EXPIRY_MINUTE:02d} IST."
+)
+
+# ---------------------------------------------------------------------------
+# Automatic reschedule of unstarted surveys
+# ---------------------------------------------------------------------------
+
+#: A survey scheduled for a given day stops waiting to be started at this time
+#: on the *day after* it: a Friday survey gives its captain until Saturday
+#: 15:00, a Monday survey until Tuesday 15:00.  After that the survey is
+#: rescheduled for them instead of being left to silently never happen.
+#:
+#: Deliberately NOT the same clock as ``RESCHEDULED_EXPIRY_HOUR``.  This is when
+#: the row is created, that one is when it is cancelled, and a captain who misses
+#: their own afternoon should still get the weekend.  What has to hold is only the
+#: ordering - every Mon-Fri deadline (latest: Saturday 15:00) lands before that
+#: week's Sunday 23:30 expiry - so a row this creates is never born already
+#: expired.  See :func:`auto_reschedule_deadline`.
+AUTO_RESCHEDULE_HOUR = 15
+AUTO_RESCHEDULE_MINUTE = 0
+
+#: Why a survey appeared in the table that the captain never asked for.  Shown
+#: by the dashboards' "View Reason" button, so it has to stand on its own -
+#: a captain who did not press anything needs to be told a machine did.  Prefixed
+#: in front of whatever was already there for the same reason as
+#: ``RESCHEDULED_EXPIRED_NOTE``: nobody's own words are thrown away.
+AUTO_RESCHEDULED_NOTE = (
+    "Auto-rescheduled: not started by "
+    f"{AUTO_RESCHEDULE_HOUR:02d}:{AUTO_RESCHEDULE_MINUTE:02d} IST "
+    "the day after its scheduled day."
 )
 
 # ---------------------------------------------------------------------------
@@ -485,8 +522,14 @@ def rescheduled_expiry_deadline(ist_dt=None):
     week window routes/captain.py:2175-2207 uses to decide which survey row a
     reschedule belongs to.  Taking the week from the argument rather than from
     "now" is the whole point: a survey rescheduled on Wednesday gets until that
-    coming Sunday, one rescheduled on Sunday morning gets until 15:00 the same
+    coming Sunday, one rescheduled on Sunday morning gets until 23:30 the same
     day, and an already-overdue row from a previous week expires immediately.
+
+    Because the deadline comes from the argument, a sweep that does not run until
+    Monday still measures the row against the Sunday it actually belonged to and
+    cancels it.  The hour is late in the day on purpose, so the only thing it
+    costs is that a reschedule created in the last half hour of Sunday is worth
+    very little.
 
     ``ist_dt`` is naive IST wall-clock, matching ``ist_now``.
     """
@@ -495,6 +538,47 @@ def rescheduled_expiry_deadline(ist_dt=None):
         days=6,
         hours=RESCHEDULED_EXPIRY_HOUR,
         minutes=RESCHEDULED_EXPIRY_MINUTE,
+    )
+
+
+def auto_reschedule_deadline(survey_day, ist_dt=None):
+    """
+    When a survey scheduled for ``survey_day`` stops waiting to be started.
+
+    ``AUTO_RESCHEDULE_HOUR:MINUTE`` on the day *after* ``survey_day`` - a Friday
+    survey gives its captain until Saturday 15:00, a Monday one until Tuesday
+    15:00.  After that the survey is rescheduled for them instead of being left
+    to silently never happen.
+
+    ``survey_day`` is resolved inside the Mon-Sun week that contains ``ist_dt``,
+    the same window :func:`rescheduled_expiry_deadline` uses.  That is what makes
+    the two rules compose instead of fighting: every Mon-Fri deadline falls at or
+    before Saturday 15:00, which is always ahead of that week's Sunday 23:30
+    expiry, so an auto-rescheduled survey is guaranteed to have some of the week
+    left to actually be surveyed in.  Once the Sunday expiry has gone by there is
+    no deadline left in the week worth acting on, and the caller stops.
+
+    Returns None for anything outside ``SCHEDULE_DAYS``.  ``ALL_DAYS`` also offers
+    Saturday and Sunday because the captain's own day picker does
+    (templates/captain/select_stretch.html), but an assignment's day is always a
+    schedule day - and a Sunday-scheduled survey would get a Monday deadline that
+    is past the expiry meant to end it.
+
+    ``ist_dt`` is naive IST wall-clock, matching ``ist_now``.
+    """
+    if survey_day not in SCHEDULE_DAYS:
+        return None
+
+    ist_dt = ist_dt or ist_now()
+
+    scheduled_at = week_start_monday(ist_dt) + timedelta(
+        days=WEEKDAY_ORDER[survey_day] - 1
+    )
+
+    return scheduled_at + timedelta(
+        days=1,
+        hours=AUTO_RESCHEDULE_HOUR,
+        minutes=AUTO_RESCHEDULE_MINUTE,
     )
 
 

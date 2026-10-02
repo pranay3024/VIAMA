@@ -821,8 +821,6 @@ onclick="clearFilters()">
 
 <th style="min-width:100px;">Cycle</th>
 
-<th>Actual<br>Survey<br>Day</th>
-
 <th style="min-width:170px;">Start<br>Time</th>
 
 <th style="min-width:170px;">End<br>Time</th>
@@ -830,8 +828,6 @@ onclick="clearFilters()">
 <th style="min-width:140px;">PDF<br>Upload Time</th>
 
 <th>Video<br>Upload Time</th>
-
-<th style="min-width:220px;">Captain</th>
 
 <th style="min-width:160px;">Status</th>
 
@@ -897,8 +893,6 @@ onclick="clearFilters()">
 {% endif %}
 
 </td>
-
-    <td>{{ survey.scheduled_day }}</td>
 
     <td style="min-width:140px;line-height:1.4;">
 
@@ -985,8 +979,6 @@ onclick="clearFilters()">
 {% endif %}
 
 </td>
-
-    <td>{{ survey.captain_name }}</td>
 
 <td style="
     min-width:220px;
@@ -2182,16 +2174,14 @@ function exportDashboardToExcel() {
     // 1  UPC Code
     // 2  Section
     // 3  Cycle
-    // 4  Actual Survey Day
-    // 5  Start Time
-    // 6  End Time
-    // 7  PDF Upload Time
-    // 8  Video Upload Time
-    // 9  Captain
-    // 10 Status
-    // 11 Survey Form
-    // 12 Raw Video
-    // 13 Defect Report
+    // 4  Start Time
+    // 5  End Time
+    // 6  PDF Upload Time
+    // 7  Video Upload Time
+    // 8  Status
+    // 9  Survey Form
+    // 10 Raw Video
+    // 11 Defect Report
     //
     // Road Vision, RV Remark and Details
     // are intentionally NOT exported.
@@ -2202,12 +2192,10 @@ function exportDashboardToExcel() {
         "UPC Code",
         "Section",
         "Cycle",
-        "Actual Survey Day",
         "Start Time",
         "End Time",
         "PDF Upload Time",
         "Video Upload Time",
-        "Captain",
         "Status",
         "Survey Form",
         "Raw Video",
@@ -2229,8 +2217,11 @@ function exportDashboardToExcel() {
     // text on the two upload-time columns so the exported sheet stays
     // colour-consistent with the page. (xlsx/builds that strip cell styles
     // cannot do this; exceljs writes the font colour into the file.)
-    const COL_PDF_UPLOAD = 7;
-    const COL_VIDEO_UPLOAD = 8;
+    //
+    // These are 0-based <td> indices into the dashboard table, so they have to
+    // move whenever a column is added or removed ahead of them.
+    const COL_PDF_UPLOAD = 6;
+    const COL_VIDEO_UPLOAD = 7;
 
     let addedRows = 0;
 
@@ -2240,13 +2231,13 @@ function exportDashboardToExcel() {
             row.querySelectorAll("td")
         );
 
-        if (cells.length < 14) {
+        if (cells.length < 12) {
             return;
         }
 
         const values = [];
 
-        for (let i = 0; i < 14; i++) {
+        for (let i = 0; i < 12; i++) {
 
             values.push(cells[i]
                 .innerText
@@ -2296,12 +2287,10 @@ function exportDashboardToExcel() {
         20,    // UPC
         12,    // Section
         8,     // Cycle
-        18,    // Actual Survey Day
         25,    // Start Time
         25,    // End Time
         22,    // PDF Upload
         22,    // Video Upload
-        25,    // Captain
         35,    // Status
         25,    // Survey Form
         25,    // Raw Video

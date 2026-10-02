@@ -55,6 +55,18 @@
                 {{ delayed_surveys|length }} survey(s) with a survey form &middot;
                 total working days delay: <b>{{ total_delay_days|default(0) }}</b>
             </p>
+            {% if not bucket_available %}
+                <p style="margin:6px 0 0 0;color:#a33;">
+                    Bucket video upload times unavailable (RV_GIS_TOKEN unset or the GIS API
+                    did not respond). Times shown are captain-reported only.
+                </p>
+            {% elif bucket_missing %}
+                <p style="margin:6px 0 0 0;color:#555;">
+                    Bucket video upload time from the RoadVision GCS bucket for
+                    <b>{{ bucket_matched }}</b> of {{ delayed_surveys|length }} survey(s);
+                    {{ bucket_missing }} have no bucket entry and show the captain-reported time.
+                </p>
+            {% endif %}
         </div>
 
                 <form method="post" style="margin-bottom:20px; display: none;">
@@ -74,7 +86,7 @@
                         <th>Survey PDF</th>
                         <th>PDF Upload Time</th>
                         <th>End Time</th>
-                        <th>Video Upload Time</th>
+                        <th title="Last video upload time recorded in the RoadVision GCS bucket. Falls back to the captain-reported time for stretches the bucket has never seen.">Bucket Video Upload Time</th>
                         <th>Survey Start Date</th>
                         <th>Survey End Date</th>
                         <th>End Date Confidence</th>
@@ -102,7 +114,15 @@
                         </td>
                         <td>{{ survey.display_pdf_upload_time.strftime('%d/%m/%Y %I:%M %p') if survey.display_pdf_upload_time else '-' }}</td>
                         <td>{{ survey.display_end_time.strftime('%d/%m/%Y %I:%M %p') if survey.display_end_time else '-' }}</td>
-                        <td>{{ survey.display_video_upload_time.strftime('%d/%m/%Y %I:%M %p') if survey.display_video_upload_time else '-' }}</td>
+                        <td>
+                            {% if survey.bucket_video_upload_time %}
+                                <span title="From the RoadVision GCS bucket (stretch {{ survey.bucket_match_keys|join(', ') }}, cycle {{ survey.cycle_no }}{% if survey.bucket_match_keys|length > 1 %} - latest of the covered stretches{% endif %})">{{ survey.display_video_upload_time.strftime('%d/%m/%Y %I:%M %p') }}</span>
+                            {% elif survey.display_video_upload_time %}
+                                <span class="delay-warn" title="No bucket entry for this stretch-cycle; showing the captain-reported time">{{ survey.display_video_upload_time.strftime('%d/%m/%Y %I:%M %p') }}</span>
+                            {% else %}
+                                -
+                            {% endif %}
+                        </td>
                         <td>{{ survey.extracted_survey_start_date.strftime('%d/%m/%Y') if survey.extracted_survey_start_date else '-' }}</td>
                         <td>{{ survey.extracted_survey_end_date.strftime('%d/%m/%Y') if survey.extracted_survey_end_date else '-' }}</td>
                         <td>{{ '%.0f%%'|format((survey.survey_end_date_confidence or 0) * 100) }}</td>

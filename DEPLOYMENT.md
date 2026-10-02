@@ -134,15 +134,28 @@ An admin can also re-run the sync on demand at any time by visiting
 
 ---
 
-## Rescheduled surveys auto-cancel after Sunday 15:00 IST
+## Rescheduled surveys auto-cancel after Sunday 23:30 IST
 
 A survey a captain pushed back stays **Rescheduled** so the team can see it is
-coming. Once **Sunday 15:00 IST of the week it was rescheduled in** passes without
+coming. Once **Sunday 23:30 IST of the week it was rescheduled in** passes without
 the survey being restarted, it becomes **Cancelled** automatically.
 
 The cutoff is derived from the row's own week, not from "now": rescheduled on
-Wednesday → that coming Sunday 15:00; rescheduled Sunday morning → 15:00 the same
+Wednesday → that coming Sunday 23:30; rescheduled Sunday morning → 23:30 the same
 day; already overdue from a previous week → cancelled on the next run.
+
+The clock time is `RESCHEDULED_EXPIRY_HOUR` / `RESCHEDULED_EXPIRY_MINUTE` in
+`core/config.py`, and `RESCHEDULED_EXPIRED_NOTE` is built from them, so the
+"View Reason" text always matches the deadline. Changing the time is a two-line
+edit there — nothing else hardcodes it.
+
+23:30 is deliberately the last moment of the week before the Monday-00:00 rollover
+that clears the assignment, so a captain gets the whole of Sunday rather than
+losing the weekend at mid-afternoon. Nothing depends on that 30-minute margin:
+the deadline comes from the row's own anchor, so a sweep that first runs on Monday
+still finds last week's row overdue and cancels it. The only thing the late hour
+costs is that a reschedule created in the final half hour of Sunday is worth very
+little.
 
 **Two triggers, both already deployed with the code — no infra change needed:**
 
@@ -189,7 +202,7 @@ touches nothing, including the dashboard trigger. Set it back to `1` to resume.
 > behaviour, but it is why the admin dashboard's Rescheduled count dropped
 > sharply. No rows were deleted — they remain visible under Cancelled, and the
 > captain's original reason is kept after
-> `Auto-cancelled: not started before Sunday 15:00 IST. Original reason: …`.
+> `Auto-cancelled: not started before Sunday 23:30 IST. Original reason: …`.
 
 ---
 
@@ -203,7 +216,7 @@ touches nothing, including the dashboard trigger. Set it back to `1` to resume.
 | All rows `no_bucket_data` | Section numbering drift between the two systems | See "Known data issues" below |
 | `500` referencing `video_count_matched` | Migration didn't run on this database | `python migrate_video_count_check.py` |
 | Cron never fires | Env vars added but not redeployed, or Hobby daily cap already used | Redeploy; check Settings → Cron Jobs → last run |
-| Rescheduled survey never auto-cancelled | `RESCHEDULED_EXPIRY=0` is set, or it is already Sunday 15:00 IST and the sweep has not run | Check the tick's `rescheduled_expiry` result; `would_cancel: 0` with `candidates > 0` means the rows are still in date |
+| Rescheduled survey never auto-cancelled | `RESCHEDULED_EXPIRY=0` is set, or it is already Sunday 23:30 IST and the sweep has not run | Check the tick's `rescheduled_expiry` result; `would_cancel: 0` with `candidates > 0` means the rows are still in date |
 
 ---
 

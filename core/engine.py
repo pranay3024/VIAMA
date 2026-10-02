@@ -3125,7 +3125,7 @@ def _rescheduled_anchor_ist(survey):
 
 def expire_rescheduled_surveys(now=None, dry_run=False):
     """
-    Cancel every rescheduled survey whose Sunday-15:00-IST deadline has passed.
+    Cancel every rescheduled survey whose Sunday-23:30-IST deadline has passed.
 
     A captain who reschedules keeps the row in ``rescheduled`` so the team can see
     it is coming; once the week runs out, nobody restarted it, so it is cancelled
@@ -3337,6 +3337,428 @@ def _with_expiry_note(existing):
     if not original:
         return RESCHEDULED_EXPIRED_NOTE
     return f"{RESCHEDULED_EXPIRED_NOTE} Original reason: {original}"
+
+
+# ==========================================================================
+# Auto-reschedule: a survey nobody started becomes a survey they can
+# ==========================================================================
+#
+# The counterpart to the sweep above, and it exists for the same reason from the
+# other direction.  A captain who forgets to press RESCHEDULE leaves the stretch
+# with no survey row at all, so nothing is ever created, nothing appears on any
+# dashboard, and the cycle quietly rolls into next week.  The captain has to
+# remember; the miss is invisible until somebody audits it.
+#
+# So: once a scheduled day's afternoon is over, the sweep creates the missing
+# "rescheduled" row itself.  The captain's own flow then takes over untouched -
+# POST /checklist (routes/captain.py:217-286) already reuses a current-week row
+# whose captain_status is "rescheduled" and flips it to "ongoing", and
+# expire_rescheduled_surveys above already cancels whatever is still untouched at
+# Sunday 23:30.  Neither of those two needed changing; they were waiting for
+# something to hand them a row.
+#
+# The two sweeps are the whole feature: create on the day after, cancel on the
+# Sunday.  A captain now has a working afternoon, an evening and the whole of
+# Sunday to turn up, and a survey that nobody does anything about is still closed
+# out rather than left hanging.
+
+
+#: Backstop on how many assignments one sweep looks at.  Same shape and same
+#: reasoning as ``RESCHEDULED_EXPIRY_SCAN_LIMIT``: a dashboard load must not turn
+#: into an unbounded scan.  ``truncated`` in the result says when it bites, and
+#: the rows cut are the highest-id ones, so the oldest overdue work is never the
+#: thing that waits for the next run.
+AUTO_RESCHEDULE_SCAN_LIMIT = 500
+
+#: Statuses that mean the previous attempt at a stretch never actually happened,
+#: so the retry reuses its cycle number instead of consuming a fresh one.  A
+#: deliberate copy of the list routes/captain.py:2412-2415 hardcodes and of
+#: ``NOT_HAPPENED_STATUSES`` in utils/schedules.py - the same three-way
+#: duplication as the week helpers, kept separate so core/ stays independent of
+#: the portal's utils/ and of routes/.  They must agree.
+AUTO_RESCHEDULE_REUSED_STATUSES = ("cancelled", "rescheduled")
+
+
+def _week_survey_keys(section_nos, week_start, week_end):
+    """
+    The identity 4-tuples of every survey row already recorded this week.
+
+    Deliberately the same identity, and the same "status does not matter", as the
+    query routes/captain.py:2338-2360 uses to decide whether a reschedule should
+    update a row rather than create one - a row that is cancelled or rescheduled
+    still *is* this week's attempt at the stretch, and is exactly what the
+    captain's CONTINUE button is built to reuse.  Creating a second row beside it
+    would give the stretch two cycles and two sets of uploads to reconcile.
+
+    Matching is on the 4-tuple rather than a foreign key because ``Survey`` has no
+    link to ``SurveyAssignment`` (see models/db_models.py).  ``start_time`` is
+    naive IST here for the same reason it is there: the portal's survey routes
+    write IST wall-clock into a naive column (routes/captain.py:2324-2326).
+
+    One query for the whole batch rather than one per assignment: this sweep runs
+    on every dashboard load, and the per-row version turned a page render into
+    hundreds of round trips.  Returns a set of tuples to test with ``in``.
+    """
+    from models.db_models import Survey
+
+    if not section_nos:
+        return set()
+
+    rows = Survey.query.filter(
+        Survey.section_no.in_(list(section_nos)),
+        Survey.start_time >= week_start,
+        Survey.start_time < week_end,
+    ).all()
+
+    return {
+        (
+            row.captain_email,
+            row.section_no,
+            row.upc_code,
+            row.stretch_code,
+        )
+        for row in rows
+    }
+
+
+def _auto_reschedule_cycle_no(assignment, week_start):
+    """
+    The cycle number the auto-created row should carry.
+
+    A survey that was never started does not consume a cycle, and the same rule
+    decides it here as in the captain's own reschedule
+    (routes/captain.py:2407-2434): the most recent survey of this stretch before
+    the week started decides, and if that one was cancelled or rescheduled it did
+    not count, so this attempt reuses its number.  Anything else means the cycle
+    was spent and this is the next one.  No history at all is cycle 1.
+
+    Matches :func:`utils.schedules.live_cycles`, which is what the schedules
+    tables display as "Cycle (This Week)" - the number a captain reads on the
+    screen has to be the number the new row carries.
+    """
+    from models.db_models import Survey
+
+    previous = (
+        Survey.query.filter(
+            Survey.section_no == assignment.section_no,
+            Survey.upc_code == assignment.upc_code,
+            Survey.stretch_code == assignment.stretch_code,
+            Survey.start_time < week_start,
+        )
+        .order_by(
+            Survey.start_time.desc(),
+            Survey.id.desc(),
+        )
+        .first()
+    )
+
+    if previous is None or previous.cycle_no is None:
+        return 1
+
+    if previous.status in AUTO_RESCHEDULE_REUSED_STATUSES:
+        return previous.cycle_no
+
+    return previous.cycle_no + 1
+
+
+def _auto_reschedule_assignment(assignment, stamp):
+    """
+    Move the assignment into the same rescheduled state its survey was created in.
+
+    A field-for-field mirror of routes/captain.py:2535-2556.  The assignment has
+    to move too, not just the survey: routes/regional.py:274 renders the
+    *assignment's* reason over the survey's, so leaving the assignment on
+    "pending" would show a rescheduled survey beside an assignment nobody
+    rescheduled.
+
+    A ``missed`` assignment is put back to ``pending`` first, for the reason the
+    captain's own reschedule does the same: the stretch is being given another
+    chance, so the missed-alert has been answered and must not keep nagging -
+    otherwise the alert re-raises on the next dashboard load for a survey that is
+    now officially back on.
+
+    ``reason`` is prefixed, not overwritten, because the field survives the Monday
+    reset (core/engine.py:run_weekly_reset only touches status and
+    ``last_week_reset``) and a leftover reason from last week would otherwise be
+    presented as the reason for this week's automatic reschedule.
+    """
+    from core.config import AUTO_RESCHEDULED_NOTE
+
+    if assignment.status == "missed":
+        assignment.status = "pending"
+        assignment.alert_acknowledged = False
+        assignment.missed_alert = False
+        assignment.missed_reason = None
+
+    assignment.captain_status = "rescheduled"
+    assignment.captain_status_reason = _with_auto_reschedule_note(
+        assignment.captain_status_reason
+    )
+    assignment.captain_status_updated_at = stamp
+    return assignment
+
+
+def _with_auto_reschedule_note(existing):
+    """
+    ``existing`` with the auto-reschedule note in front, keeping the captain's text.
+
+    The same prefix-don't-replace decision as :func:`_with_expiry_note`, and for
+    the same reason - the dashboards' "View Reason" button reads this field
+    verbatim, so overwriting it would silently discard something a human typed.
+    Kept as a second function rather than a shared helper because the two notes
+    say different things and only one of them is ever in front.
+    """
+    from core.config import AUTO_RESCHEDULED_NOTE
+
+    original = (existing or "").strip()
+    if not original:
+        return AUTO_RESCHEDULED_NOTE
+    return f"{AUTO_RESCHEDULED_NOTE} Original reason: {original}"
+
+
+def auto_reschedule_unstarted_surveys(now=None, dry_run=False):
+    """
+    Create a "rescheduled" survey for every scheduled stretch nobody started.
+
+    Not scoped by captain or by state, and that is deliberate rather than lazy:
+    a row created from one dashboard has to be the same row every other screen
+    reads, so a partial sweep would leave two screens disagreeing about the same
+    stretch.  The day filter below is what keeps the whole-project scan cheap
+    enough for that to be safe.
+
+    An assignment is due when ``auto_reschedule_deadline`` says its scheduled day
+    is more than a working afternoon gone - Friday's survey after Saturday 15:00
+    - and it has no current-week survey row yet.  What gets created is the same
+    row the captain's RESCHEDULE button would have created: status
+    "rescheduled", captain_status "rescheduled", the assignment's own survey_day,
+    and the cycle number the schedules tables are already showing.
+
+    From there the existing flows do the rest, unchanged:
+
+    * the captain starts it from their normal stretch list, because
+      ``POST /checklist`` already reuses a "rescheduled" current-week row and
+      flips it to "ongoing" (routes/captain.py:217-286);
+    * if they never do, ``expire_rescheduled_surveys`` cancels it at Sunday 23:30
+      of the same week, because ``captain_status_updated_at`` is stamped here
+      exactly as the captain's reschedule stamps it.
+
+    Four guards keep it from doing damage:
+
+    * **The week has to still be open.**  Once the Sunday expiry has passed, every
+      deadline in the week has passed with it and a row created now would be
+      cancelled the moment it appeared, so the sweep stops and the Monday reset
+      clears the assignment instead.  This is also what makes a long quiet
+      weekend harmless rather than a burst of invented surveys on Monday morning.
+    * **Only days whose deadline has passed are even looked at.**  Pruned in SQL
+      rather than in Python, so on a normal day the sweep costs one empty query
+      instead of a scan of the whole schedule.
+    * **Any existing current-week row wins**, whatever its status.  Once the
+      captain has started it, finished it, or cancelled it themselves there is
+      nothing to add - see :func:`_week_survey_keys`.
+    * **Disabled assignments are skipped**, so a stretch switched off for the
+      week is never resurrected.
+
+    Idempotent, and deliberately so for the obvious reason: it runs on dashboard
+    loads, which are the common case, so every pass has to be a no-op when there
+    is nothing new to do.  A second run finds the rows it just created and stops.
+
+    Set ``AUTO_RESCHEDULE=0`` to switch the whole thing off without a redeploy.
+    ``dry_run=True`` reports what it would create and writes nothing.
+    """
+    import os
+    from datetime import timedelta
+
+    from core.config import (
+        AUTO_RESCHEDULED_NOTE,
+        SCHEDULE_DAYS,
+        SURVEY_RESCHEDULED,
+        auto_reschedule_deadline,
+        ist_now,
+        rescheduled_expiry_deadline,
+        utc_now,
+        week_start_monday,
+    )
+    from extensions import db
+    from models.db_models import Survey, SurveyAssignment
+
+    if os.getenv("AUTO_RESCHEDULE", "1").strip() in ("0", "false", "no", "off"):
+        return {
+            "ran": False,
+            "skipped": "disabled via AUTO_RESCHEDULE=0",
+            "created_count": 0,
+        }
+
+    now_ist = now or ist_now()
+
+    week_deadline = rescheduled_expiry_deadline(now_ist)
+
+    if now_ist >= week_deadline:
+        return {
+            "ran": False,
+            "skipped": "this week's rescheduled window has already closed",
+            "created_count": 0,
+            "expires_at_ist": week_deadline.isoformat(),
+            "checked_at_ist": now_ist.isoformat(),
+        }
+
+    week_start = week_start_monday(now_ist)
+    week_end = week_start + timedelta(days=7)
+    # Naive, because that is what the survey routes write into this column.
+    start_time_ist = now_ist.replace(tzinfo=None)
+
+    # Only a day whose deadline has already gone by can have anything due, which
+    # for most of the week is none of them. Deciding that here and putting it in
+    # the WHERE clause is what keeps this cheap enough to run on every dashboard
+    # load: on Monday morning the filter matches no day at all and the whole sweep
+    # is one empty query, instead of reading every assignment in the project and
+    # testing its day in Python.
+    due_days = [
+        day
+        for day in SCHEDULE_DAYS
+        if auto_reschedule_deadline(day, now_ist) <= now_ist
+    ]
+
+    if not due_days:
+        return {
+            "ran": False,
+            "skipped": "no scheduled day has passed its deadline yet",
+            "created_count": 0,
+            "checked_at_ist": now_ist.isoformat(),
+            "next_deadlines": {
+                day: auto_reschedule_deadline(day, now_ist).isoformat()
+                for day in SCHEDULE_DAYS
+            },
+        }
+
+    try:
+        query = SurveyAssignment.query.filter(
+            SurveyAssignment.survey_enabled.is_(True),
+            SurveyAssignment.survey_day.in_(due_days),
+        )
+
+        assignments = (
+            query.order_by(SurveyAssignment.id.asc())
+            .limit(AUTO_RESCHEDULE_SCAN_LIMIT + 1)
+            .all()
+        )
+
+        truncated = len(assignments) > AUTO_RESCHEDULE_SCAN_LIMIT
+        if truncated:
+            assignments = assignments[:AUTO_RESCHEDULE_SCAN_LIMIT]
+
+        already_surveyed = _week_survey_keys(
+            {a.section_no for a in assignments if a.section_no},
+            week_start,
+            week_end,
+        )
+
+        due = []
+
+        for assignment in assignments:
+            if (
+                assignment.captain_email,
+                assignment.section_no,
+                assignment.upc_code,
+                assignment.stretch_code,
+            ) in already_surveyed:
+                continue
+
+            deadline = auto_reschedule_deadline(
+                assignment.survey_day,
+                now_ist,
+            )
+
+            due.append((assignment, deadline))
+
+        result = {
+            "scanned": len(assignments),
+            "candidates": len(assignments),
+            "days_due": due_days,
+            "due": len(due),
+            "truncated": truncated,
+            "checked_at_ist": now_ist.isoformat(),
+            "week_deadline_ist": week_deadline.isoformat(),
+        }
+
+        if dry_run:
+            result["dry_run"] = True
+            result["would_create"] = len(due)
+            result["assignment_ids"] = [a.id for a, _ in due]
+            return result
+
+        if not due:
+            result["ran"] = False
+            result["created_count"] = 0
+            return result
+
+        if not _job_lock("viama_auto_reschedule"):
+            result["ran"] = False
+            result["created_count"] = 0
+            result["reason"] = (
+                "another auto-reschedule sweep is already in progress"
+            )
+            return result
+
+        stamp = utc_now()
+        created = []
+
+        for assignment, _deadline in due:
+            survey = Survey(
+                captain_email=assignment.captain_email,
+                captain_name=assignment.main_person,
+                state=assignment.state,
+                stretch_code=assignment.stretch_code,
+                section_no=assignment.section_no,
+                upc_code=assignment.upc_code,
+                nh_number=assignment.nh_number,
+                ro=assignment.ro,
+                piu=assignment.piu,
+                survey_day=assignment.survey_day,
+                survey_type=assignment.survey_type or "Day",
+                section_length=assignment.section_length,
+                status=SURVEY_RESCHEDULED,
+                captain_status=SURVEY_RESCHEDULED,
+                captain_status_reason=AUTO_RESCHEDULED_NOTE,
+                captain_status_updated_at=stamp,
+                start_time=start_time_ist,
+                end_time=None,
+                cycle_no=_auto_reschedule_cycle_no(assignment, week_start),
+                is_resurvey=False,
+                show_on_dashboard=True,
+                show_in_teamleader_dashboard=True,
+            )
+
+            db.session.add(survey)
+            created.append(survey)
+            _auto_reschedule_assignment(assignment, stamp)
+
+        db.session.flush()
+
+        result["ran"] = True
+        result["created_count"] = len(created)
+        result["survey_ids"] = [survey.id for survey in created]
+        result["assignment_ids"] = [a.id for a, _ in due]
+        db.session.commit()
+        return result
+
+    except Exception as exc:
+        # Runs inside somebody else's request - a dashboard render or a cron tick
+        # - so it must never take that request down.  Rolling back matters for the
+        # same reason as in expire_rescheduled_surveys: a half-applied batch left
+        # in the session would be committed by whatever the caller did next.
+        #
+        # The rollback gets its own guard because a failure in here would replace
+        # the original error with a new one and propagate it out of this function,
+        # which is the one thing this handler exists to prevent.  Better a dirty
+        # session the caller rolls back than an exception it does not expect.
+        try:
+            db.session.rollback()
+        except Exception:
+            log.warning("auto-reschedule rollback failed", exc_info=True)
+
+        log.warning("auto-reschedule sweep failed: %s", exc, exc_info=True)
+        return {"ran": False, "error": f"{type(exc).__name__}: {exc}"[:300]}
+
 
 
 def missed_count(states=None):

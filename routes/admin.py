@@ -59,6 +59,7 @@ from utils.defect_report_delay import (
     working_days_between,
     defect_report_delay_days,
 )
+from utils.video_upload_times import survey_match_report
 
 admin_bp = Blueprint(
     "admin",
@@ -393,6 +394,8 @@ def delayed_surveys():
 
     ist_offset = timedelta(hours=5, minutes=30)
 
+    bucket_matched, bucket_missing, bucket_available = survey_match_report(delayed)
+
     for survey in delayed:
         survey.display_start_time = (
             survey.start_time + ist_offset if survey.start_time else None
@@ -405,9 +408,14 @@ def delayed_surveys():
             if survey.survey_pdf_uploaded_at and not survey.pdf_reupload_required
             else None
         )
+        # The GIS bucket is authoritative for when videos landed, so it replaces the
+        # captain's self-reported video_upload_time in this column. Surveys whose
+        # stretch the bucket has never seen fall back to what we recorded.
         survey.display_video_upload_time = (
-            survey.video_upload_time + ist_offset
-            if survey.video_upload_time else None
+            survey.bucket_video_upload_time or (
+                survey.video_upload_time + ist_offset
+                if survey.video_upload_time else None
+            )
         )
 
     total_delay_days = sum(
@@ -432,6 +440,9 @@ def delayed_surveys():
         total_delay_days=total_delay_days,
         selected_team=selected_team,
         selected_state=selected_state,
+        bucket_available=bucket_available,
+        bucket_matched=bucket_matched,
+        bucket_missing=bucket_missing,
         message=message,
     )
 
@@ -450,7 +461,7 @@ def admin_dashboard():
     # EXPIRE OVERDUE RESCHEDULED SURVEYS
     #
     # A rescheduled survey is cancelled automatically once
-    # Sunday 15:00 IST of the week it was rescheduled in has
+    # Sunday 23:30 IST of the week it was rescheduled in has
     # passed. Run here - before any of the queries below - so
     # the page the admin is looking at is already correct, and
     # so a quiet day still gets fixed the next time somebody
@@ -464,6 +475,30 @@ def admin_dashboard():
         from core.engine import expire_rescheduled_surveys
 
         expire_rescheduled_surveys()
+    except Exception:
+        pass
+
+    # =====================================================
+    # AUTO-RESCHEDULE NEVER-STARTED SURVEYS
+    #
+    # A scheduled survey that was not started by 15:00 IST
+    # the day after its scheduled day gets its own
+    # "rescheduled" row, so the captain can still start it
+    # instead of the stretch quietly rolling into next week.
+    # The Sunday 23:30 auto-cancel above then closes out
+    # whatever they never touch.
+    #
+    # Same trade as the sweep above: no in-process timer
+    # survives on Vercel, so this is lazy - on every
+    # dashboard load plus POST /api/v1/jobs/tick. It is
+    # idempotent and swallows its own errors, so it can
+    # never take this page down.
+    # =====================================================
+
+    try:
+        from core.engine import auto_reschedule_unstarted_surveys
+
+        auto_reschedule_unstarted_surveys()
     except Exception:
         pass
 

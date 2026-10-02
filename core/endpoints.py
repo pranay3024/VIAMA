@@ -4790,8 +4790,9 @@ _ = (parse_int, request)
 # /api/v1/jobs - scheduled maintenance.
 #
 # ``POST /jobs/tick`` is a single entrypoint that decides internally what is due:
-# drain webhooks, run the missed-survey engine, expire overdue rescheduled surveys,
-# do the Monday reset, purge expired audit rows and idempotency keys.
+# drain webhooks, run the missed-survey engine, auto-reschedule surveys that were
+# never started, expire overdue rescheduled surveys, do the Monday reset, purge
+# expired audit rows and idempotency keys.
 #
 # One endpoint rather than five because Vercel's Hobby plan allows only two cron
 # jobs at daily granularity - consolidating keeps the whole thing inside one slot
@@ -4845,6 +4846,11 @@ def tick():
 
     if should("alerts"):
         results["missed_engine"] = _safely(lambda: _alerts(dry_run))
+
+    if should("auto_reschedule"):
+        results["auto_reschedule"] = _safely(
+            lambda: _auto_reschedule(dry_run)
+        )
 
     if should("rescheduled_expiry"):
         results["rescheduled_expiry"] = _safely(
@@ -4903,9 +4909,27 @@ def _alerts(dry_run):
     return run_missed_engine(dry_run=dry_run)
 
 
+def _auto_reschedule(dry_run):
+    """
+    Create the missing "rescheduled" row for every scheduled survey nobody started.
+
+    Like the expiry sweep below, this one has no hour gate.  Each assignment's
+    deadline is a property of its own scheduled day, so the per-row comparison
+    inside the engine is what decides whether anything is due, not the time of day
+    the tick happens to arrive.
+
+    Runs before ``rescheduled_expiry`` in the tick so a row created in this same
+    pass is already inside the Sunday rule rather than needing a second pass to be
+    judged by it.
+    """
+    from core.engine import auto_reschedule_unstarted_surveys
+
+    return auto_reschedule_unstarted_surveys(dry_run=dry_run)
+
+
 def _rescheduled_expiry(dry_run):
     """
-    Cancel rescheduled surveys that passed their Sunday-15:00-IST deadline.
+    Cancel rescheduled surveys that passed their Sunday-23:30-IST deadline.
 
     Unlike the other jobs here this one has no hour gate.  A reschedule can be
     made at any time in the week, so the sweep has to be willing to run at any
@@ -4986,9 +5010,19 @@ def list_jobs():
                     "frequency": f"a few times a day after {ALERT_CUTOFF_HOUR_PRIMARY}:00 IST",
                 },
                 {
+                    "name": "auto_reschedule",
+                    "does": (
+                        "Creates the missing 'rescheduled' row for any scheduled "
+                        "survey not started by 15:00 IST the day after its "
+                        "scheduled day. Runs before rescheduled_expiry so a row it "
+                        "creates is judged by the Sunday rule in the same pass."
+                    ),
+                    "frequency": "any hour; it no-ops unless a day's deadline has passed",
+                },
+                {
                     "name": "rescheduled_expiry",
                     "does": (
-                        "Cancels rescheduled surveys whose Sunday-15:00-IST "
+                        "Cancels rescheduled surveys whose Sunday-23:30-IST "
                         "deadline has passed. Also runs on every dashboard load, "
                         "so it is not dependent on this job firing."
                     ),

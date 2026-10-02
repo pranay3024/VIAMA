@@ -1110,6 +1110,34 @@ def captain_home():
     user = User.query.get(session["user_id"])
 
     # -----------------------------------
+    # AUTO-RESCHEDULED SURVEYS
+    #
+    # A scheduled survey that was not started by
+    # 15:00 IST the day after its day gets a
+    # "rescheduled" row of its own, so it can still
+    # be started from the normal stretch list
+    # instead of the stretch silently rolling into
+    # next week. Cancel it or it closes itself at
+    # Sunday 23:30.
+    #
+    # Not scoped to this captain - it is the same
+    # sweep the dashboards run, and it has to be,
+    # because a row created here is the same row
+    # every other screen reads. Scoping it would
+    # mean this page could show a stale picture.
+    # Cheap enough to run anyway: the day filter
+    # means most passes are a single empty query.
+    # Idempotent, never raises.
+    # -----------------------------------
+
+    try:
+        from core.engine import auto_reschedule_unstarted_surveys
+
+        auto_reschedule_unstarted_surveys()
+    except Exception:
+        pass
+
+    # -----------------------------------
     # ALL ONGOING / ACTIVE SURVEYS
     # -----------------------------------
 

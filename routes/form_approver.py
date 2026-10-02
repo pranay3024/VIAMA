@@ -123,7 +123,7 @@ def dashboard():
     if _require_role():
         return redirect("/")
 
-    # A rescheduled survey auto-cancels after Sunday 15:00 IST of the week it was
+    # A rescheduled survey auto-cancels after Sunday 23:30 IST of the week it was
     # rescheduled in. Swept before the query below so the RESCHEDULED filter
     # option cannot return a survey that has already expired. Idempotent, never
     # raises.
@@ -131,6 +131,18 @@ def dashboard():
         from core.engine import expire_rescheduled_surveys
 
         expire_rescheduled_surveys()
+    except Exception:
+        pass
+
+    # Same pair of sweeps on this screen: a scheduled survey nobody started by
+    # 15:00 IST the day after its day becomes a "rescheduled" row here, and is then
+    # cancelled at Sunday 23:30 if it is still untouched. Both run before the query
+    # below so neither filter option can return a row that has already moved on.
+    # Idempotent, never raises.
+    try:
+        from core.engine import auto_reschedule_unstarted_surveys
+
+        auto_reschedule_unstarted_surveys()
     except Exception:
         pass
 

@@ -462,7 +462,8 @@ class="logout-btn">
 
     {% for state in states %}
 
-    <option value="{{ state[0] }}">
+    <option value="{{ state[0] }}"
+    {% if request.args.get('state') == state[0] %}selected{% endif %}>
     {{ state[0] }}
     </option>
 
@@ -499,7 +500,8 @@ UP-Jharkhand
 
         {% for captain in captains %}
 
-        <option value="{{ captain.name }}">
+        <option value="{{ captain.name }}"
+        {% if request.args.get('captain_name') == captain.name %}selected{% endif %}>
         {{ captain.name }}
         </option>
 
@@ -1617,6 +1619,39 @@ function clearFilters() {
         .reset();
 
     window.location.href = "/admin";
+
+}
+
+
+// ===============================
+// AUTO-APPLY FILTERS
+//
+// Every control in the form is a filter, so any one of them
+// changing applies the lot straight away - form.submit() sends
+// every control's current value, so a second dropdown narrows
+// what the first one already selected rather than replacing
+// it. The state lives in the URL, so it survives the reload,
+// and only the x Clear button drops it.
+//
+// Listens for change, not input, so a date field applies once
+// its value is committed instead of on every keystroke. The
+// Extract / Export buttons are type="button" and never reach
+// here.
+// ===============================
+
+const adminFilterForm = document
+    .querySelector("form.advanced-filter");
+
+if (adminFilterForm) {
+
+    adminFilterForm.addEventListener(
+        "change",
+        function () {
+
+            adminFilterForm.submit();
+
+        }
+    );
 
 }
 

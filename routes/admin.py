@@ -848,11 +848,16 @@ def admin_dashboard():
     if week:
      week_no = safe_week(week)
 
-    elif not other_filters_applied:
-     week_no = current_week_no
+    elif "week" in request.args or other_filters_applied:
+       # "week" in request.args means the admin actively cleared the Week
+       # dropdown - a form control always submits its value, so an emptied
+       # select arrives as week="" rather than as a missing parameter. Either
+       # that, or some other filter is doing the narrowing, means do not
+       # quietly re-impose the current week on top of it.
+       week_no = None
 
     else:
-       week_no= None
+       week_no = current_week_no
 
     if week_no is not None:
         
@@ -1208,12 +1213,39 @@ def admin_dashboard():
     # #endregion
 
     cycles = [
-        (cycle,)
-        for cycle in sorted(
+        (cycle_no,)
+        for cycle_no in sorted(
             {survey.cycle_no for survey in all_surveys},
             key=lambda value: (value is None, value or 0),
         )
     ]
+
+    # all_surveys is already filtered, so a cycle the admin has selected can
+    # drop out of this list the moment a second filter (Status, State, Week,
+    # Day...) narrows the rows away from it. The select would then fall back
+    # to its "Cycles" placeholder, which reads as the filter having reset
+    # itself, and the next submit would quietly drop the cycle from the
+    # query. Keep the selected cycle on the list so the two filters keep
+    # combining instead of undoing each other.
+    if cycle:
+
+        try:
+
+            selected_cycle_no = int(cycle)
+
+        except (TypeError, ValueError):
+
+            selected_cycle_no = None
+
+        if selected_cycle_no is not None and all(
+            row[0] != selected_cycle_no
+            for row in cycles
+        ):
+
+            cycles = sorted(
+                cycles + [(selected_cycle_no,)],
+                key=lambda row: (row[0] is None, row[0] or 0),
+            )
 
     extract_groups = {
     "PDF Re-upload Required": [],

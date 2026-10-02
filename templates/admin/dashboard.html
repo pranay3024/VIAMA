@@ -454,6 +454,16 @@ class="logout-btn">
 
     <form method="GET" class="advanced-filter">
 
+    <!-- There is no visible Apply button any more: every control applies
+    itself on change (see AUTO-APPLY FILTERS at the bottom of this file).
+    This hidden one is the form's default submit button, so that pressing
+    Enter after typing into a date field still applies the filters. -->
+    <button
+    type="submit"
+    aria-label="Apply filters"
+    style="position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0;">
+    </button>
+
     <select name="state">
 
     <option value="">
@@ -753,14 +763,6 @@ onclick="clearFilters()">
 ✕ Clear
 
 </button>
-
-<button
-    type="submit"
-    class="search-btn">
-
-    Apply Filters
-
-    </button>
 
     <button
     type="button"

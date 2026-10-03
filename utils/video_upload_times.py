@@ -51,11 +51,12 @@ CACHE_TTL_SECONDS = 900
 # that comfortably or every cache expiry turns into a blank column. The wait is
 # bounded and paid at most once per CACHE_TTL_SECONDS; if the GIS API is genuinely
 # down we give up rather than hang the admin page.
-FETCH_TIMEOUT_SECONDS = 75
+# Reduced to fail fast on the admin page when the API is unreachable.
+FETCH_TIMEOUT_SECONDS = 10
 
 _IST_SUFFIX = " IST"
 
-_cache = {"fetched_at": 0.0, "index": None}
+_cache = {"fetched_at": 0.0, "index": None, "failed_at": 0.0}
 
 
 # ---------------------------------------------------------------------------
@@ -118,18 +119,24 @@ def fetch_index(force=False, timeout=None):
     Caches for CACHE_TTL_SECONDS and serves the last good index on failure, so a
     brief GIS outage degrades to slightly stale times rather than blank ones.
     """
-    token = os.getenv("RV_GIS_TOKEN")
+    token = os.getenv("RV_GIS_TOKEN") or os.getenv("RV_DASHBOARD_TOKEN")
 
     if not token:
-        log.error("RV_GIS_TOKEN is not set - bucket video upload times unavailable")
+        log.error("RV_GIS_TOKEN/RV_DASHBOARD_TOKEN not set - bucket video upload times unavailable")
         return None
 
+    now = time.time()
+    # If we recently failed, don't retry immediately to avoid slowing page loads
+    if _cache["index"] is None and not force:
+        if _cache["failed_at"] and (now - _cache["failed_at"]) < 60:  # don't retry for 1 min
+            return None
     if _cache["index"] is not None and not force:
-        if (time.time() - _cache["fetched_at"]) < CACHE_TTL_SECONDS:
+        if (now - _cache["fetched_at"]) < CACHE_TTL_SECONDS:
             return _cache["index"]
 
+    api_url = os.getenv("RV_GIS_UPLOAD_TIMES_URL") or API_URL
     request = urllib.request.Request(
-        API_URL,
+        api_url,
         headers={
             "Authorization": "Bearer " + token,
             "Accept": "application/json",
@@ -137,12 +144,13 @@ def fetch_index(force=False, timeout=None):
     )
 
     try:
+        effective_timeout = timeout if timeout is not None else FETCH_TIMEOUT_SECONDS
         with urllib.request.urlopen(
-            request, timeout=timeout or FETCH_TIMEOUT_SECONDS
+            request, timeout=effective_timeout
         ) as response:
             payload = json.loads(response.read().decode("utf-8"))
 
-        index = build_index(payload["result"]["rows"])
+        index = build_index(payload.get("result", {}).get("rows", []))
 
         _cache["index"] = index
         _cache["fetched_at"] = time.time()
@@ -152,14 +160,19 @@ def fetch_index(force=False, timeout=None):
         return index
 
     except urllib.error.HTTPError as exc:
+        try:
+            body = exc.read()[:200].decode(errors="replace")
+        except Exception:
+            body = ""
         log.error(
             "GIS upload times upstream %s: %s",
             exc.code,
-            exc.read()[:200].decode(errors="replace"),
+            body,
         )
     except Exception as exc:
         log.error("GIS upload times fetch failed: %s: %s", type(exc).__name__, exc)
 
+    _cache["failed_at"] = time.time()
     if _cache["index"] is not None:
         log.warning("serving stale GIS upload times from cache")
         return _cache["index"]
@@ -258,7 +271,7 @@ def lookup(section_no, cycle_no, upc_code=None, index=None):
     return max(when for _, when in matches)
 
 
-def survey_match_report(surveys):
+def survey_match_report(surveys, timeout=None):
     """Attach a bucket time to each survey in place.
 
     Sets ``survey.bucket_video_upload_time`` (naive IST, or None) and
@@ -267,7 +280,10 @@ def survey_match_report(surveys):
 
     Returns ``(matched, missing, available)``.
     """
-    index = fetch_index()
+    try:
+        index = fetch_index(timeout=timeout)
+    except Exception:
+        index = None
     available = bool(index)
 
     matched = 0

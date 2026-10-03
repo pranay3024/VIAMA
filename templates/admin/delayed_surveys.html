@@ -166,22 +166,31 @@
         }
 
         (async function () {
-            let data = await sweepOnce();
-            if (data.error) {
-                return;
-            }
-            if (data.remaining > 0) {
-                let polls = 0;
-                const timer = setInterval(async () => {
-                    data = await sweepOnce();
-                    polls += 1;
-                    if (!data.remaining || data.error || polls >= 30) {
-                        clearInterval(timer);
-                        window.location.reload();
-                    }
-                }, 10000);
-            } else if (data.processed > 0) {
-                window.location.reload();
+            try {
+                let data = await sweepOnce();
+                if (data.error) {
+                    return;
+                }
+                if (data.remaining > 0) {
+                    let polls = 0;
+                    const timer = setInterval(async () => {
+                        try {
+                            data = await sweepOnce();
+                        } catch (e) {
+                            clearInterval(timer);
+                            return;
+                        }
+                        polls += 1;
+                        if (!data.remaining || data.error || polls >= 5) { // reduce max polls
+                            clearInterval(timer);
+                            window.location.reload();
+                        }
+                    }, 5000); // poll faster initially but fewer times
+                } else if (data.processed > 0) {
+                    window.location.reload();
+                }
+            } catch (e) {
+                // ignore
             }
         })();
     </script>

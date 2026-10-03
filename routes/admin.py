@@ -394,7 +394,12 @@ def delayed_surveys():
 
     ist_offset = timedelta(hours=5, minutes=30)
 
-    bucket_matched, bucket_missing, bucket_available = survey_match_report(delayed)
+    try:
+        bucket_matched, bucket_missing, bucket_available = survey_match_report(
+            delayed, timeout=5
+        )
+    except Exception:
+        bucket_matched, bucket_missing, bucket_available = 0, len(delayed), False
 
     for survey in delayed:
         survey.display_start_time = (

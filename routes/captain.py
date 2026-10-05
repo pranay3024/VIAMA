@@ -1002,6 +1002,15 @@ def complete_survey():
             )
 
             try:
+                # Clear cache for the new PDF URL if present
+                try:
+                    from gemini_utils import _form_fields_cache
+                    if survey.end_survey_pdf and survey.end_survey_pdf in _form_fields_cache:
+                        _form_fields_cache.pop(survey.end_survey_pdf, None)
+                except Exception:
+                    pass
+                survey._force_reextract = True
+                db.session.commit()
                 from utils.auto_sync import extract_survey_form_fields
                 result = extract_survey_form_fields(
                     survey, pdf_bytes=pdf_bytes
@@ -1839,6 +1848,16 @@ def reupload_survey_pdf(survey_id):
         # Append this upload to the PDF history so the original stays visible
         # alongside the corrected copy.
 
+        # Clear cache for the new PDF URL
+        try:
+            from gemini_utils import _form_fields_cache
+            if new_pdf_url and new_pdf_url in _form_fields_cache:
+                _form_fields_cache.pop(new_pdf_url, None)
+            if old_pdf_url and old_pdf_url in _form_fields_cache:
+                _form_fields_cache.pop(old_pdf_url, None)
+        except Exception:
+            pass
+
         pdf_versions.record_version(
             survey,
             new_pdf_url,
@@ -1868,6 +1887,16 @@ def reupload_survey_pdf(survey_id):
         survey.defect_report_sent_at = None
         survey.defect_report_delay_days = None
         survey._force_reextract = True
+
+        # Clear any cached form-field extraction for the old/new PDF
+        try:
+            from gemini_utils import _form_fields_cache
+            if new_pdf_url and new_pdf_url in _form_fields_cache:
+                _form_fields_cache.pop(new_pdf_url, None)
+            if old_pdf_url and old_pdf_url in _form_fields_cache:
+                _form_fields_cache.pop(old_pdf_url, None)
+        except Exception:
+            pass
 
         db.session.commit()
 

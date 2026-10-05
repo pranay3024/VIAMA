@@ -160,17 +160,17 @@ def manual_delayed_survey_update(survey_id):
 
     # Keep whatever is still being filtered on, otherwise saving a manual date
     # silently jumps the admin back to the current week.
-      week_param = request.args.get("week")
-      team_param = request.args.get("team")
-      state_param = request.args.get("state")
-      delay_param = request.args.get("delay")
-      return redirect(url_for(
+    week_param = request.args.get("week")
+    team_param = request.args.get("team")
+    state_param = request.args.get("state")
+    delay_param = request.args.get("delay")
+    return redirect(url_for(
         "admin.delayed_surveys",
         week=week_param or None,
         team=team_param or None,
         state=state_param or None,
         delay=delay_param or None,
-      ))
+    ))
 
 
 @admin_bp.route("/admin/delayed-surveys", methods=["GET", "POST"])
@@ -443,16 +443,16 @@ def delayed_surveys():
             )
         )
 
-      total_delay_days = sum(
-      survey.defect_report_delay_days or 0
-      for survey in summary_surveys
-  )
+    total_delay_days = sum(
+        survey.defect_report_delay_days or 0
+        for survey in summary_surveys
+    )
 
-      # ============================================================
-      # Render page
-      # ============================================================
+    # ============================================================
+    # Render page
+    # ============================================================
 
-      return render_template(
+    return render_template(
         "admin/delayed_surveys.html",
         delayed_surveys=delayed,
         current_week_no=current_week_no,
@@ -470,7 +470,7 @@ def delayed_surveys():
         bucket_matched=bucket_matched,
         bucket_missing=bucket_missing,
         message=message,
-      )
+    )
 
 from datetime import datetime
 

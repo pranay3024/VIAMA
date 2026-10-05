@@ -296,6 +296,11 @@ def delayed_surveys():
     selected_team = request.args.get("team", "").strip()
     selected_state = request.args.get("state", "").strip()
     delay_filter = request.args.get("delay", "").strip()
+    delay_options = []
+    if delay_filter == 'custom':
+        delay_custom = request.args.get("delay_custom", "").strip()
+    else:
+        delay_custom = ""
     team_states = {
         "Krish": ("WEST BENGAL", "ASSAM", "BIHAR", "MEGHALAYA"),
         "Godbole": ("ODISHA",),
@@ -364,24 +369,67 @@ def delayed_surveys():
         delayed_query = delayed_query.filter(Survey.state.in_(state_values))
 
     if delay_filter:
-        try:
-            delay_val = int(delay_filter)
-            if delay_val == 0:
-                delayed_query = delayed_query.filter(
-                    Survey.defect_report_delay_days == 0
-                )
-            elif delay_val > 0:
-                delayed_query = delayed_query.filter(
-                    Survey.defect_report_delay_days >= delay_val
-                )
-            else:
-                # negative if any, treat as no filter
+        if delay_filter == 'custom':
+            try:
+                delay_val = int(delay_custom)
+                if delay_val == 0:
+                    delayed_query = delayed_query.filter(
+                        Survey.defect_report_delay_days == 0
+                    )
+                elif delay_val > 0:
+                    delayed_query = delayed_query.filter(
+                        Survey.defect_report_delay_days == delay_val
+                    )
+            except ValueError:
                 pass
-        except ValueError:
-            pass
+        else:
+            try:
+                delay_val = int(delay_filter)
+                if delay_val == 0:
+                    delayed_query = delayed_query.filter(
+                        Survey.defect_report_delay_days == 0
+                    )
+                elif delay_val > 0:
+                    delayed_query = delayed_query.filter(
+                        Survey.defect_report_delay_days >= delay_val
+                    )
+            except ValueError:
+                pass
 
-    # Totals come from the same week-scoped query as the table below, so the
-    # headline can never disagree with the rows it is describing.
+    # Build delay options from current week results
+    try:
+        base_for_options = exclude_deleted(Survey.query, Survey).filter(
+            Survey.end_survey_pdf.isnot(None),
+            Survey.start_time >= week_start,
+            Survey.start_time < week_end,
+            Survey.status.isnot(None),
+            Survey.status != "cancelled",
+        )
+        if selected_team in team_states:
+            base_for_options = base_for_options.filter(
+                Survey.state.in_(team_states[selected_team])
+            )
+        if selected_state:
+            state_values = (
+                ("UP", "UTTAR PRADESH")
+                if selected_state == "UP"
+                else (selected_state,)
+            )
+            base_for_options = base_for_options.filter(Survey.state.in_(state_values))
+        delay_options = sorted(
+            set(
+                d
+                for d in (
+                    s.defect_report_delay_days
+                    for s in base_for_options.all()
+                )
+                if d is not None
+            )
+        )
+    except Exception:
+        delay_options = []
+
+    # Totals come from the same week-scoped query as the table below
     summary_surveys = delayed_query.all()
 
     # ------------------------------------------------------------
@@ -466,6 +514,8 @@ def delayed_surveys():
         selected_team=selected_team,
         selected_state=selected_state,
         selected_delay=delay_filter,
+        selected_delay_custom=delay_custom,
+        delay_options=delay_options,
         bucket_available=bucket_available,
         bucket_matched=bucket_matched,
         bucket_missing=bucket_missing,

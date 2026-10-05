@@ -1415,12 +1415,12 @@ def extract_survey_form_fields_from_drive(view_url):
 def apply_survey_form_fields(survey, fields):
     """Assign extracted form fields onto a Survey object without committing."""
     manual = getattr(survey, "defect_report_match_status", None) == "manual"
-    if not manual and fields.get("start_date"):
+    if fields.get("start_date"):
         survey.extracted_survey_start_date = date.fromisoformat(
             fields["start_date"]
         )
         survey.survey_start_date_confidence = fields.get("start_confidence")
-    if not manual and fields.get("end_date"):
+    if fields.get("end_date"):
         survey.extracted_survey_end_date = date.fromisoformat(fields["end_date"])
         survey.survey_end_date_confidence = fields.get("end_confidence")
     for field in (

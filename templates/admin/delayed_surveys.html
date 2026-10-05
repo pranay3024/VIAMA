@@ -50,7 +50,16 @@
                 <option value="3" {% if selected_delay == '3' %}selected{% endif %}>&gt;= 3 days</option>
                 <option value="5" {% if selected_delay == '5' %}selected{% endif %}>&gt;= 5 days</option>
                 <option value="7" {% if selected_delay == '7' %}selected{% endif %}>&gt;= 7 days</option>
+                {% for d in delay_options %}
+                    {% if d not in [0,1,3,5,7] %}
+                        <option value="{{ d }}" {% if selected_delay == d|string %}selected{% endif %}>{{ d }} days</option>
+                    {% endif %}
+                {% endfor %}
+                <option value="custom" {% if selected_delay == 'custom' %}selected{% endif %}>Custom...</option>
             </select>
+            {% if selected_delay == 'custom' %}
+                <input type="number" name="delay_custom" min="0" value="{{ selected_delay_custom or '' }}" placeholder="exact days" style="width:80px;" onchange="this.form.submit()" onkeypress="if(event.key==='Enter'){this.form.submit();}">
+            {% endif %}
             <a href="{{ url_for('admin.delayed_surveys') }}" class="search-btn">Clear Filters</a>
         </form>
 
@@ -90,6 +99,7 @@
                 <thead>
                     <tr>
                         <th>S.No.</th>
+                        <th>UPC Code</th>
                         <th>Stretch / Cycle</th>
                         <th>Section Length (km)</th>
                         <th>Survey PDF</th>
@@ -110,6 +120,7 @@
                 {% for survey in delayed_surveys %}
                     <tr>
                         <td>{{ loop.index }}</td>
+                        <td>{{ survey.upc_code or '-' }}</td>
                         <td>{{ survey.section_no }}_Cycle{{ survey.cycle_no }}</td>
                         <td>{{ '%.2f'|format(survey.section_length) if survey.section_length else '-' }}</td>
                         <td>

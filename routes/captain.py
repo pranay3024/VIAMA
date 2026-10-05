@@ -1855,6 +1855,19 @@ def reupload_survey_pdf(survey_id):
 
         survey.pdf_reupload_requested_by = None
 
+        # Re-extract start/end dates from the new PDF
+        survey.extracted_survey_start_date = None
+        survey.extracted_survey_end_date = None
+        survey.survey_start_date_confidence = None
+        survey.survey_end_date_confidence = None
+        try:
+            survey.end_date_extract_attempts = 0
+        except Exception:
+            pass
+        survey.defect_report_match_status = None
+        survey.defect_report_sent_at = None
+        survey.defect_report_delay_days = None
+
         db.session.commit()
 
         # -----------------------------------

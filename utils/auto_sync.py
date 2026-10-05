@@ -65,7 +65,10 @@ def extract_survey_form_fields(survey, pdf_bytes=None, view_url=None):
         print(f"[DEBUG_FLOW] survey={survey.id} SKIP: no pdf bytes or view_url", flush=True)
         return False
 
-    if survey.extracted_survey_end_date and survey.extracted_survey_start_date:
+    # Allow re-extraction when explicitly requested (see force_reextract)
+    if getattr(survey, '_force_reextract', False):
+        survey._force_reextract = False
+    elif survey.extracted_survey_end_date and survey.extracted_survey_start_date:
         print(f"[DEBUG_FLOW] survey={survey.id} SKIP: both dates already stored", flush=True)
         return False
 

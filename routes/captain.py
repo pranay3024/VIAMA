@@ -1867,6 +1867,7 @@ def reupload_survey_pdf(survey_id):
         survey.defect_report_match_status = None
         survey.defect_report_sent_at = None
         survey.defect_report_delay_days = None
+        survey._force_reextract = True
 
         db.session.commit()
 

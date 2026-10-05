@@ -160,15 +160,17 @@ def manual_delayed_survey_update(survey_id):
 
     # Keep whatever is still being filtered on, otherwise saving a manual date
     # silently jumps the admin back to the current week.
-    week_param = request.args.get("week")
-    team_param = request.args.get("team")
-    state_param = request.args.get("state")
-    return redirect(url_for(
+      week_param = request.args.get("week")
+      team_param = request.args.get("team")
+      state_param = request.args.get("state")
+      delay_param = request.args.get("delay")
+      return redirect(url_for(
         "admin.delayed_surveys",
         week=week_param or None,
         team=team_param or None,
         state=state_param or None,
-    ))
+        delay=delay_param or None,
+      ))
 
 
 @admin_bp.route("/admin/delayed-surveys", methods=["GET", "POST"])
@@ -293,6 +295,7 @@ def delayed_surveys():
 
     selected_team = request.args.get("team", "").strip()
     selected_state = request.args.get("state", "").strip()
+    delay_filter = request.args.get("delay", "").strip()
     team_states = {
         "Krish": ("WEST BENGAL", "ASSAM", "BIHAR", "MEGHALAYA"),
         "Godbole": ("ODISHA",),
@@ -360,6 +363,23 @@ def delayed_surveys():
         )
         delayed_query = delayed_query.filter(Survey.state.in_(state_values))
 
+    if delay_filter:
+        try:
+            delay_val = int(delay_filter)
+            if delay_val == 0:
+                delayed_query = delayed_query.filter(
+                    Survey.defect_report_delay_days == 0
+                )
+            elif delay_val > 0:
+                delayed_query = delayed_query.filter(
+                    Survey.defect_report_delay_days >= delay_val
+                )
+            else:
+                # negative if any, treat as no filter
+                pass
+        except ValueError:
+            pass
+
     # Totals come from the same week-scoped query as the table below, so the
     # headline can never disagree with the rows it is describing.
     summary_surveys = delayed_query.all()
@@ -423,16 +443,16 @@ def delayed_surveys():
             )
         )
 
-    total_delay_days = sum(
-    survey.defect_report_delay_days or 0
-    for survey in summary_surveys
-)
+      total_delay_days = sum(
+      survey.defect_report_delay_days or 0
+      for survey in summary_surveys
+  )
 
-    # ============================================================
-    # Render page
-    # ============================================================
+      # ============================================================
+      # Render page
+      # ============================================================
 
-    return render_template(
+      return render_template(
         "admin/delayed_surveys.html",
         delayed_surveys=delayed,
         current_week_no=current_week_no,
@@ -445,11 +465,12 @@ def delayed_surveys():
         total_delay_days=total_delay_days,
         selected_team=selected_team,
         selected_state=selected_state,
+        selected_delay=delay_filter,
         bucket_available=bucket_available,
         bucket_matched=bucket_matched,
         bucket_missing=bucket_missing,
         message=message,
-    )
+      )
 
 from datetime import datetime
 

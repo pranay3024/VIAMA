@@ -42,6 +42,15 @@
                     <option value="{{ state_value }}" {% if selected_state == state_value %}selected{% endif %}>{{ state_label }}</option>
                 {% endfor %}
             </select>
+            <label for="delay-days">Working Days Delay</label>
+            <select id="delay-days" name="delay" onchange="this.form.submit()">
+                <option value="">All</option>
+                <option value="0" {% if selected_delay == '0' %}selected{% endif %}>0 days</option>
+                <option value="1" {% if selected_delay == '1' %}selected{% endif %}>&gt;= 1 day</option>
+                <option value="3" {% if selected_delay == '3' %}selected{% endif %}>&gt;= 3 days</option>
+                <option value="5" {% if selected_delay == '5' %}selected{% endif %}>&gt;= 5 days</option>
+                <option value="7" {% if selected_delay == '7' %}selected{% endif %}>&gt;= 7 days</option>
+            </select>
             <a href="{{ url_for('admin.delayed_surveys') }}" class="search-btn">Clear Filters</a>
         </form>
 

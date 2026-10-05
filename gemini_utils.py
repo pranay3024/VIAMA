@@ -1387,22 +1387,22 @@ def extract_survey_form_fields_from_drive(view_url):
         if cached is not None and _has_complete_survey_dates(cached):
             # skip cached when forcing re-extraction is handled by caller clearing cache
             pass
-        print("[GEMINI SURVEY FORM] downloading survey form from Drive", flush=True)
-        pdf_bytes = download_file_from_drive(view_url)
+    print("[GEMINI SURVEY FORM] downloading survey form from Drive", flush=True)
+    pdf_bytes = download_file_from_drive(view_url)
+    print(
+        f"[GEMINI SURVEY FORM] downloaded PDF bytes: {len(pdf_bytes)}",
+        flush=True,
+    )
+    fields = _extract_form_fields_with_images(pdf_bytes, text_dates)
+    if fields and _has_complete_survey_dates(fields):
+        _form_fields_cache[view_url] = fields
+    else:
         print(
-            f"[GEMINI SURVEY FORM] downloaded PDF bytes: {len(pdf_bytes)}",
+            "[GEMINI SURVEY FORM] incomplete result not cached; a later "
+            "attempt will re-read the PDF",
             flush=True,
         )
-        fields = _extract_form_fields_with_images(pdf_bytes, text_dates)
-        if fields and _has_complete_survey_dates(fields):
-            _form_fields_cache[view_url] = fields
-        else:
-            print(
-                "[GEMINI SURVEY FORM] incomplete result not cached; a later "
-                "attempt will re-read the PDF",
-                flush=True,
-            )
-        return fields
+    return fields
 
 
 def apply_survey_form_fields(survey, fields):
@@ -1417,14 +1417,14 @@ def apply_survey_form_fields(survey, fields):
     if fields.get("end_date"):
         survey.extracted_survey_end_date = date.fromisoformat(fields["end_date"])
         survey.survey_end_date_confidence = fields.get("end_confidence")
-    for field in (
-        "ae_ie_sc_name",
-        "piu_name",
-        "contractor_agency",
-    ):
-        value = fields.get(field)
-        if value is not None:
-            setattr(survey, f"extracted_{field}", value)
+    if fields.get("start_date"):
+        survey.extracted_survey_start_date = date.fromisoformat(
+            fields["start_date"]
+        )
+        survey.survey_start_date_confidence = fields.get("start_confidence")
+    if fields.get("end_date"):
+        survey.extracted_survey_end_date = date.fromisoformat(fields["end_date"])
+        survey.survey_end_date_confidence = fields.get("end_confidence")
 
 
 _form_fields_cache = {}

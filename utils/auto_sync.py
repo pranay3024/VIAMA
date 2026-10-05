@@ -66,7 +66,8 @@ def extract_survey_form_fields(survey, pdf_bytes=None, view_url=None):
         return False
 
     if getattr(survey, '_force_reextract', False):
-        survey._force_reextract = False
+        survey.end_date_extract_attempts = 0
+        db.session.commit()
     elif survey.extracted_survey_end_date and survey.extracted_survey_start_date:
         print(f"[DEBUG_FLOW] survey={survey.id} SKIP: both dates already stored", flush=True)
         return False
@@ -83,31 +84,22 @@ def extract_survey_form_fields(survey, pdf_bytes=None, view_url=None):
     db.session.commit()
 
     try:
-        fields = (
-            extract_survey_form_fields_from_pdf(pdf_bytes)
-            if pdf_bytes is not None
-            else extract_survey_form_fields_from_drive(view_url)
-        )
-        apply_survey_form_fields(survey, fields)
+        result = extract_survey_form_fields_from_pdf(pdf_bytes)
+        apply_survey_form_fields(survey, result)
+        db.session.commit()
+        survey._force_reextract = False
         db.session.commit()
         print(
             f"[DEBUG_FLOW] survey={survey.id} EXTRACT OK "
             f"start={survey.extracted_survey_start_date} "
-            f"end={survey.extracted_survey_end_date} "
-            f"ae={survey.extracted_ae_ie_sc_name!r} "
-            f"piu={survey.extracted_piu_name!r} "
-            f"contractor={survey.extracted_contractor_agency!r}",
+            f"end={survey.extracted_survey_end_date}",
             flush=True,
         )
         log.info(
-            "Survey %s: form fields extracted start=%s end=%s ae=%s piu=%s "
-            "contractor=%s",
+            "Survey %s: form fields extracted start=%s end=%s",
             survey.id,
             survey.extracted_survey_start_date,
             survey.extracted_survey_end_date,
-            survey.extracted_ae_ie_sc_name,
-            survey.extracted_piu_name,
-            survey.extracted_contractor_agency,
         )
         return True
     except Exception as exc:

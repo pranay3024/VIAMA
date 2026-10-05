@@ -1015,6 +1015,11 @@ def complete_survey():
                 result = extract_survey_form_fields(
                     survey, pdf_bytes=pdf_bytes
                 )
+                try:
+                    survey._force_reextract = False
+                    db.session.commit()
+                except Exception:
+                    pass
                 print(
                     f"[DEBUG_FLOW] complete_survey survey={survey.id} "
                     f"hook returned {result} "
@@ -1915,6 +1920,11 @@ def reupload_survey_pdf(survey_id):
             result = extract_survey_form_fields(
                 survey, pdf_bytes=pdf_bytes
             )
+            try:
+                survey._force_reextract = False
+                db.session.commit()
+            except Exception:
+                pass
             print(
                 f"[DEBUG_FLOW] reupload survey={survey.id} hook returned {result} "
                 f"start={survey.extracted_survey_start_date} "

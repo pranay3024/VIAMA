@@ -329,7 +329,9 @@ def find_defect_report_email(survey, email_index, gmail=None):
 						format="full",
 					)
 				)
-			except Exception:
+			except Exception as exc:
+				if _is_retryable_gmail_error(exc):
+					raise
 				continue
 			body_text = _message_text(message.get("payload", {}))
 			full_text = body_text + " " + subject

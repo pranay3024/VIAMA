@@ -181,32 +181,22 @@
         }
 
         (async function () {
-            try {
-                let data = await sweepOnce();
+            for (let attempt = 0; attempt < 6; attempt += 1) {
+                const data = await sweepOnce();
                 if (data.error) {
                     return;
                 }
-                if (data.remaining > 0) {
-                    let polls = 0;
-                    const timer = setInterval(async () => {
-                        try {
-                            data = await sweepOnce();
-                        } catch (e) {
-                            clearInterval(timer);
-                            return;
-                        }
-                        polls += 1;
-                        if (!data.remaining || data.error || polls >= 5) { // reduce max polls
-                            clearInterval(timer);
-                            window.location.reload();
-                        }
-                    }, 5000); // poll faster initially but fewer times
-                } else if (data.processed > 0) {
-                    window.location.reload();
+                if (!data.remaining) {
+                    if (data.processed > 0) {
+                        window.location.reload();
+                    }
+                    return;
                 }
-            } catch (e) {
-                // ignore
+                if (attempt < 5) {
+                    await new Promise(resolve => setTimeout(resolve, 5000));
+                }
             }
+            window.location.reload();
         })();
     </script>
 </body>

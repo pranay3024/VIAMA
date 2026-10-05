@@ -19,9 +19,9 @@
     </div>
 
     <div class="dashboard-content">
-        <form method="get" style="display:flex;align-items:center;gap:10px;margin-bottom:15px;flex-wrap:wrap;">
+        <form method="get" style="display:flex;align-items:center;gap:10px;margin-bottom:15px;flex-wrap:wrap;" id="filter-form">
             <label for="delay-week">Week</label>
-            <select id="delay-week" name="week">
+            <select id="delay-week" name="week" onchange="this.form.submit()">
                 {% for week in week_options %}
                     <option value="{{ week }}" {% if selected_week == week %}selected{% endif %}>
                         Week {{ week }}{% if week == current_week_no %} (current){% endif %}
@@ -29,20 +29,19 @@
                 {% endfor %}
             </select>
             <label for="delay-team">Team</label>
-            <select id="delay-team" name="team">
+            <select id="delay-team" name="team" onchange="this.form.submit()">
                 <option value="">All Teams</option>
                 <option value="Krish" {% if selected_team == 'Krish' %}selected{% endif %}>Krish (North-East)</option>
                 <option value="Godbole" {% if selected_team == 'Godbole' %}selected{% endif %}>Godbole (Odisha)</option>
                 <option value="Aspizo" {% if selected_team == 'Aspizo' %}selected{% endif %}>Aspizo (UP-Jharkhand)</option>
             </select>
             <label for="delay-state">State</label>
-            <select id="delay-state" name="state">
+            <select id="delay-state" name="state" onchange="this.form.submit()">
                 <option value="">All States</option>
                 {% for state_value, state_label in [('WEST BENGAL', 'West Bengal'), ('ODISHA', 'Odisha'), ('UP', 'UP'), ('JHARKHAND', 'Jharkhand'), ('BIHAR', 'Bihar'), ('ASSAM', 'Assam'), ('MEGHALAYA', 'Meghalaya')] %}
                     <option value="{{ state_value }}" {% if selected_state == state_value %}selected{% endif %}>{{ state_label }}</option>
                 {% endfor %}
             </select>
-            <button type="submit" class="search-btn">Filter</button>
             <a href="{{ url_for('admin.delayed_surveys') }}" class="search-btn">Clear Filters</a>
         </form>
 
@@ -83,6 +82,7 @@
                     <tr>
                         <th>S.No.</th>
                         <th>Stretch / Cycle</th>
+                        <th>Section Length (km)</th>
                         <th>Survey PDF</th>
                         <th>PDF Upload Time</th>
                         <th>End Time</th>
@@ -90,9 +90,6 @@
                         <th>Survey Start Date</th>
                         <th>Survey End Date</th>
                         <th>End Date Confidence</th>
-                        <th>AE/IE/SC Name</th>
-                        <th>PIU Name</th>
-                        <th>Contractor / O&amp;M Agency</th>
                         <th>Defect Report Sent</th>
                         <th>Gmail Sent Confidence</th>
                         <th>Working Days Delay</th>
@@ -105,6 +102,7 @@
                     <tr>
                         <td>{{ loop.index }}</td>
                         <td>{{ survey.section_no }}_Cycle{{ survey.cycle_no }}</td>
+                        <td>{{ '%.2f'|format(survey.section_length) if survey.section_length else '-' }}</td>
                         <td>
                             {% if survey.end_survey_pdf %}
                                 <a href="{{ survey.end_survey_pdf }}" class="view-btn" target="_blank" rel="noopener">View</a>
@@ -126,9 +124,6 @@
                         <td>{{ survey.extracted_survey_start_date.strftime('%d/%m/%Y') if survey.extracted_survey_start_date else '-' }}</td>
                         <td>{{ survey.extracted_survey_end_date.strftime('%d/%m/%Y') if survey.extracted_survey_end_date else '-' }}</td>
                         <td>{{ '%.0f%%'|format((survey.survey_end_date_confidence or 0) * 100) }}</td>
-                        <td>{{ survey.extracted_ae_ie_sc_name if survey.extracted_ae_ie_sc_name else '-' }}</td>
-                        <td>{{ survey.extracted_piu_name if survey.extracted_piu_name else '-' }}</td>
-                        <td>{{ survey.extracted_contractor_agency if survey.extracted_contractor_agency else '-' }}</td>
                         <td>{{ survey.defect_report_sent_at.strftime('%d/%m/%Y') if survey.defect_report_sent_at else '-' }}</td>
                         <td>{{ '%.0f%%'|format((survey.defect_report_sent_confidence or 0) * 100) }}</td>
                         <td style="color:red;font-weight:bold;">{{ survey.defect_report_delay_days if survey.defect_report_delay_days is not none else '-' }}</td>

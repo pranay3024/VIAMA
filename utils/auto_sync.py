@@ -66,6 +66,7 @@ def extract_survey_form_fields(survey, pdf_bytes=None, view_url=None):
         return False
 
     if getattr(survey, '_force_reextract', False):
+        attempts = 0
         survey.end_date_extract_attempts = 0
         db.session.commit()
     elif survey.extracted_survey_end_date and survey.extracted_survey_start_date:

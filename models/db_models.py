@@ -135,6 +135,8 @@ class Survey(db.Model):
     default=False,
     nullable=False
 )
+
+    survey_form_approved_at = db.Column(db.DateTime)
     
     show_on_dashboard = db.Column(
     db.Boolean,

@@ -21,6 +21,7 @@ from flask import session
 from flask import url_for
 
 from sqlalchemy import and_, case, or_
+import pytz
 
 from werkzeug.security import check_password_hash, generate_password_hash
 
@@ -434,6 +435,10 @@ def survey_form_approval(survey_id):
         )
 
     survey.survey_form_approved = (action == "approve")
+    if survey.survey_form_approved:
+        survey.survey_form_approved_at = datetime.now(
+            pytz.timezone("Asia/Kolkata")
+        )
     db.session.commit()
 
     log.info(

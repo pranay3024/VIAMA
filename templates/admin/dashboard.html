@@ -1511,6 +1511,12 @@ View
 {% if survey.survey_form_approved %}
 
 <span style="color:green;font-weight:bold;">YES</span>
+{% if survey.survey_form_approved_at %}
+<br><span style="font-size:12px;">
+    {{ survey.survey_form_approved_at.strftime('%A, %d %b %Y') }}<br>
+    {{ survey.survey_form_approved_at.strftime('%I:%M %p') }} IST
+</span>
+{% endif %}
 
 {% else %}
 

@@ -200,9 +200,8 @@ touches nothing, including the dashboard trigger. Set it back to `1` to resume.
 > dating back to the week of 2026-07-05 were still sitting in `rescheduled`
 > forever. They were cancelled on that first run, which is the intended
 > behaviour, but it is why the admin dashboard's Rescheduled count dropped
-> sharply. No rows were deleted — they remain visible under Cancelled, and the
-> captain's original reason is kept after
-> `Auto-cancelled: not started before Sunday 23:30 IST. Original reason: …`.
+> sharply. No rows were deleted — they remain visible under Cancelled. Automatic
+> cancellation does not populate a reason.
 
 ---
 

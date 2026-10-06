@@ -117,14 +117,6 @@ ALLOWED_STATUS_TRANSITIONS = {
 RESCHEDULED_EXPIRY_HOUR = 23
 RESCHEDULED_EXPIRY_MINUTE = 30
 
-#: Prefix put in front of the captain's own reason when the sweep cancels a
-#: survey, so the dashboards' "View Reason" button explains the status change
-#: instead of silently showing text about a reschedule that no longer applies.
-RESCHEDULED_EXPIRED_NOTE = (
-    "Auto-cancelled: not started before Sunday "
-    f"{RESCHEDULED_EXPIRY_HOUR:02d}:{RESCHEDULED_EXPIRY_MINUTE:02d} IST."
-)
-
 # ---------------------------------------------------------------------------
 # Automatic reschedule of unstarted surveys
 # ---------------------------------------------------------------------------
@@ -142,17 +134,6 @@ RESCHEDULED_EXPIRED_NOTE = (
 #: expired.  See :func:`auto_reschedule_deadline`.
 AUTO_RESCHEDULE_HOUR = 15
 AUTO_RESCHEDULE_MINUTE = 0
-
-#: Why a survey appeared in the table that the captain never asked for.  Shown
-#: by the dashboards' "View Reason" button, so it has to stand on its own -
-#: a captain who did not press anything needs to be told a machine did.  Prefixed
-#: in front of whatever was already there for the same reason as
-#: ``RESCHEDULED_EXPIRED_NOTE``: nobody's own words are thrown away.
-AUTO_RESCHEDULED_NOTE = (
-    "Auto-rescheduled: not started by "
-    f"{AUTO_RESCHEDULE_HOUR:02d}:{AUTO_RESCHEDULE_MINUTE:02d} IST "
-    "the day after its scheduled day."
-)
 
 # ---------------------------------------------------------------------------
 # Assignment status

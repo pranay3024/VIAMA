@@ -3253,9 +3253,7 @@ def expire_rescheduled_surveys(now=None, dry_run=False):
             survey.status = SURVEY_CANCELLED
             survey.captain_status = SURVEY_CANCELLED
             survey.captain_status_updated_at = stamp
-            survey.captain_status_reason = _with_expiry_note(
-                survey.captain_status_reason
-            )
+            survey.captain_status_reason = None
             # Left as they are on purpose - the portal's cancel keeps the row
             # visible (routes/captain.py:2099-2105).
             _sync_assignment_to_cancelled(survey, stamp)
@@ -3314,29 +3312,9 @@ def _sync_assignment_to_cancelled(survey, stamp):
         assignment.missed_reason = None
 
     assignment.captain_status = "cancelled"
-    assignment.captain_status_reason = _with_expiry_note(
-        assignment.captain_status_reason
-    )
+    assignment.captain_status_reason = None
     assignment.captain_status_updated_at = stamp
     return assignment
-
-
-def _with_expiry_note(existing):
-    """
-    ``existing`` with the auto-cancel note in front, keeping the captain's text.
-
-    Prefixed rather than replaced so nothing the captain typed is lost - the
-    dashboards' "View Reason" button reads this field verbatim.  The assignment
-    copy needs it too, because routes/regional.py:275 renders the *assignment's*
-    reason over the survey's, so leaving that one stale would show a
-    "why I rescheduled" explanation for a survey that is now cancelled.
-    """
-    from core.config import RESCHEDULED_EXPIRED_NOTE
-
-    original = (existing or "").strip()
-    if not original:
-        return RESCHEDULED_EXPIRED_NOTE
-    return f"{RESCHEDULED_EXPIRED_NOTE} Original reason: {original}"
 
 
 # ==========================================================================
@@ -3477,13 +3455,9 @@ def _auto_reschedule_assignment(assignment, stamp):
     otherwise the alert re-raises on the next dashboard load for a survey that is
     now officially back on.
 
-    ``reason`` is prefixed, not overwritten, because the field survives the Monday
-    reset (core/engine.py:run_weekly_reset only touches status and
-    ``last_week_reset``) and a leftover reason from last week would otherwise be
-    presented as the reason for this week's automatic reschedule.
+    The reason is cleared because this transition is automatic, not a captain
+    decision that needs an explanation.
     """
-    from core.config import AUTO_RESCHEDULED_NOTE
-
     if assignment.status == "missed":
         assignment.status = "pending"
         assignment.alert_acknowledged = False
@@ -3491,29 +3465,9 @@ def _auto_reschedule_assignment(assignment, stamp):
         assignment.missed_reason = None
 
     assignment.captain_status = "rescheduled"
-    assignment.captain_status_reason = _with_auto_reschedule_note(
-        assignment.captain_status_reason
-    )
+    assignment.captain_status_reason = None
     assignment.captain_status_updated_at = stamp
     return assignment
-
-
-def _with_auto_reschedule_note(existing):
-    """
-    ``existing`` with the auto-reschedule note in front, keeping the captain's text.
-
-    The same prefix-don't-replace decision as :func:`_with_expiry_note`, and for
-    the same reason - the dashboards' "View Reason" button reads this field
-    verbatim, so overwriting it would silently discard something a human typed.
-    Kept as a second function rather than a shared helper because the two notes
-    say different things and only one of them is ever in front.
-    """
-    from core.config import AUTO_RESCHEDULED_NOTE
-
-    original = (existing or "").strip()
-    if not original:
-        return AUTO_RESCHEDULED_NOTE
-    return f"{AUTO_RESCHEDULED_NOTE} Original reason: {original}"
 
 
 def auto_reschedule_unstarted_surveys(now=None, dry_run=False):
@@ -3569,7 +3523,6 @@ def auto_reschedule_unstarted_surveys(now=None, dry_run=False):
     from datetime import timedelta
 
     from core.config import (
-        AUTO_RESCHEDULED_NOTE,
         SCHEDULE_DAYS,
         SURVEY_RESCHEDULED,
         auto_reschedule_deadline,
@@ -3718,7 +3671,7 @@ def auto_reschedule_unstarted_surveys(now=None, dry_run=False):
                 section_length=assignment.section_length,
                 status=SURVEY_RESCHEDULED,
                 captain_status=SURVEY_RESCHEDULED,
-                captain_status_reason=AUTO_RESCHEDULED_NOTE,
+                captain_status_reason=None,
                 captain_status_updated_at=stamp,
                 start_time=start_time_ist,
                 end_time=None,

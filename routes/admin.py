@@ -1018,9 +1018,6 @@ def admin_dashboard():
     end_dt = safe_date(end_date)
     video_upload_dt = safe_date(video_upload_date)
 
-    # Date inputs represent the displayed IST calendar date, while timestamps
-    # are stored as UTC-naive values in the database.
-    start_dt_utc = start_dt - ist_offset if start_dt else None
     end_dt_utc = end_dt - ist_offset if end_dt else None
     video_upload_dt_utc = (
         video_upload_dt - ist_offset
@@ -1028,10 +1025,10 @@ def admin_dashboard():
     )
 
 # Start Date → survey STARTED on this date
-    if start_dt_utc:
+    if start_dt:
      query = query.filter(
-        Survey.start_time >= start_dt_utc,
-        Survey.start_time < start_dt_utc + timedelta(days=1)
+        Survey.start_time >= start_dt,
+        Survey.start_time < start_dt + timedelta(days=1)
     )
 
 # End Date → survey ENDED on this date
@@ -1120,10 +1117,10 @@ def admin_dashboard():
         )
 
 # DATE RANGE
-    if start_dt_utc:
+        if start_dt:
          query = query.filter(
-            Survey.start_time >= start_dt_utc,
-            Survey.start_time < start_dt_utc + timedelta(days=1)
+            Survey.start_time >= start_dt,
+            Survey.start_time < start_dt + timedelta(days=1)
         )
 
     if end_dt_utc:

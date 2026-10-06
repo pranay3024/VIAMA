@@ -93,6 +93,11 @@
         {% if message %}
         <div class="alert-popup">{{ message }}</div>
         {% endif %}
+        {% with notices = get_flashed_messages(with_categories=true) %}
+            {% for category, notice in notices %}
+                <div class="alert-popup">{{ notice }}</div>
+            {% endfor %}
+        {% endwith %}
 
         <div class="table-wrapper">
             <table class="survey-table">
@@ -108,6 +113,8 @@
                         <th title="Last video upload time recorded in the RoadVision GCS bucket. Falls back to the captain-reported time for stretches the bucket has never seen.">Bucket Video Upload Time</th>
                         <th>Survey Start Date</th>
                         <th>Survey End Date</th>
+                        <th>Dates Approval</th>
+                        <th>Survey Form Email</th>
                         <th>End Date Confidence</th>
                         <th>Defect Report Sent</th>
                         <th>Gmail Sent Confidence</th>
@@ -143,6 +150,46 @@
                         </td>
                         <td>{{ survey.extracted_survey_start_date.strftime('%d/%m/%Y') if survey.extracted_survey_start_date else '-' }}</td>
                         <td>{{ survey.extracted_survey_end_date.strftime('%d/%m/%Y') if survey.extracted_survey_end_date else '-' }}</td>
+                        <td>
+                            {% if survey.survey_dates_approved %}
+                                <strong style="color:green;">YES</strong>
+                                {% if survey.survey_dates_approved_at %}
+                                    <br>{{ survey.display_survey_dates_approved_at.strftime('%d/%m/%Y %I:%M %p') }} IST
+                                {% endif %}
+                                {% if survey.survey_form_approved and not survey.raw_video_email_sent_at %}
+                                    <form method="post" action="{{ url_for('admin.approve_survey_dates', survey_id=survey.id) }}">
+                                        <input type="hidden" name="week" value="{{ selected_week }}">
+                                        <input type="hidden" name="team" value="{{ selected_team }}">
+                                        <input type="hidden" name="state" value="{{ selected_state }}">
+                                        <input type="hidden" name="delay" value="{{ selected_delay }}">
+                                        <button type="submit" class="search-btn">Retry Email</button>
+                                    </form>
+                                {% endif %}
+                            {% elif survey.extracted_survey_start_date and survey.extracted_survey_end_date %}
+                                <form method="post" action="{{ url_for('admin.approve_survey_dates', survey_id=survey.id) }}">
+                                    <input type="hidden" name="week" value="{{ selected_week }}">
+                                    <input type="hidden" name="team" value="{{ selected_team }}">
+                                    <input type="hidden" name="state" value="{{ selected_state }}">
+                                    <input type="hidden" name="delay" value="{{ selected_delay }}">
+                                    <button type="submit" class="search-btn">Approve Dates</button>
+                                </form>
+                            {% else %}
+                                Pending dates
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if survey.raw_video_email_sent_at %}
+                                Sent<br>{{ survey.display_raw_video_email_sent_at.strftime('%d/%m/%Y %I:%M %p') }} IST
+                            {% elif survey.survey_dates_approved and survey.survey_form_approved %}
+                                Ready to retry
+                            {% elif survey.survey_dates_approved %}
+                                Waiting for form approval
+                            {% elif survey.survey_form_approved %}
+                                Waiting for dates approval
+                            {% else %}
+                                Waiting for approvals
+                            {% endif %}
+                        </td>
                         <td>{{ '%.0f%%'|format((survey.survey_end_date_confidence or 0) * 100) }}</td>
                         <td>{{ survey.defect_report_sent_at.strftime('%d/%m/%Y') if survey.defect_report_sent_at else '-' }}</td>
                         <td>{{ '%.0f%%'|format((survey.defect_report_sent_confidence or 0) * 100) }}</td>
@@ -158,7 +205,7 @@
                         </td>
                     </tr>
                 {% else %}
-                    <tr><td colspan="17">No surveys with a survey form in Week {{ selected_week }}.</td></tr>
+                    <tr><td colspan="18">No surveys with a survey form in Week {{ selected_week }}.</td></tr>
                 {% endfor %}
                 </tbody>
             </table>

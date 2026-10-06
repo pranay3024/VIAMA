@@ -11,7 +11,7 @@ same filter language, same table columns minus the admin-only ones).
 
 import logging
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from flask import Blueprint
 from flask import redirect
@@ -21,7 +21,6 @@ from flask import session
 from flask import url_for
 
 from sqlalchemy import and_, case, or_
-import pytz
 
 from werkzeug.security import check_password_hash, generate_password_hash
 
@@ -437,9 +436,18 @@ def survey_form_approval(survey_id):
     survey.survey_form_approved = (action == "approve")
     if survey.survey_form_approved:
         survey.survey_form_approved_at = datetime.now(
-            pytz.timezone("Asia/Kolkata")
-        )
+            timezone.utc
+        ).replace(tzinfo=None)
     db.session.commit()
+
+    if action == "approve":
+        try:
+            from utils.approved_survey_email import send_approved_survey_email
+
+            send_approved_survey_email(survey.id)
+        except Exception:
+            db.session.rollback()
+            log.exception("Approved survey email failed for survey %s", survey.id)
 
     log.info(
         "Survey form %s for survey %s by user %s",

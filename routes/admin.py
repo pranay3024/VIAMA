@@ -12,7 +12,7 @@ from sqlalchemy.orm import defer
 from models.db_models import Survey
 from models.db_models import User
 from flask import redirect
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from google_drive import download_file_from_drive
 from gemini_utils import extract_survey_dates_from_pdf, extract_survey_dates_from_drive
 from utils.auto_sync import (
@@ -129,6 +129,10 @@ def manual_delayed_survey_update(survey_id):
             ).date()
             survey.survey_end_date_confidence = 1.0
 
+        if start_date_value or end_date_value:
+            survey.survey_dates_approved = False
+            survey.survey_dates_approved_at = None
+
         if sent_at_value:
             survey.defect_report_sent_at = datetime.fromisoformat(
                 sent_at_value
@@ -170,6 +174,51 @@ def manual_delayed_survey_update(survey_id):
         team=team_param or None,
         state=state_param or None,
         delay=delay_param or None,
+    ))
+
+
+@admin_bp.route(
+    "/admin/delayed-surveys/<int:survey_id>/approve-dates",
+    methods=["POST"],
+)
+def approve_survey_dates(survey_id):
+    if session.get("role") != "admin":
+        return redirect("/")
+
+    survey = Survey.query.get_or_404(survey_id)
+    if not survey.extracted_survey_start_date or not survey.extracted_survey_end_date:
+        flash("Both survey dates are required before approval.", "warning")
+    else:
+        if not survey.survey_dates_approved:
+            survey.survey_dates_approved = True
+            survey.survey_dates_approved_at = datetime.now(
+                timezone.utc
+            ).replace(tzinfo=None)
+            db.session.commit()
+
+        try:
+            from utils.approved_survey_email import send_approved_survey_email
+
+            result = send_approved_survey_email(survey.id)
+            if result == "sent":
+                flash("Dates approved and survey-form email sent.", "success")
+            elif result == "already_sent":
+                flash("Dates approved. The survey-form email was already sent.", "info")
+            elif result == "waiting_for_approval":
+                flash("Dates approved. Waiting for survey form approval.", "success")
+            elif result == "missing_survey_data":
+                flash("Dates approved, but the survey PDF is not available.", "warning")
+        except Exception:
+            db.session.rollback()
+            log.exception("Approved survey email failed for survey %s", survey.id)
+            flash("Dates are approved, but email sending failed. Retry from this row.", "error")
+
+    return redirect(url_for(
+        "admin.delayed_surveys",
+        week=request.form.get("week") or None,
+        team=request.form.get("team") or None,
+        state=request.form.get("state") or None,
+        delay=request.form.get("delay") or None,
     ))
 
 
@@ -470,6 +519,14 @@ def delayed_surveys():
         bucket_matched, bucket_missing, bucket_available = 0, len(delayed), False
 
     for survey in delayed:
+        survey.display_survey_dates_approved_at = (
+            survey.survey_dates_approved_at + ist_offset
+            if survey.survey_dates_approved_at else None
+        )
+        survey.display_raw_video_email_sent_at = (
+            survey.raw_video_email_sent_at + ist_offset
+            if survey.raw_video_email_sent_at else None
+        )
         survey.display_start_time = (
             survey.start_time + ist_offset if survey.start_time else None
         )
@@ -1345,6 +1402,10 @@ def admin_dashboard():
     current_state_km = {}
 
     for survey in all_surveys:
+        survey.display_survey_form_approved_at = (
+            survey.survey_form_approved_at + ist_offset
+            if survey.survey_form_approved_at else None
+        )
         extract_key = f"{survey.upc_code}_Cycle{survey.cycle_no}"
         if survey.pdf_reupload_required:
             extract_groups["PDF Re-upload Required"].append(extract_key)

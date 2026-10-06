@@ -14,15 +14,19 @@ Now the two credentials are independent: Drive uploads keep working when the
 Gmail token expires, and vice versa. `core/engine.py` already turns a failure
 here into a 503 rather than a 500.
 
-Credential sources, in order:
+Drive credential sources, in order:
 
-1. ``GOOGLE_SA_JSON`` - a service-account JSON document, used for Drive. No
-   refresh token on disk, nothing to expire, and the Drive pickle stops having to
-   ship in the deployment bundle (see .vercelignore).
-2. ``token_drive.pickle`` / ``token_gmail.pickle`` - the OAuth refresh tokens,
-   resolved relative to this file so the working directory does not matter.
-   ``pickle.load`` executes arbitrary code from those files: treat write access
-   to them as equivalent to code execution.
+1. ``DRIVE_TOKEN_JSON`` - an OAuth user token supplied as JSON.
+2. ``token_drive.pickle`` - an OAuth user token resolved relative to this file.
+    Local uploads should use an account with access to the destination folder,
+    because service accounts do not have personal Drive storage quota.
+3. ``GOOGLE_SA_JSON`` / ``GOOGLE_SA_JSON_FILE`` - a service account, suitable
+    when the destination is a Shared Drive or otherwise supports service-account
+    storage.
+
+Gmail uses ``GMAIL_TOKEN_JSON`` or ``token_gmail.pickle``. ``pickle.load``
+executes arbitrary code from token files: treat write access to them as
+equivalent to code execution.
 """
 
 import io
@@ -152,6 +156,15 @@ def _client(name):
                 )
 
                 source = "DRIVE_TOKEN_JSON"
+
+            elif os.path.isfile(DRIVE_TOKEN_PATH):
+
+                creds = _creds_from_pickle(
+                    DRIVE_TOKEN_PATH,
+                    "Drive",
+                )
+
+                source = "token_drive.pickle"
 
             else:
 
@@ -633,3 +646,67 @@ def create_gmail_draft(
     log.info("gmail draft created: %s", draft.get("id"))
 
     return draft["id"]
+
+
+def send_gmail_email(
+    to_email,
+    from_email,
+    subject,
+    html_body,
+    attachment_bytes,
+    attachment_filename,
+    message_id=None,
+):
+    """Send one HTML email with one attachment and no CC or BCC."""
+    gmail = get_gmail()
+    message = MIMEMultipart()
+    message["From"] = from_email
+    message["To"] = to_email
+    message["Subject"] = subject
+    if message_id:
+        message["Message-ID"] = message_id
+    message.attach(MIMEText(html_body, "html"))
+
+    attachment = MIMEApplication(attachment_bytes, _subtype="pdf")
+    attachment.add_header(
+        "Content-Disposition",
+        "attachment",
+        filename=attachment_filename,
+    )
+    message.attach(attachment)
+
+    raw = base64.urlsafe_b64encode(message.as_bytes()).decode()
+    send_request = gmail.users().messages().send(
+        userId="me",
+        body={"raw": raw},
+    )
+    from utils.defect_report_delay import _gmail_call
+
+    if message_id:
+        search_request = gmail.users().messages().list(
+            userId="me",
+            q=f"rfc822msgid:{message_id.strip('<>')}",
+            maxResults=1,
+        )
+        existing = _gmail_call(search_request, attempts=2, quota_max_wait=5)
+        if existing.get("messages"):
+            return existing["messages"][0]["id"]
+
+    try:
+        sent = _gmail_call(send_request, attempts=1, quota_max_wait=5)
+        return sent["id"]
+    except Exception:
+        if not message_id:
+            raise
+        existing = _gmail_call(
+            gmail.users().messages().list(
+                userId="me",
+                q=f"rfc822msgid:{message_id.strip('<>')}",
+                maxResults=1,
+            ),
+            attempts=2,
+            quota_max_wait=5,
+        )
+        if existing.get("messages"):
+            return existing["messages"][0]["id"]
+        raise

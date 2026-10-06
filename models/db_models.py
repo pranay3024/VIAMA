@@ -266,6 +266,14 @@ class Survey(db.Model):
 
     # Fields extracted from the uploaded survey form by a SINGLE Gemini call.
     extracted_survey_start_date = db.Column(db.Date, nullable=True)
+    survey_dates_approved = db.Column(
+        db.Boolean,
+        nullable=False,
+        default=False,
+    )
+    survey_dates_approved_at = db.Column(db.DateTime, nullable=True)
+    raw_video_email_sent_at = db.Column(db.DateTime, nullable=True)
+    raw_video_email_message_id = db.Column(db.String(255), nullable=True)
     survey_start_date_confidence = db.Column(db.Float, nullable=True)
     extracted_ae_ie_sc_name = db.Column(db.String(255), nullable=True)
     extracted_piu_name = db.Column(db.String(255), nullable=True)

@@ -9,18 +9,35 @@ appeared to succeed while the app carried on using the old one.
 Gmail has its own generator: ``python generate_gmail_token.py``.
 """
 
-from google_auth_oauthlib.flow import InstalledAppFlow
+import json
+import os
 import pickle
 
-# Both scopes are requested so this token also works if you ever want to collapse
-# Drive and Gmail back into one credential. Only the Drive scope is required.
-SCOPES = [
-    "https://www.googleapis.com/auth/drive",
-    "https://www.googleapis.com/auth/gmail.compose"
-]
+from google_auth_oauthlib.flow import InstalledAppFlow
+
+SCOPES = ["https://www.googleapis.com/auth/drive"]
+
+client_secret_file = os.getenv(
+    "DRIVE_CLIENT_SECRET_FILE",
+    "gmail_client_secret.json",
+)
+if not os.path.exists(client_secret_file):
+    raise SystemExit(
+        f"Missing {client_secret_file}. Download an OAuth Desktop client "
+        "JSON from Google Cloud Console."
+    )
+
+with open(client_secret_file, encoding="utf-8") as secret_file:
+    client_config = json.load(secret_file)
+
+if "installed" not in client_config and "web" not in client_config:
+    raise SystemExit(
+        f"{client_secret_file} is not an OAuth Desktop/Web client file. "
+        "Use a Google OAuth client JSON, not a service-account key."
+    )
 
 flow = InstalledAppFlow.from_client_secrets_file(
-    "client_secret.json",
+    client_secret_file,
     SCOPES
 )
 

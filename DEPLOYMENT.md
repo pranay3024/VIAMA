@@ -214,6 +214,8 @@ touches nothing, including the dashboard trigger. Set it back to `1` to resume.
 | Summary shows `considered: 0` | No surveys completed in the last 10 days | Widen with `?days=30` to confirm the query works |
 | All rows `no_bucket_data` | Section numbering drift between the two systems | See "Known data issues" below |
 | `500` referencing `video_count_matched` | Migration didn't run on this database | `python migrate_video_count_check.py` |
+| `500` referencing survey date-approval or raw-email fields | Approval/email migration didn't run on this database | `python migrate_survey_date_approval_email.py` |
+| Approved-survey email fails to send | Gmail OAuth identity is not `adordashcam@gmail.com` or a verified Send mail as alias | Reauthorize the Gmail token for that sender with `gmail.compose` scope, then redeploy |
 | Cron never fires | Env vars added but not redeployed, or Hobby daily cap already used | Redeploy; check Settings → Cron Jobs → last run |
 | Rescheduled survey never auto-cancelled | `RESCHEDULED_EXPIRY=0` is set, or it is already Sunday 23:30 IST and the sweep has not run | Check the tick's `rescheduled_expiry` result; `would_cancel: 0` with `candidates > 0` means the rows are still in date |
 

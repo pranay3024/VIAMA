@@ -239,7 +239,7 @@ Please find attached herewith cancelled Survey Form for the subject project.
 
 <p style="margin:0 0 12px 0;">
 
-Please find attached herewith raw data for the subject project,
+Please find attached herewith the signed survey form for the subject project,
 survey completed on
 {end}.
 The survey details are as under:
@@ -255,20 +255,9 @@ The survey details are as under:
 
 <p>
 
-The raw data for the surveyed stretch including link for the
-dashcam survey raw video and signed survey form are provided below
-for your kind reference and download.
-
-</p>
-
-<p>
-
-<b>Raw Video Download Links:</b>
-
-</p>
-
-<p>
-Excel file attached herewith for your reference. Stretch No. {survey.section_no}_Cycle{survey.cycle_no} (Week {selected_week})
+The signed survey form is attached herewith for your reference. The raw
+video download link will be provided separately. Stretch No.
+{survey.section_no}_Cycle{survey.cycle_no} (Week {selected_week})
 </p>
 
 </div>

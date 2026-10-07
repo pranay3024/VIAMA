@@ -1528,8 +1528,9 @@ View
 
 <span style="color:green;font-weight:bold;">YES</span>
 {% if survey.survey_form_approved_at %}
-<br><span style="font-size:12px;">
-    {{ survey.display_survey_form_approved_at.strftime('%A, %d %b %Y') }}<br>
+<br><span style="font-size:11px;line-height:1.15;">
+    {{ survey.display_survey_form_approved_at.strftime('%d %b %Y') }}<br>
+    {{ survey.display_survey_form_approved_at.strftime('%A') }}<br>
     {{ survey.display_survey_form_approved_at.strftime('%I:%M %p') }} IST
 </span>
 {% endif %}

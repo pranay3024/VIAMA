@@ -74,8 +74,9 @@
             </p>
             {% if not bucket_available %}
                 <p style="margin:6px 0 0 0;color:#a33;">
-                    Bucket video upload times unavailable (RV_GIS_TOKEN unset or the GIS API
-                    did not respond). Times shown are captain-reported only.
+                    RoadVision bucket upload times are temporarily unavailable. Times shown
+                    are captain-reported only. The GIS snapshot may still be building; refresh
+                    this report shortly to try again.
                 </p>
             {% elif bucket_missing %}
                 <p style="margin:6px 0 0 0;color:#555;">

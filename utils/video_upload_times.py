@@ -46,6 +46,7 @@ API_URL = os.getenv(
 # Upstream keeps its own snapshot for 900s and rebuilding costs ~35s, so polling
 # faster than this just burns a request to be told the same thing.
 CACHE_TTL_SECONDS = 900
+FAILURE_RETRY_SECONDS = 35
 
 # A cold fetch rebuilds the upstream snapshot and takes ~35s, so this must clear
 # that comfortably or every cache expiry turns into a blank column. The wait is
@@ -126,9 +127,13 @@ def fetch_index(force=False, timeout=None):
         return None
 
     now = time.time()
-    # If we recently failed, don't retry immediately to avoid slowing page loads
+    # Let the upstream cold snapshot finish, then retry instead of hiding it
+    # behind a long cooldown.
     if _cache["index"] is None and not force:
-        if _cache["failed_at"] and (now - _cache["failed_at"]) < 60:  # don't retry for 1 min
+        if (
+            _cache["failed_at"]
+            and (now - _cache["failed_at"]) < FAILURE_RETRY_SECONDS
+        ):
             return None
     if _cache["index"] is not None and not force:
         if (now - _cache["fetched_at"]) < CACHE_TTL_SECONDS:

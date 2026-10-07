@@ -1336,6 +1336,12 @@ def admin_dashboard():
             if deadline_passed(survey)
         ]
 
+    try:
+        survey_match_report(all_surveys, timeout=5)
+    except Exception:
+        for survey in all_surveys:
+            survey.bucket_video_upload_time = None
+
     # #region agent log
     _dbg("C", "admin.py:after_all_surveys", "main survey list loaded", {
         "all_surveys_count": len(all_surveys),

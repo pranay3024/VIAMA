@@ -833,6 +833,8 @@ onclick="clearFilters()">
 
 <th>Video<br>Upload Time</th>
 
+<th style="min-width:150px;">Bucket Video<br>Upload Time</th>
+
 <th style="min-width:160px;">Status</th>
 
 <!-- <th>Survey<br>Duration</th>
@@ -980,6 +982,20 @@ onclick="clearFilters()">
 
     -
 
+{% endif %}
+
+</td>
+
+<td>
+
+{% if survey.bucket_video_upload_time %}
+    <span title="RoadVision GCS bucket timestamp">
+        {{ survey.bucket_video_upload_time.strftime('%d/%m/%Y') }}
+        <br>
+        {{ survey.bucket_video_upload_time.strftime('%H:%M') }}
+    </span>
+{% else %}
+    -
 {% endif %}
 
 </td>
@@ -2221,10 +2237,11 @@ function exportDashboardToExcel() {
     // 5  End Time
     // 6  PDF Upload Time
     // 7  Video Upload Time
-    // 8  Status
-    // 9  Survey Form
-    // 10 Raw Video
-    // 11 Defect Report
+    // 8  Bucket Video Upload Time
+    // 9  Status
+    // 10 Survey Form
+    // 11 Raw Video
+    // 12 Defect Report
     //
     // Road Vision, RV Remark and Details
     // are intentionally NOT exported.
@@ -2239,6 +2256,7 @@ function exportDashboardToExcel() {
         "End Time",
         "PDF Upload Time",
         "Video Upload Time",
+        "Bucket Video Upload Time",
         "Status",
         "Survey Form",
         "Raw Video",
@@ -2274,13 +2292,13 @@ function exportDashboardToExcel() {
             row.querySelectorAll("td")
         );
 
-        if (cells.length < 12) {
+        if (cells.length < 13) {
             return;
         }
 
         const values = [];
 
-        for (let i = 0; i < 12; i++) {
+        for (let i = 0; i < 13; i++) {
 
             values.push(cells[i]
                 .innerText
@@ -2334,6 +2352,7 @@ function exportDashboardToExcel() {
         25,    // End Time
         22,    // PDF Upload
         22,    // Video Upload
+        24,    // Bucket Video Upload
         35,    // Status
         25,    // Survey Form
         25,    // Raw Video

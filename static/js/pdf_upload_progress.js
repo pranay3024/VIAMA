@@ -338,12 +338,14 @@
                 payload = null;
             }
 
-            // A redirect (JS off, or an unexpected error page) means the POST
-            // worked and the server is already sending the captain onward.
-            if (!payload) {
-                window.location.href = request.responseURL
-                    || form.getAttribute("action")
-                    || "/captain-home";
+            // Only the route's explicit JSON acknowledgement means the PDF
+            // was saved. HTML can be a login page or a server error response.
+            if (!payload || typeof payload !== "object"
+                || request.status < 200 || request.status >= 300) {
+                fail(payload && payload.message
+                    || "The server did not confirm the PDF upload (HTTP "
+                        + request.status
+                        + "). Check Pending Uploads before retrying.");
                 return;
             }
 

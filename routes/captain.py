@@ -932,14 +932,26 @@ def complete_survey():
                 f"_Section-{survey.section_no}.pdf"
             )
 
-            result = upload_file_to_drive(
-                file_bytes=pdf_bytes,
-                filename=pdf_filename,
-                folder_id=PDF_FOLDER_ID,
-                mime_type="application/pdf"
-            )
-
-            pdf_url = result["view_url"]
+            try:
+                result = upload_file_to_drive(
+                    file_bytes=pdf_bytes,
+                    filename=pdf_filename,
+                    folder_id=PDF_FOLDER_ID,
+                    mime_type="application/pdf"
+                )
+                pdf_url = result["view_url"]
+            except Exception as exc:
+                print(
+                    "GOOGLE DRIVE PDF UPLOAD ERROR:",
+                    type(exc).__name__,
+                    exc,
+                    flush=True,
+                )
+                return _pdf_upload_failed(
+                    "/recording",
+                    "PDF upload failed. Please try again.",
+                    category="danger",
+                )
 
             survey.end_survey_pdf = pdf_url
             survey.survey_pdf_uploaded_at = datetime.utcnow()

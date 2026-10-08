@@ -1900,9 +1900,11 @@ def reupload_survey_pdf(survey_id):
             survey.end_date_extract_attempts = 0
         except Exception:
             pass
-        survey.defect_report_match_status = None
-        survey.defect_report_sent_at = None
-        survey.defect_report_delay_days = None
+        if not survey.defect_report_sent_at:
+            survey.defect_report_match_status = None
+            survey.defect_report_sent_confidence = None
+            survey.defect_report_email_id = None
+            survey.defect_report_delay_days = None
         survey._force_reextract = True
 
         # Clear any cached form-field extraction for the old/new PDF

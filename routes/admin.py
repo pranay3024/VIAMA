@@ -283,9 +283,13 @@ def delayed_surveys():
                     )
 
                     if not match:
-                        survey.defect_report_match_status = "not_found"
-                        survey.defect_report_sent_at = None
-                        survey.defect_report_delay_days = None
+                        if survey.defect_report_sent_at:
+                            survey.defect_report_match_status = "matched"
+                        else:
+                            survey.defect_report_match_status = "not_found"
+                            survey.defect_report_sent_confidence = None
+                            survey.defect_report_email_id = None
+                            survey.defect_report_delay_days = None
                         continue
 
                     # ------------------------------------------------

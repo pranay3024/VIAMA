@@ -179,11 +179,16 @@ def sync_batch(args):
 
                 match = find_defect_report_email(survey, email_index, gmail)
                 if not match:
-                    survey.defect_report_sent_at = None
-                    survey.defect_report_email_id = None
-                    survey.defect_report_delay_days = None
-                    survey.defect_report_match_status = "not_found"
-                    counts["not_found"] += 1
+                    if survey.defect_report_sent_at:
+                        survey.defect_report_match_status = "matched"
+                        counts["matched"] += 1
+                    else:
+                        survey.defect_report_sent_confidence = None
+                        survey.defect_report_sent_at = None
+                        survey.defect_report_email_id = None
+                        survey.defect_report_delay_days = None
+                        survey.defect_report_match_status = "not_found"
+                        counts["not_found"] += 1
                 else:
                     survey.defect_report_sent_at = match["sent_at"]
                     survey.defect_report_sent_confidence = 1.0

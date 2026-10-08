@@ -641,7 +641,7 @@ def create_gmail_draft(
             }
         }
 
-    ).execute()
+    ).execute(num_retries=5)
 
     log.info("gmail draft created: %s", draft.get("id"))
 

@@ -819,9 +819,9 @@ onclick="clearFilters()">
 
 <th>S.No.</th>
 
-<th>UPC<br>Code</th>
+<th style="width:150px; white-space:normal;">UPC<br>Code</th>
 
-<th style="min-width:80px;">Section</th>
+<th style="width:110px; white-space:normal;">Section</th>
 
 <th style="min-width:100px;">Cycle</th>
 
@@ -882,9 +882,19 @@ onclick="clearFilters()">
 
    
 
-    <td>{{ survey.upc_code }}</td>
+    <td style="width:150px; white-space:normal;">
+        {% for code in (survey.upc_code or '').split(' & ') %}
+            {% if not loop.first %}<br>{% endif %}
+            {{ code }}{% if not loop.last %} &{% endif %}
+        {% endfor %}
+    </td>
 
-    <td>{{ survey.section_no }}</td>
+    <td style="width:110px; white-space:normal;">
+        {% for section in (survey.section_no or '').split(' & ') %}
+            {% if not loop.first %}<br>{% endif %}
+            {{ section }}{% if not loop.last %} &{% endif %}
+        {% endfor %}
+    </td>
 
     <td>
 

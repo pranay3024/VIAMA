@@ -370,7 +370,7 @@ Fetch these from `GET /meta/tasks` and `GET /meta/teams` rather than hardcoding.
 
 | Key | Display | States |
 |---|---|---|
-| `Krish` | Krish | WEST BENGAL, ASSAM, BIHAR |
+| `Krish` | Krish | WEST BENGAL, ASSAM, BIHAR, MEGHALAYA |
 | `Godbole` | **Viama** | ODISHA |
 | `Aspizo` | Aspizo | UTTAR PRADESH, JHARKHAND |
 

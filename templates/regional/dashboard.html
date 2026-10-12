@@ -115,6 +115,18 @@ filename='css/regional.css') }}">
 
 </button>
 
+{% if can_manage_upload_password %}
+
+<button
+    class="view-btn"
+    onclick="openSurveyUploadPasswordModal()">
+
+    🔑 Survey Form Password
+
+</button>
+
+{% endif %}
+
     <a
     href="/logout"
     class="logout-btn">
@@ -1433,6 +1445,179 @@ function showCaptainReason(button) {
     }
 
     alert(reason);
+}
+</script>
+
+{% if can_manage_upload_password %}
+
+<!-- SURVEY FORM UPLOAD PASSWORD (Krish team) -->
+
+<div
+id="surveyUploadPasswordModal"
+class="password-modal">
+
+<div class="password-card">
+
+<h2>Survey Form Password</h2>
+
+<p>
+Captains in Assam, West Bengal, Meghalaya and Bihar must type this password
+before their survey form PDF is uploaded. Share it only with the captains who
+should be able to upload.
+</p>
+
+<div class="upload-password-current">
+
+<span class="upload-password-current-label">
+Current password
+</span>
+
+<code>{{ survey_upload_password_value or "Not set" }}</code>
+
+</div>
+
+{% if survey_upload_password_updated_at %}
+
+<div class="upload-password-meta">
+
+Last changed
+{{ survey_upload_password_updated_at.strftime('%d %b %Y, %I:%M %p') }}
+
+{% if survey_upload_password_updated_by %}
+by {{ survey_upload_password_updated_by }}
+{% endif %}
+
+</div>
+
+{% endif %}
+
+<form
+action="/regional/survey-upload-password"
+method="POST">
+
+<label>
+New Survey Form Password
+</label>
+
+<input
+type="text"
+name="survey_upload_password"
+placeholder="Enter new survey form password"
+minlength="4"
+autocomplete="off"
+required>
+
+<div class="password-buttons">
+
+<button
+type="submit"
+class="confirm-btn">
+
+Update Survey Form Password
+
+</button>
+
+<button
+type="button"
+class="cancel-btn"
+onclick="closeSurveyUploadPasswordModal()">
+
+Cancel
+
+</button>
+
+</div>
+
+</form>
+
+</div>
+
+</div>
+
+{% endif %}
+
+<style>
+/* The regional password modal opened to a white card on a white overlay with
+a white heading. These overrides make either modal readable and give the
+survey-password card its own look. Scoped to .password-modal / .password-card,
+which only regional templates use. */
+.password-modal{
+    background:rgba(15,23,42,.55);
+    backdrop-filter:blur(2px);
+}
+.password-modal .password-card h2{
+    color:#1f2937;
+    font-size:26px;
+}
+.upload-password-current{
+    display:flex;
+    align-items:center;
+    gap:14px;
+    flex-wrap:wrap;
+    background:#f0fdf4;
+    border:1px solid #86efac;
+    border-radius:10px;
+    padding:14px 16px;
+    margin:8px 0 12px;
+}
+.upload-password-current-label{
+    font-size:12px;
+    font-weight:700;
+    text-transform:uppercase;
+    letter-spacing:.04em;
+    color:#166534;
+}
+.password-modal .upload-password-current code{
+    font-size:18px;
+    font-weight:700;
+    color:#065f46;
+    background:#dcfce7;
+    padding:6px 12px;
+    border-radius:8px;
+    word-break:break-all;
+}
+.password-modal .upload-password-meta{
+    font-size:12px;
+    color:#6b7280;
+    margin:0 0 18px;
+}
+</style>
+
+<script>
+function openPasswordModal() {
+
+    const modal = document.getElementById("passwordModal");
+
+    if (modal) {
+        modal.style.display = "flex";
+    }
+}
+
+function closePasswordModal() {
+
+    const modal = document.getElementById("passwordModal");
+
+    if (modal) {
+        modal.style.display = "none";
+    }
+}
+
+function openSurveyUploadPasswordModal() {
+
+    const modal = document.getElementById("surveyUploadPasswordModal");
+
+    if (modal) {
+        modal.style.display = "flex";
+    }
+}
+
+function closeSurveyUploadPasswordModal() {
+
+    const modal = document.getElementById("surveyUploadPasswordModal");
+
+    if (modal) {
+        modal.style.display = "none";
+    }
 }
 </script>
 

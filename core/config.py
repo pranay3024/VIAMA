@@ -190,7 +190,7 @@ ROLE_LANDING = {
 # still says "Viama".  The key is what the code joins on - only the label moved.
 
 TEAMS = {
-    "Krish": {"display": "Krish", "states": ("WEST BENGAL", "ASSAM", "BIHAR")},
+    "Krish": {"display": "Krish", "states": ("WEST BENGAL", "ASSAM", "BIHAR", "MEGHALAYA")},
     "Godbole": {"display": "Odisha", "states": ("ODISHA",)},
     "Aspizo": {"display": "Aspizo", "states": ("UTTAR PRADESH", "JHARKHAND")},
 }
@@ -201,12 +201,13 @@ STATE_TO_TEAM = {
     state: key for key, meta in TEAMS.items() for state in meta["states"]
 }
 
-#: Hardcoded in templates/admin/reports.html:171-181.  Kept for the /meta/states
+#: Hardcoded in templates/admin/reports.html:171-183.  Kept for the /meta/states
 #: fallback when the DB has no assignments yet.
 KNOWN_STATES = (
     "ASSAM",
     "BIHAR",
     "JHARKHAND",
+    "MEGHALAYA",
     "ODISHA",
     "UTTAR PRADESH",
     "WEST BENGAL",

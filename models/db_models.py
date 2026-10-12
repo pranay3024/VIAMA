@@ -482,6 +482,42 @@ class RegionalManagerState(db.Model):
 
 
 
+class SurveyUploadPassword(db.Model):
+    """Shared survey-form upload password, one row per team.
+
+    Only the Krish team's states (Assam, West Bengal, Meghalaya, Bihar) gate
+    the captain's survey-form upload behind this password. It is stored in
+    clear text on purpose: the regional manager dashboard has to display the
+    current value, which a hash could not do. ``team`` is the team key from
+    core/config.py (e.g. "krish").
+    """
+
+    __tablename__ = "survey_upload_passwords"
+
+    id = db.Column(db.Integer, primary_key=True)
+
+    team = db.Column(
+        db.String(50),
+        nullable=False,
+        unique=True
+    )
+
+    password = db.Column(
+        db.String(255),
+        nullable=False
+    )
+
+    updated_by_email = db.Column(
+        db.String(150),
+        nullable=True
+    )
+
+    updated_at = db.Column(
+        db.DateTime,
+        default=datetime.utcnow
+    )
+
+
 class MissedSurveyHistory(db.Model):
     id = db.Column(db.Integer, primary_key=True)
 

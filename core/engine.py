@@ -2269,12 +2269,12 @@ def _advisory_lock(key):
 
     from extensions import db
 
-    try:
-        db.session.execute(
-            text("SELECT pg_advisory_xact_lock(hashtext(:key))"), {"key": str(key)}
-        )
-    except Exception:
-        db.session.rollback()
+    if db.session.get_bind().dialect.name == "sqlite":
+        return
+
+    db.session.execute(
+        text("SELECT pg_advisory_xact_lock(hashtext(:key))"), {"key": str(key)}
+    )
 
 
 # ---------------------------------------------------------------------------

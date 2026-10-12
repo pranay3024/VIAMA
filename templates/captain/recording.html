@@ -12,6 +12,37 @@ content="width=device-width, initial-scale=1.0">
 href="{{ url_for('static',
 filename='css/mobile.css') }}">
 
+<style>
+.upload-password-box{
+    margin:15px 0;
+    padding:16px;
+    border:1px solid #fcd34d;
+    border-radius:12px;
+    background:#fff8e1;
+}
+.upload-password-box label{
+    display:block;
+    font-weight:700;
+    color:#92400e;
+    margin-bottom:8px;
+    font-size:15px;
+}
+.upload-password-box input{
+    width:100%;
+    padding:13px;
+    border:1px solid #ddd;
+    border-radius:8px;
+    font-size:15px;
+    box-sizing:border-box;
+}
+.upload-password-hint{
+    margin:8px 0 0;
+    font-size:12px;
+    color:#92400e;
+    line-height:1.4;
+}
+</style>
+
 </head>
 
 <body>
@@ -258,6 +289,35 @@ value="yes">
 
 <hr>
 
+{% if require_upload_password %}
+
+<!-- Krish-team gate. Only captains in Assam, West Bengal, Meghalaya and
+Bihar see this. The shared password is handed out by the regional manager
+(login id "vipin"); the server re-checks it in routes/captain.py before the
+PDF is accepted, so this field is convenience, not the control. -->
+
+<div class="upload-password-box">
+
+<label for="survey_upload_password">
+🔒 Survey Upload Password
+</label>
+
+<input
+type="password"
+id="survey_upload_password"
+name="survey_upload_password"
+placeholder="Enter the password shared by your regional manager"
+autocomplete="off"
+required>
+
+<p class="upload-password-hint">
+This state's survey form needs the password from your regional manager.
+</p>
+
+</div>
+
+{% endif %}
+
 <h3>📄 Upload Duly Signed & Stamped Survey Form (PDF)</h3>
 
 <label
@@ -339,6 +399,20 @@ document.getElementById(
 
 let photoUploaded = false;
 
+// Present only for the Krish team's states. The server validates it again;
+// this just keeps the button honest on the page.
+const uploadPasswordInput =
+document.getElementById(
+    "survey_upload_password"
+);
+
+function uploadPasswordFilled(){
+
+    return !uploadPasswordInput
+    || uploadPasswordInput.value.trim().length > 0;
+
+}
+
 function updateButton(){
 
     const allChecked =
@@ -346,13 +420,21 @@ function updateButton(){
         check => check.checked
     );
 
-    nextBtn.disabled =
-    !(allChecked && photoUploaded);
+    const passwordFilled =
+    uploadPasswordFilled();
 
-    if(allChecked && photoUploaded){
+    nextBtn.disabled =
+    !(allChecked && photoUploaded && passwordFilled);
+
+    if(allChecked && photoUploaded && passwordFilled){
 
         nextBtn.innerHTML =
         "✅ FINISH SURVEY";
+
+    }else if(uploadPasswordInput && !passwordFilled){
+
+        nextBtn.innerHTML =
+        "ENTER SURVEY UPLOAD PASSWORD";
 
     }else{
 
@@ -415,6 +497,15 @@ checks.forEach(
 
     }
 );
+
+if(uploadPasswordInput){
+
+    uploadPasswordInput.addEventListener(
+        "input",
+        updateButton
+    );
+
+}
 
 updateButton();
 

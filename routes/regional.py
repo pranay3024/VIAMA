@@ -8,6 +8,7 @@ from models.db_models import db
 
 from utils.request_params import safe_date, safe_int, safe_week
 from utils import schedules as schedule_views
+from utils import survey_upload_password
 
 from sqlalchemy import case, and_, or_
 from sqlalchemy.orm import defer
@@ -475,6 +476,47 @@ def regional_dashboard():
         .all()
     )
 
+    # -----------------------------------
+    # KRISH-TEAM SURVEY FORM PASSWORD
+    #
+    # Only the manager whose login id is "vipin" may see or change the shared
+    # password that gates survey-form uploads for Assam, West Bengal, Meghalaya
+    # and Bihar. Other regional managers get None here and the card is not
+    # rendered for them.
+    # -----------------------------------
+
+    can_manage_upload_password = (
+        survey_upload_password.is_krish_manager(user)
+    )
+
+    survey_upload_password_value = None
+    survey_upload_password_updated_at = None
+    survey_upload_password_updated_by = None
+
+    if can_manage_upload_password:
+
+        survey_upload_password_value = (
+            survey_upload_password.get_upload_password()
+        )
+
+        try:
+            from models.db_models import SurveyUploadPassword
+
+            password_row = SurveyUploadPassword.query.filter_by(
+                team=survey_upload_password.KRISH_TEAM
+            ).first()
+
+            if password_row:
+                survey_upload_password_updated_at = (
+                    password_row.updated_at
+                )
+                survey_upload_password_updated_by = (
+                    password_row.updated_by_email
+                )
+
+        except Exception:
+            pass
+
     return render_template(
 
         "regional/dashboard.html",
@@ -496,7 +538,12 @@ def regional_dashboard():
         cycles=cycles,
 
         alerts=alerts,
-        resurvey_requests=[]
+        resurvey_requests=[],
+
+        can_manage_upload_password=can_manage_upload_password,
+        survey_upload_password_value=survey_upload_password_value,
+        survey_upload_password_updated_at=survey_upload_password_updated_at,
+        survey_upload_password_updated_by=survey_upload_password_updated_by
 
     )
 
@@ -836,6 +883,57 @@ def regional_change_password():
     return """
     <script>
     alert("Password changed successfully.");
+    window.location.href="/regional";
+    </script>
+    """
+
+
+@regional_bp.route(
+    "/regional/survey-upload-password",
+    methods=["POST"]
+)
+def regional_survey_upload_password():
+    """Change the shared Krish-team survey-form upload password.
+
+    Restricted to the one manager whose login id is "vipin" - the same gate
+    that controls whether the card is shown on the dashboard. Captains in
+    Assam, West Bengal, Meghalaya and Bihar must type this value before their
+    survey-form PDF is accepted.
+    """
+
+    if session.get("role") != "regional_manager":
+        return redirect("/")
+
+    user = User.query.get(
+        session["user_id"]
+    )
+
+    if not survey_upload_password.is_krish_manager(user):
+        return "Unauthorized", 403
+
+    new_password = (
+        request.form.get("survey_upload_password", "") or ""
+    ).strip()
+
+    # Four characters is enough for a shared hand-out code; the point is that
+    # only captains who have been told it can upload, not brute-force strength.
+    if len(new_password) < 4:
+
+        return """
+        <script>
+        alert("Survey form password must be at least 4 characters.");
+        window.location.href="/regional";
+        </script>
+        """
+
+    survey_upload_password.set_upload_password(
+        new_password,
+        updated_by_email=user.email
+    )
+
+    return """
+    <script>
+    alert("Survey form password updated. Captains in Assam, West Bengal, Meghalaya and Bihar will need this new password.");
     window.location.href="/regional";
     </script>
     """

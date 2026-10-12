@@ -19,6 +19,7 @@ from utils.image_compressor import compress_image
 from utils.visibility import exclude_deleted
 from utils.request_params import safe_count, safe_int
 from utils import pdf_versions
+from utils import survey_upload_password
 
 
 
@@ -145,6 +146,10 @@ def checklist():
         session.pop("assignment_id", None)
         return "Assignment not found"
 
+    from core.engine import _advisory_lock
+
+    _advisory_lock(assignment.section_no)
+
     # =========================================================
     # CURRENT WEEK
     # MONDAY 00:00 → NEXT MONDAY 00:00
@@ -189,8 +194,6 @@ def checklist():
     # =========================================================
 
     existing_survey = Survey.query.filter(
-
-        Survey.captain_email == user.email,
 
         Survey.section_no == assignment.section_no,
 
@@ -651,6 +654,11 @@ def recording():
     return render_template(
         "captain/recording.html",
         survey=survey,
+        require_upload_password=(
+            survey_upload_password.state_requires_upload_password(
+                survey.state
+            )
+        ),
         start_time=display_time.strftime(
             "%d %b %Y, %I:%M %p"
         ) if display_time else "-"
@@ -880,6 +888,35 @@ def complete_survey():
                     "/recording",
                     "Only PDF files are allowed."
                 )
+
+            # -----------------------------------
+            # TEAM UPLOAD PASSWORD
+            #
+            # Captains in the Krish team's states (Assam, West Bengal,
+            # Meghalaya, Bihar) cannot finish a survey form until they type
+            # the shared password the regional manager holds. Checked here -
+            # before the bytes reach Drive - so a failed attempt costs nothing.
+            # -----------------------------------
+
+            if survey_upload_password.state_requires_upload_password(
+                survey.state
+            ):
+
+                submitted_password = request.form.get(
+                    "survey_upload_password",
+                    ""
+                )
+
+                if not survey_upload_password.check_upload_password(
+                    survey.state,
+                    submitted_password
+                ):
+
+                    return _pdf_upload_failed(
+                        "/recording",
+                        "Incorrect upload password. Please ask your "
+                        "regional manager for the survey form password."
+                    )
 
             # -----------------------------------
             # UPLOAD PDF
@@ -1734,6 +1771,33 @@ def reupload_survey_pdf(survey_id):
             )
 
         # -----------------------------------
+        # TEAM UPLOAD PASSWORD
+        #
+        # Same Krish-team gate as the first upload (see complete_survey). A
+        # correction requested by admin must not become a way around it.
+        # -----------------------------------
+
+        if survey_upload_password.state_requires_upload_password(
+            survey.state
+        ):
+
+            submitted_password = request.form.get(
+                "survey_upload_password",
+                ""
+            )
+
+            if not survey_upload_password.check_upload_password(
+                survey.state,
+                submitted_password
+            ):
+
+                return _pdf_upload_failed(
+                    f"/reupload-survey-pdf/{survey_id}",
+                    "Incorrect upload password. Please ask your regional "
+                    "manager for the survey form password."
+                )
+
+        # -----------------------------------
         # SAVE OLD PDF URL
         #
         # The previous PDF is deliberately NOT deleted from Drive any more:
@@ -1967,7 +2031,12 @@ def reupload_survey_pdf(survey_id):
 
     return render_template(
         "captain/reupload_pdf.html",
-        survey=survey
+        survey=survey,
+        require_upload_password=(
+            survey_upload_password.state_requires_upload_password(
+                survey.state
+            )
+        )
     )
 
 

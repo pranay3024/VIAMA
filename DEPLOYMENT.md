@@ -35,8 +35,18 @@ for all of them.
 | `SECRET_KEY` | *(copy from local `.env`)* | Flask session key. Was hardcoded; now required. Without it the app falls back to the old public default and logs a warning. |
 | `SUPABASE_ANON_KEY` | *(copy from local `.env`)* | Was hardcoded in `supabase_client.py`. Same fallback behaviour. |
 | `API_JWT_SECRET` | *(copy from local `.env`)* | Only if you are using the JSON API. Without it every `/api/v1` call returns `503 api_misconfigured`. |
+| `RV_RAW_XLSX_API_KEY` | *(RoadVision API key)* | Required to fetch the raw XLSX attachment for approved survey emails. |
+| `M365_TENANT_ID` | *(Entra tenant ID)* | Microsoft Graph app-only email authentication. |
+| `M365_CLIENT_ID` | *(Entra application/client ID)* | Microsoft Graph app-only email authentication. |
+| `M365_CLIENT_SECRET` | *(new secret value)* | Store only as an environment secret. The secret previously shared in chat must be revoked and replaced. |
 
 `.env.example` lists every variable the app reads, including the optional ones.
+
+The approved survey email uses Microsoft Graph to send as
+`projects9@adorpower.com`. The Entra app needs Microsoft Graph **Application**
+permission `Mail.Send` with admin consent, and Exchange must allow the app to
+send as that mailbox. The raw XLSX API key and all three `M365_*` variables are
+required locally and in Vercel. Never commit or share the client secret.
 
 The exact values are in your local
 `VIAMA-main/.env`. Copy them verbatim — no quotes, no trailing spaces.

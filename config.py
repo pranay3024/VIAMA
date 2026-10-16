@@ -33,7 +33,9 @@ class Config:
     SQLALCHEMY_DATABASE_URI = os.getenv("DATABASE_URL")
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     SQLALCHEMY_ENGINE_OPTIONS = {
-    "pool_pre_ping": True,
+    "pool_pre_ping": os.getenv(
+        "SQLALCHEMY_POOL_PRE_PING", "true"
+    ).strip().lower() not in ("0", "false", "no"),
     "connect_args": {
         "options": "-csearch_path=public"
     }

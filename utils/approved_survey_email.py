@@ -4,17 +4,19 @@ from datetime import datetime, timezone
 
 from core.config import current_week_number, week_of
 from extensions import db
-from google_drive import download_file_from_drive, send_gmail_email
+from google_drive import download_file_from_drive
 from models.db_models import Survey
 from utils.email_templates import build_email_body, build_subject
+from utils.microsoft_graph_mail import send_microsoft_graph_email
+from utils.raw_xlsx import download_raw_xlsx
 
 
-TO_EMAIL = "ishit1561@gmail.com"
-FROM_EMAIL = "adordashcam@gmail.com"
+TO_EMAIL = "mail.hunterrr@gmail.com"
+FROM_EMAIL = "projects9@adorpower.com"
 
 
 def send_approved_survey_email(survey_id):
-    """Send the raw-data email with only the signed survey-form PDF attached."""
+    """Send the approved survey email with its PDF and raw XLSX attachments."""
     survey = (
         Survey.query.filter_by(id=survey_id)
         .with_for_update()
@@ -57,13 +59,19 @@ def send_approved_survey_email(survey_id):
             f"{survey.upc_code or survey.section_no}_Cycle-"
             f"{survey.cycle_no}_Survey_Form.pdf"
         )
-        message_id = send_gmail_email(
+        raw_xlsx_bytes, raw_xlsx_filename = download_raw_xlsx(
+            survey.section_no,
+            survey.cycle_no,
+            survey.survey_type,
+        )
+        message_id = send_microsoft_graph_email(
             to_email=TO_EMAIL,
             from_email=FROM_EMAIL,
             subject=subject,
             html_body=html_body,
             attachment_bytes=attachment_bytes,
             attachment_filename=attachment_filename,
+            additional_attachments=[(raw_xlsx_bytes, raw_xlsx_filename)],
             message_id=f"<viama-survey-{survey.id}@viama.local>",
         )
         survey.raw_video_email_sent_at = datetime.now(

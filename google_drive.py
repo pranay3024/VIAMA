@@ -33,6 +33,7 @@ import io
 import json
 import logging
 import os
+import mimetypes
 import pickle
 import re
 import base64
@@ -656,8 +657,9 @@ def send_gmail_email(
     attachment_bytes,
     attachment_filename,
     message_id=None,
+    additional_attachments=None,
 ):
-    """Send one HTML email with one attachment and no CC or BCC."""
+    """Send one HTML email with attachments and no CC or BCC."""
     gmail = get_gmail()
     message = MIMEMultipart()
     message["From"] = from_email
@@ -667,13 +669,18 @@ def send_gmail_email(
         message["Message-ID"] = message_id
     message.attach(MIMEText(html_body, "html"))
 
-    attachment = MIMEApplication(attachment_bytes, _subtype="pdf")
-    attachment.add_header(
-        "Content-Disposition",
-        "attachment",
-        filename=attachment_filename,
-    )
-    message.attach(attachment)
+    attachments = [(attachment_bytes, attachment_filename)]
+    attachments.extend(additional_attachments or [])
+    for content, filename in attachments:
+        mimetype = mimetypes.guess_type(filename)[0] or "application/octet-stream"
+        subtype = mimetype.split("/", 1)[1]
+        attachment = MIMEApplication(content, _subtype=subtype)
+        attachment.add_header(
+            "Content-Disposition",
+            "attachment",
+            filename=filename,
+        )
+        message.attach(attachment)
 
     raw = base64.urlsafe_b64encode(message.as_bytes()).decode()
     send_request = gmail.users().messages().send(

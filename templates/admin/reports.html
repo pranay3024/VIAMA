@@ -1,417 +1,127 @@
 <!DOCTYPE html>
-<html>
-
+<html lang="en">
 <head>
-
-<title>Reports</title>
-
-<link rel="stylesheet"
-href="{{ url_for('static',
-filename='css/admin.css') }}">
-
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Survey Reports</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}">
+    <style>
+        .reports-page { width: 100%; max-width: none; box-sizing: border-box; margin: 0; padding: 22px 24px 48px; color: #20333b; }
+        .report-panel { background: #fff; border: 1px solid #f1d0b1; border-radius: 6px; padding: 22px; margin-bottom: 22px; }
+        .report-panel h2 { margin: 0 0 6px; font-size: 21px; }
+        .report-subtitle { margin: 0 0 18px; color: #62747a; }
+        .report-table-wrap { overflow-x: auto; }
+        .manual-table { width: 100%; table-layout: fixed; border-collapse: collapse; min-width: 900px; font-size: 17px; }
+        .manual-table th, .manual-table td { padding: 6px 6px; border-bottom: 1px solid #f1e2d5; text-align: left; }
+        .manual-table th { color: #fff; background: #ff7a00; font-size: 15px; }
+        .manual-table td:first-child { font-weight: 700; white-space: nowrap; }
+        .manual-table input, .cancel-form input, .cancel-form select { box-sizing: border-box; width: 100%; padding: 9px; border: 1px solid #b8c8c9; border-radius: 4px; font: inherit; }
+        .manual-table input { max-width: 130px; font-size: 16px; }
+        .weekly-actions { display: flex; justify-content: flex-end; padding-top: 16px; }
+        .report-button { border: 0; border-radius: 4px; background: #ff7a00; color: white; padding: 10px 16px; font: inherit; font-weight: 650; cursor: pointer; }
+        .report-button:hover { background: #ea580c; }
+        .flash-message { padding: 10px 14px; margin-bottom: 12px; border-radius: 4px; background: #e7f4ed; color: #24583c; }
+        .flash-message.error { background: #fbe9e7; color: #8a3029; }
+        .chart-wrap { width: 100%; overflow-x: auto; }
+        #weekly-chart { display: block; width: 100%; min-width: 620px; height: 300px; }
+        .chart-legend { display: flex; gap: 20px; color: #52676d; font-size: 13px; }
+        .legend-mark { display: inline-block; width: 11px; height: 11px; margin-right: 6px; border-radius: 2px; background: #ff7a00; }
+        .legend-mark.conducted { background: #c2410c; border-radius: 50%; }
+        .top-navbar { position: static; }
+        @media (max-width: 700px) {
+            .reports-page { padding: 16px 12px 28px; }
+            .report-panel { padding: 16px 12px; }
+        }
+    </style>
 </head>
-
 <body>
-
 <div class="top-navbar">
-
     <div class="nav-left">
-
-        <img
-        src="{{ url_for('static',
-        filename='images/viama_logo.png') }}"
-        class="logo-img">
-
-        <div class="welcome-text">
-
-            <h2>Reports</h2>
-
-            <p>
-                Survey Reporting Dashboard
-            </p>
-
-        </div>
-
+        <img src="{{ url_for('static', filename='images/viama_logo.png') }}" class="logo-img" alt="VIAMA">
+        <div class="welcome-text"><h2>Reports</h2><p>Weekly survey plan and cancellations</p></div>
     </div>
-
-    <a
-    href="/admin"
-    class="logout-btn">
-
-    ⬅ Dashboard
-
-    </a>
-
+    <a href="/admin" class="logout-btn">Dashboard</a>
 </div>
 
-<div class="dashboard-content">
-
-<!-- ===================== FILTERS ===================== -->
-
-<div class="card">
-
-<h2>
-
-📊 Generate Report
-
-</h2>
-
-<a
-href="{{ url_for(
-    'admin.export_report',
-    week=request.args.get('week'),
-    cycle=request.args.get('cycle'),
-    team=request.args.get('team'),
-    state=request.args.get('state'),
-    from_date=request.args.get('from_date'),
-    to_date=request.args.get('to_date')
-) }}"
-class="search-btn"
-style="
-display:inline-flex;
-align-items:center;
-justify-content:center;
-text-decoration:none;
-margin-left:10px;">
-
-📥 Export Excel
-
-</a>
-
-
-
-<form method="GET">
-
-<div class="advanced-filter">
-
-<select name="week">
-
-<option value="">
- Weeks
-</option>
-
-{% for w in weeks %}
-
-<option
-value="{{ w }}"
-{% if request.args.get('week') == w|string %}
-selected
-{% endif %}>
-
-Week {{ w }}
-
-</option>
-
-{% endfor %}
-
-</select>
-
-<select name="cycle">
-
-<option value="">
- Cycles
-</option>
-
-{% for c in cycles %}
-
-<option
-value="{{ c.cycle_no }}"
-{% if request.args.get('cycle') == c.cycle_no|string %}
-selected
-{% endif %}>
-
-Cycle {{ c.cycle_no }}
-
-</option>
-
-{% endfor %}
-
-</select>
-
-<select name="team">
-
-<option value="">
- Teams
-</option>
-
-<option
-value="Krish"
-{% if request.args.get('team')=="Krish" %}
-selected
-{% endif %}>
-Krish
-</option>
-
-<option
-value="Godbole"
-{% if request.args.get('team')=="Godbole" %}
-selected
-{% endif %}>
-Viama
-</option>
-
-<option
-value="Aspizo"
-{% if request.args.get('team')=="Aspizo" %}
-selected
-{% endif %}>
-Aspizo
-</option>
-
-</select>
-
-<!-- NEW STATE FILTER -->
-
-<select name="state">
-
-<option value="">
-States
-</option>
-
-<option value="ASSAM" {% if request.args.get('state')=="ASSAM" %}selected{% endif %}>ASSAM</option>
-
-<option value="BIHAR" {% if request.args.get('state')=="BIHAR" %}selected{% endif %}>BIHAR</option>
-
-<option value="JHARKHAND" {% if request.args.get('state')=="JHARKHAND" %}selected{% endif %}>JHARKHAND</option>
-
-<option value="MEGHALAYA" {% if request.args.get('state')=="MEGHALAYA" %}selected{% endif %}>MEGHALAYA</option>
-
-<option value="ODISHA" {% if request.args.get('state')=="ODISHA" %}selected{% endif %}>ODISHA</option>
-
-<option value="UTTAR PRADESH" {% if request.args.get('state')=="UTTAR PRADESH" %}selected{% endif %}>UTTAR PRADESH</option>
-
-<option value="WEST BENGAL" {% if request.args.get('state')=="WEST BENGAL" %}selected{% endif %}>WEST BENGAL</option>
-
-</select>
-
-<input
-type="date"
-name="from_date"
-value="{{ request.args.get('from_date','') }}">
-
-<input
-type="date"
-name="to_date"
-value="{{ request.args.get('to_date','') }}">
-
-<button
-type="submit"
-class="search-btn">
-
-Generate Report
-
-</button>
-
-<a
-href="{{ url_for('admin.reports') }}"
-class="search-btn"
-style="
-background:#6c757d;
-text-decoration:none;
-display:inline-flex;
-align-items:center;
-justify-content:center;
-margin-left:10px;">
-
-✖ Clear Filters
-
-</a>
-
-</div>
-
-</form>
-
-</div>
-
-<!-- ===================== SUMMARY ===================== -->
-
-<div class="stats">
-
-<div class="stat-card">
-
-<h3>
-
-✅ Completed
-
-</h3>
-
-<h1>
-
-{{ completed_surveys }}
-
-</h1>
-
-</div>
-
-<div class="stat-card">
-
-<h3>
-
-🛣 Total KM
-
-</h3>
-
-<h1>
-
-{{ "%.2f"|format(total_km) }}
-
-</h1>
-
-</div>
-
-<div class="stat-card">
-
-<h3>
-
-👮 Captains
-
-</h3>
-
-<h1>
-
-{{ captains }}
-
-</h1>
-
-</div>
-
-<div class="stat-card">
-
-<h3>
-
-⏱ Hours
-
-</h3>
-
-<h1>
-
-{{ total_hours }}
-
-</h1>
-
-</div>
-
-</div>
-
-<!-- ===================== REPORT TABLE ===================== -->
-
-<div class="card" style="margin-top:30px;">
-
-<h2>
-
-📋 Survey Report
-
-</h2>
-
-<div style="overflow-x:auto;">
-
-<table class="report-table">
-
-<thead>
-
-<tr>
-<th>UPC Code</th>
-
-<th>Section No</th>
-
-<th>Cycle</th>
-
-<th>Date</th>
-
-<th>Captain</th>
-
-<th>State</th>
-
-<th>Stretch</th>
-
-<th>KM</th>
-
-<th>Survey Type</th>
-
-<th>Status</th>
-
-</tr>
-
-</thead>
-
-<tbody>
-
-{% for survey in surveys %}
-
-<tr>
-
-<td>
-{{ survey.upc_code }}
-</td>
-
-<td>
-{{ survey.section_no }}
-</td>
-
-<td>
-{{ survey.cycle_no }}
-</td>
-
-<td>
-{{ survey.start_time.strftime("%d-%m-%Y") if survey.start_time else "-" }}
-</td>
-
-
-<td>
-{{ survey.captain_name }}
-</td>
-
-<td>
-{{ survey.state }}
-</td>
-
-
-
-<td>
-{{ survey.stretch_code }}
-</td>
-
-<td>
-{{ "%.2f"|format(survey.section_length or 0) }}
-</td>
-
-<td>
-{{ survey.survey_type }}
-</td>
-
-<td>
-{{ survey.status }}
-</td>
-
-</tr>
-
-{% endfor %}
-
-{% if surveys|length == 0 %}
-
-<tr>
-
-<td colspan="10"
-style="text-align:center;padding:30px;">
-
-No surveys found for selected filters.
-
-</td>
-
-</tr>
-
-{% endif %}
-
-</tbody>
-
-</table>
-
-</div>
-
-</div>
-
-</div>
-
+<main class="reports-page">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% for category, message in messages %}<div class="flash-message {{ category }}">{{ message }}</div>{% endfor %}
+    {% endwith %}
+
+    <section class="report-panel" aria-labelledby="weekly-title">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;">
+            <h2 id="weekly-title">Weekly survey schedule</h2>
+            <a class="report-button" style="text-decoration:none;display:inline-flex;align-items:center;" href="{{ url_for('admin.cancelled_survey_report') }}">Cancelled survey report</a>
+        </div>
+        <p class="report-subtitle">Enter the scheduled surveys for each region. The weekly total and graph update as you type.</p>
+        <div class="chart-legend"><span><i class="legend-mark conducted"></i>Conducted</span><span><i class="legend-mark"></i>Scheduled</span></div>
+        <div class="chart-wrap"><svg id="weekly-chart" viewBox="0 0 1000 300" role="img" aria-label="Weekly scheduled and conducted survey counts"></svg></div>
+
+        <form method="POST" action="{{ url_for('admin.save_weekly_report') }}">
+            <div class="report-table-wrap">
+                <table class="manual-table" id="weekly-table">
+                    <thead><tr><th>Sr. No.</th><th>Week</th><th>North East</th><th>UP-JH</th><th>Odisha</th><th>Total survey conducted</th><th>Cancelled</th><th>Total scheduled</th></tr></thead>
+                    <tbody>
+                    {% for week in weeks %}
+                        {% set plan = plans.get(week) %}
+                        <tr data-week="{{ week }}">
+                            <td>{{ loop.index }}</td>
+                            <td>{{ week }}<input type="hidden" name="week_no" value="{{ week }}"></td>
+                            <td><input type="number" min="0" step="1" name="north_east" value="{{ plan.north_east if plan else 0 }}" aria-label="Week {{ week }} North East scheduled"></td>
+                            <td><input type="number" min="0" step="1" name="up_jh" value="{{ plan.up_jh if plan else 0 }}" aria-label="Week {{ week }} UP-JH scheduled"></td>
+                            <td><input type="number" min="0" step="1" name="odisha" value="{{ plan.odisha if plan else 0 }}" aria-label="Week {{ week }} Odisha scheduled"></td>
+                            <td><input type="number" min="0" step="1" name="conducted" value="{{ plan.conducted if plan else 0 }}" aria-label="Week {{ week }} surveys conducted"></td>
+                            <td><input type="number" min="0" step="1" name="cancelled_count" value="{{ plan.cancelled_count if plan and plan.cancelled_count is not none else cancelled_by_week.get(week, 0) }}" aria-label="Week {{ week }} cancelled surveys"></td>
+                            <td><input type="number" min="0" step="1" name="total_scheduled" value="{{ plan.total_scheduled if plan and plan.total_scheduled is not none else 0 }}" aria-label="Week {{ week }} total scheduled"></td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            <div class="weekly-actions"><button class="report-button" type="submit">Save weekly counts</button></div>
+        </form>
+    </section>
+
+</main>
+
+<script>
+    const weeklyRows = [...document.querySelectorAll("#weekly-table tbody tr")];
+    const chart = document.getElementById("weekly-chart");
+
+    function renderWeeklyChart() {
+        const values = weeklyRows.map((row) => ({
+            week: row.dataset.week,
+              scheduled: Math.max(0, Number(row.querySelector('[name="total_scheduled"]').value) || 0),
+              conducted: Math.max(0, Number(row.querySelector('[name="conducted"]').value) || 0),
+        }));
+        const maxValue = Math.max(5, ...values.flatMap((item) => [item.scheduled, item.conducted]));
+        const left = 42;
+        const right = 986;
+        const top = 18;
+        const bottom = 246;
+        const step = values.length ? (right - left) / values.length : right - left;
+        const y = (value) => bottom - (value / maxValue) * (bottom - top);
+        const grid = [0, 0.25, 0.5, 0.75, 1].map((fraction) => {
+            const position = bottom - fraction * (bottom - top);
+            return `<line x1="${left}" y1="${position}" x2="${right}" y2="${position}" stroke="#e3e9e9"/><text x="${left - 8}" y="${position + 4}" text-anchor="end" fill="#62747a" font-size="11">${Math.round(maxValue * fraction)}</text>`;
+        }).join("");
+        const bars = values.map((item, index) => {
+            const center = left + step * (index + 0.5);
+            const height = bottom - y(item.scheduled);
+            const width = Math.min(28, step * 0.54);
+            return `<rect x="${center - width / 2}" y="${y(item.scheduled)}" width="${width}" height="${height}" rx="2" fill="#ff7a00"><title>Week ${item.week}: ${item.scheduled} scheduled</title></rect><text x="${center}" y="268" text-anchor="middle" fill="#52676d" font-size="11">${item.week}</text>`;
+        }).join("");
+        const points = values.map((item, index) => `${left + step * (index + 0.5)},${y(item.conducted)}`).join(" ");
+        const markers = values.map((item, index) => {
+            const center = left + step * (index + 0.5);
+            return `<circle cx="${center}" cy="${y(item.conducted)}" r="4" fill="#c2410c"><title>Week ${item.week}: ${item.conducted} conducted</title></circle>`;
+        }).join("");
+        chart.innerHTML = `${grid}${bars}<polyline points="${points}" fill="none" stroke="#c2410c" stroke-width="3" stroke-linejoin="round"/>${markers}<text x="${right}" y="290" text-anchor="end" fill="#62747a" font-size="11">Week</text>`;
+
+    }
+
+    document.getElementById("weekly-table").addEventListener("input", renderWeeklyChart);
+    renderWeeklyChart();
+</script>
 </body>
-
 </html>

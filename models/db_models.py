@@ -434,7 +434,6 @@ class SurveyAssignment(db.Model):
     piu = db.Column(db.String(100))
 
 
-
     missed_alert = db.Column(
         db.Boolean,
         default=False
@@ -459,6 +458,32 @@ class SurveyAssignment(db.Model):
 
 
 
+
+
+class WeeklySurveyPlan(db.Model):
+    __tablename__ = "weekly_survey_plans"
+
+    id = db.Column(db.Integer, primary_key=True)
+    week_no = db.Column(db.Integer, nullable=False, unique=True)
+    north_east = db.Column(db.Integer, nullable=False, default=0)
+    up_jh = db.Column(db.Integer, nullable=False, default=0)
+    odisha = db.Column(db.Integer, nullable=False, default=0)
+    conducted = db.Column(db.Integer, nullable=False, default=0)
+    cancelled_count = db.Column(db.Integer, nullable=True)
+    total_scheduled = db.Column(db.Integer, nullable=True)
+
+
+class CancelledSurveyReport(db.Model):
+    __tablename__ = "cancelled_survey_reports"
+
+    id = db.Column(db.Integer, primary_key=True)
+    week_no = db.Column(db.Integer, nullable=False, index=True)
+    team = db.Column(db.String(40), nullable=False, default="")
+    section_no = db.Column(db.String(100), nullable=True)
+    upc_code = db.Column(db.String(100), nullable=True)
+    section_or_upc = db.Column(db.String(150), nullable=False)
+    reason = db.Column(db.String(40), nullable=False)
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
 
 
 class RegionalManagerState(db.Model):

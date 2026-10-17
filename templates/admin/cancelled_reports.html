@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Cancelled Survey Report</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}">
+    <style>
+        .cancel-page { width: 100%; max-width: none; box-sizing: border-box; margin: 0; padding: 22px 24px 48px; color: #20333b; }
+        .cancel-panel { background: #fff; border: 1px solid #f1d0b1; border-radius: 6px; padding: 22px; margin-bottom: 20px; }
+        .cancel-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 5px; }
+        .cancel-heading h2 { margin: 0; font-size: 22px; }
+        .cancel-subtitle { margin: 0 0 20px; color: #62747a; }
+        .cancel-button { display: inline-flex; align-items: center; justify-content: center; min-height: 40px; padding: 9px 15px; border: 0; border-radius: 4px; background: #ff7a00; color: #fff; font: inherit; font-weight: 650; text-decoration: none; cursor: pointer; }
+        .cancel-button:hover { background: #ea580c; }
+        .filter-form { display: grid; grid-template-columns: minmax(150px, 220px) minmax(180px, 260px) max-content max-content; align-items: end; gap: 12px; }
+        .filter-form .cancel-button { width: max-content; min-width: 112px; padding: 8px 12px; }
+        .cancel-page label { display: grid; gap: 6px; color: #42585f; font-size: 13px; font-weight: 650; }
+        .cancel-page select { box-sizing: border-box; width: 100%; min-height: 40px; padding: 8px 10px; border: 1px solid #d8b995; border-radius: 4px; background: #fff; color: #20333b; font: inherit; }
+        .reason-form { display: flex; min-width: 250px; gap: 8px; }
+        .reason-form input { flex: 1; min-width: 140px; min-height: 34px; padding: 6px 8px; border: 1px solid #d8b995; border-radius: 4px; font: inherit; }
+        .reason-form button { flex: none; border: 0; border-radius: 4px; padding: 7px 10px; background: #ff7a00; color: #fff; font: inherit; cursor: pointer; }
+        .report-table-wrap { overflow-x: auto; }
+        .cancel-table { width: 100%; min-width: 900px; table-layout: fixed; border-collapse: collapse; font-size: 16px; }
+        .cancel-table th, .cancel-table td { padding: 6px 7px; border-bottom: 1px solid #f1e2d5; text-align: left; vertical-align: middle; }
+        .cancel-table th { background: #ff7a00; color: #fff; font-size: 15px; font-weight: 700; text-transform: uppercase; }
+        .cancel-table td { font-size: 17px; }
+        .cancel-table tbody tr:hover { background: #fff8ef; }
+        .cancel-table .serial { color: #62747a; width: 64px; }
+        .team-label { display: inline-block; padding: 4px 8px; border-radius: 3px; background: #fff3e6; color: #b45309; font-size: 12px; font-weight: 650; }
+        .reason-label { font-weight: 650; color: #9a3412; }
+        .empty-state { padding: 36px 14px !important; color: #62747a; text-align: center !important; }
+        .result-count { margin: 0 0 12px; color: #62747a; font-size: 13px; }
+        .top-navbar { position: static; }
+        @media (max-width: 640px) {
+            .cancel-page { padding: 16px 12px 28px; }
+            .cancel-panel { padding: 16px 12px; }
+            .filter-form { grid-template-columns: 1fr 1fr; }
+            .filter-form .cancel-button { grid-column: auto; justify-self: start; }
+            .cancel-heading h2 { font-size: 20px; }
+        }
+    </style>
+</head>
+<body>
+<div class="top-navbar">
+    <div class="nav-left">
+        <img src="{{ url_for('static', filename='images/viama_logo.png') }}" class="logo-img" alt="VIAMA">
+        <div class="welcome-text"><h2>Cancelled Survey Report</h2><p>Weekly cancellation register</p></div>
+    </div>
+    <a href="{{ url_for('admin.reports') }}" class="logout-btn">Back to Reports</a>
+</div>
+
+<main class="cancel-page">
+    <section class="cancel-panel" aria-labelledby="filters-title">
+        <div class="cancel-heading"><h2 id="filters-title">Find cancellations</h2></div>
+        <p class="cancel-subtitle">Filter the register by project week and team.</p>
+        <form class="filter-form" method="GET" action="{{ url_for('admin.cancelled_survey_report') }}">
+            <label>Week
+                <select name="week"><option value="{{ current_week }}" {% if selected_week == current_week %}selected{% endif %}>Current week ({{ current_week }})</option>{% for week in weeks if week != current_week %}<option value="{{ week }}" {% if selected_week == week %}selected{% endif %}>Week {{ week }}</option>{% endfor %}</select>
+            </label>
+            <label>Team
+                <select name="team"><option value="">All teams</option>{% for key, label in teams %}<option value="{{ key }}" {% if selected_team == key %}selected{% endif %}>{{ label }}</option>{% endfor %}</select>
+            </label>
+            <button class="cancel-button" type="submit">Apply filters</button>
+            <a class="cancel-button" style="background:#9a3412;" href="{{ url_for('admin.cancelled_survey_report') }}">Clear</a>
+        </form>
+    </section>
+
+    <section class="cancel-panel" aria-labelledby="report-title">
+        <div class="cancel-heading"><h2 id="report-title">Cancellation register</h2></div>
+        <p class="result-count">{{ records|length }} survey{{ '' if records|length == 1 else 's' }} shown</p>
+        <div class="report-table-wrap">
+            <table class="cancel-table">
+                <thead><tr><th>Sr. No.</th><th>Week</th><th>Team</th><th>Section No.</th><th>UPC Number</th><th>Reason of cancellation</th><th>Recorded</th></tr></thead>
+                <tbody>
+                {% for item in records %}
+                    <tr>
+                        <td class="serial">{{ loop.index }}</td>
+                        <td>{{ item.week_no if item.week_no else '—' }}</td>
+                        <td><span class="team-label">{{ item.team }}</span></td>
+                        <td>{{ item.section_no or '-' }}</td>
+                        <td>{{ item.upc_code or '-' }}</td>
+                        <td class="reason-label">
+                            {% if item.reason %}
+                                {{ item.reason }}
+                            {% else %}
+                                <form class="reason-form" method="POST" action="{{ url_for('admin.update_cancelled_survey_reason', survey_id=item.id) }}">
+                                    <input type="hidden" name="week" value="{{ selected_week }}">
+                                    <input type="hidden" name="team" value="{{ selected_team }}">
+                                    <input type="text" name="reason" maxlength="500" placeholder="Enter missing reason" aria-label="Cancellation reason for survey {{ item.id }}" required>
+                                    <button type="submit">Save</button>
+                                </form>
+                            {% endif %}
+                        </td>
+                        <td>{{ item.recorded_at.strftime('%d %b %Y') if item.recorded_at else '-' }}</td>
+                    </tr>
+                {% else %}
+                    <tr><td class="empty-state" colspan="7">No cancelled surveys match these filters.</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+</main>
+</body>
+</html>

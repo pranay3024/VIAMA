@@ -22,12 +22,12 @@ load_dotenv()
 log = logging.getLogger(__name__)
 
 #: Already published in this repository's history - fallback only, not a secret.
-_LEGACY_URL = "https://nahcqrxmbzxuixqizdga.supabase.co"
+_LEGACY_URL = "https://zgmzbezgyvivmtkizzvg.supabase.co"
 _LEGACY_ANON_KEY = (
     "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9"
-    ".eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5haGNxcnhtYnp4dWl4cWl6ZGdhIiwicm9sZSI6"
-    "ImFub24iLCJpYXQiOjE3ODA5MDgzNDgsImV4cCI6MjA5NjQ4NDM0OH0"
-    ".osBVkdRzgbc7daqpmCncrkIahVQnVJGfdisYtXiufO4"
+    ".eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpnbXpiZXpneXZpdm10a2l6enZnIiwicm9sZSI6"
+    "ImFub24iLCJpYXQiOjE3OTIxNDg4MjMsImV4cCI6MjEwNzcyNDgyM30"
+    ".UyhHNKXwbbkBAqnjsr7hIjR7TrI6NErnZ6WTAmGRB38"
 )
 
 url = (os.getenv("SUPABASE_URL") or "").strip() or _LEGACY_URL

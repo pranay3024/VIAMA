@@ -2,7 +2,11 @@ from flask import Blueprint
 from flask import render_template
 from flask import request
 from extensions import db
-from models.db_models import MissedSurveyHistory, SurveyAssignment
+from models.db_models import (
+    MissedSurveyHistory,
+    SurveyAssignment,
+    WeeklySurveyPlan,
+)
 from models.db_models import User
 from flask import session
 import pytz
@@ -104,6 +108,13 @@ def _completed_survey_criterion():
     from core.config import SURVEY_COMPLETED
 
     return Survey.status == SURVEY_COMPLETED
+
+
+def _cancelled_survey_criterion():
+    return db.or_(
+        Survey.status == "cancelled",
+        Survey.captain_status == "cancelled",
+    )
 
 
 @admin_bp.route("/admin/delayed-surveys/manual/<int:survey_id>", methods=["POST"])
@@ -2303,169 +2314,172 @@ def reports():
         return redirect("/")
 
     from datetime import datetime, timedelta
-
-    query = Survey.query.filter(_completed_survey_criterion())
-
-    # --------------------------
-    # FILTERS
-    # --------------------------
-
-    week = request.args.get("week")
-    cycle = request.args.get("cycle")
-    team = request.args.get("team")
-    state = request.args.get("state")
-    from_date = request.args.get("from_date")
-    to_date = request.args.get("to_date")
-
-    # Cycle
-
-    cycle_no = safe_int(cycle)
-
-    if cycle_no is not None:
-        query = query.filter_by(
-            cycle_no=cycle_no
-        )
-
-    # Week
-
     project_start = datetime(2026, 6, 22)
-
-    week_no = safe_week(week)
-
-    if week_no is not None:
-
-        start = project_start + timedelta(
-            days=(week_no - 1) * 7
-        )
-
-        end = start + timedelta(days=7)
-
-        query = query.filter(
-            Survey.start_time >= start,
-            Survey.start_time < end
-        )
-
-    # Date
-
-    from_dt = safe_date(from_date)
-    to_dt = safe_date(to_date)
-
-    if from_dt:
-
-        query = query.filter(
-            Survey.start_time >= from_dt
-        )
-
-    if to_dt:
-
-        query = query.filter(
-            Survey.start_time <
-            to_dt + timedelta(days=1)
-        )
-
-    # Team
-
-    if team == "Krish":
-
-        query = query.filter(
-            Survey.state.in_([
-                "WEST BENGAL",
-                "ASSAM",
-                "BIHAR"
-            ])
-        )
-
-    elif team == "Godbole":
-
-        query = query.filter(
-            Survey.state == "ODISHA"
-        )
-
-    elif team == "Aspizo":
-
-        query = query.filter(
-            Survey.state.in_([
-                "UTTAR PRADESH",
-                "JHARKHAND"
-            ])
-        )
-
-    # State
-
-    if state:
-         query = query.filter(
-        Survey.state == state
-    )
-
-    surveys = query.all()
-
-    # --------------------------
-    # SUMMARY
-    # --------------------------
-
-    completed_surveys = len(surveys)
-
-    total_km = sum(
-        s.section_length or 0
-        for s in surveys
-    )
-
-    captains = len(set(
-        s.captain_email
-        for s in surveys
-    ))
-
-    total_minutes = 0
-
-    for survey in surveys:
-
-        if survey.start_time and survey.end_time:
-
-            total_minutes += (
-                survey.end_time -
-                survey.start_time
-            ).total_seconds() / 60
-
-    total_hours = round(
-        total_minutes / 60,
-        2
-    )
-
-    # --------------------------
-    # FILTERS
-    # --------------------------
-
     today = datetime.utcnow()
-
-    total_weeks = (
-        (today.date()-project_start.date()).days//7
-    ) + 1
-
-    weeks = list(
-        range(
-            1,
-            total_weeks+1
-        )
-    )
-
-    cycles = db.session.query(
-        Survey.cycle_no
-    ).distinct().order_by(
-        Survey.cycle_no
+    current_week = max(1, ((today.date() - project_start.date()).days // 7) + 1)
+    saved_plans = {
+        plan.week_no: plan
+        for plan in WeeklySurveyPlan.query.order_by(WeeklySurveyPlan.week_no).all()
+    }
+    last_week = max(current_week, max(saved_plans, default=0))
+    weeks = range(1, last_week + 1)
+    cancelled_by_week = {}
+    cancelled_starts = Survey.query.with_entities(Survey.start_time).filter(
+        _cancelled_survey_criterion(),
+        Survey.start_time >= project_start,
+        Survey.start_time < project_start + timedelta(days=last_week * 7),
     ).all()
+    for (start_time,) in cancelled_starts:
+        week_no = ((start_time.date() - project_start.date()).days // 7) + 1
+        cancelled_by_week[week_no] = cancelled_by_week.get(week_no, 0) + 1
 
     return render_template(
-
         "admin/reports.html",
-
         weeks=weeks,
-        cycles=cycles,
-        surveys = surveys,
-        completed_surveys=completed_surveys,
-        total_km=round(total_km,2),
-        captains=captains,
-        total_hours=total_hours
+        plans=saved_plans,
+        cancelled_by_week=cancelled_by_week,
     )
+
+
+@admin_bp.route("/reports/weekly", methods=["POST"])
+def save_weekly_report():
+    if not session.get("user_id") or session.get("role") != "admin":
+        return redirect("/")
+
+    weeks = request.form.getlist("week_no")
+    columns = (
+        request.form.getlist("north_east"),
+        request.form.getlist("up_jh"),
+        request.form.getlist("odisha"),
+        request.form.getlist("conducted"),
+        request.form.getlist("cancelled_count"),
+        request.form.getlist("total_scheduled"),
+    )
+
+    try:
+        for values in zip(weeks, *columns):
+            week_no = int(values[0])
+            counts = [int(value or 0) for value in values[1:]]
+            if week_no < 1 or any(count < 0 for count in counts):
+                raise ValueError
+
+            plan = WeeklySurveyPlan.query.filter_by(week_no=week_no).first()
+            if not any(counts):
+                if plan:
+                    db.session.delete(plan)
+                continue
+
+            if plan is None:
+                plan = WeeklySurveyPlan(week_no=week_no)
+                db.session.add(plan)
+            (
+                plan.north_east,
+                plan.up_jh,
+                plan.odisha,
+                plan.conducted,
+                plan.cancelled_count,
+                plan.total_scheduled,
+            ) = counts
+
+        db.session.commit()
+        flash("Weekly survey counts saved.", "success")
+    except (TypeError, ValueError):
+        db.session.rollback()
+        flash("Enter whole numbers of zero or more for each count.", "error")
+
+    return redirect(url_for("admin.reports"))
+
+
+@admin_bp.route("/reports/cancelled")
+def cancelled_survey_report():
+    if not session.get("user_id") or session.get("role") != "admin":
+        return redirect("/")
+
+    from core.config import TEAMS, states_for_team, team_display, team_for_state
+
+    team_options = tuple(
+        (key, metadata["display"])
+        for key, metadata in TEAMS.items()
+    )
+    valid_teams = {key for key, _label in team_options}
+    from datetime import datetime, timedelta
+
+    project_start = datetime(2026, 6, 22)
+    current_week = max(1, ((datetime.utcnow().date() - project_start.date()).days // 7) + 1)
+    selected_week = safe_int(request.args.get("week"))
+    if selected_week is None or selected_week < 1:
+        selected_week = current_week
+    selected_team = request.args.get("team", "")
+    if selected_team not in valid_teams:
+        selected_team = ""
+
+    query = Survey.query.filter(_cancelled_survey_criterion())
+    if selected_week is not None:
+        week_start = project_start + timedelta(days=(selected_week - 1) * 7)
+        week_end = week_start + timedelta(days=7)
+        query = query.filter(
+            Survey.start_time >= week_start,
+            Survey.start_time < week_end,
+        )
+    if selected_team:
+        query = query.filter(Survey.state.in_(states_for_team(selected_team)))
+
+    surveys = query.order_by(
+        Survey.start_time.desc().nullslast(),
+        Survey.id.desc(),
+    ).all()
+    records = []
+    for survey in surveys:
+        week_no = None
+        if survey.start_time:
+            week_no = ((survey.start_time.date() - project_start.date()).days // 7) + 1
+        team_key = team_for_state(survey.state)
+        records.append({
+            "id": survey.id,
+            "week_no": week_no,
+            "team": team_display(team_key) if team_key else (survey.state or "Unassigned"),
+            "section_no": survey.section_no,
+            "upc_code": survey.upc_code,
+            "reason": (survey.captain_status_reason or "").strip(),
+            "recorded_at": survey.captain_status_updated_at or survey.start_time,
+        })
+
+    latest_week = max((record["week_no"] or 0 for record in records), default=0)
+    weeks = range(1, max(current_week, latest_week) + 1)
+
+    return render_template(
+        "admin/cancelled_reports.html",
+        records=records,
+        weeks=weeks,
+        teams=team_options,
+        selected_week=selected_week,
+        selected_team=selected_team,
+        current_week=current_week,
+    )
+
+
+@admin_bp.route("/reports/cancelled/<int:survey_id>/reason", methods=["POST"])
+def update_cancelled_survey_reason(survey_id):
+    if not session.get("user_id") or session.get("role") != "admin":
+        return redirect("/")
+
+    reason = request.form.get("reason", "").strip()
+    survey = Survey.query.filter_by(id=survey_id, status="cancelled").first_or_404()
+    if not reason:
+        flash("Enter a cancellation reason.", "error")
+    elif (survey.captain_status_reason or "").strip():
+        flash("This survey already has a cancellation reason.", "error")
+    else:
+        survey.captain_status_reason = reason
+        survey.captain_status_updated_at = datetime.utcnow()
+        db.session.commit()
+        flash("Cancellation reason saved.", "success")
+
+    return redirect(url_for(
+        "admin.cancelled_survey_report",
+        week=request.form.get("week", ""),
+        team=request.form.get("team", ""),
+    ))
 
 
 @admin_bp.route("/reports/export")

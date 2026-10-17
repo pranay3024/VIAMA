@@ -117,6 +117,34 @@ def _cancelled_survey_criterion():
     )
 
 
+def _ensure_weekly_survey_plan_schema():
+    if current_app.extensions.get("weekly_survey_plan_schema_ready"):
+        return
+
+    statements = (
+        """
+        CREATE TABLE IF NOT EXISTS weekly_survey_plans (
+            id SERIAL PRIMARY KEY,
+            week_no INTEGER NOT NULL UNIQUE,
+            north_east INTEGER NOT NULL DEFAULT 0,
+            up_jh INTEGER NOT NULL DEFAULT 0,
+            odisha INTEGER NOT NULL DEFAULT 0,
+            conducted INTEGER NOT NULL DEFAULT 0,
+            cancelled_count INTEGER,
+            total_scheduled INTEGER
+        )
+        """,
+        "ALTER TABLE weekly_survey_plans ADD COLUMN IF NOT EXISTS cancelled_count INTEGER",
+        "ALTER TABLE weekly_survey_plans ADD COLUMN IF NOT EXISTS total_scheduled INTEGER",
+        "UPDATE weekly_survey_plans SET total_scheduled = north_east + up_jh + odisha WHERE total_scheduled IS NULL",
+    )
+    with db.engine.begin() as connection:
+        for statement in statements:
+            connection.execute(db.text(statement))
+
+    current_app.extensions["weekly_survey_plan_schema_ready"] = True
+
+
 @admin_bp.route("/admin/delayed-surveys/manual/<int:survey_id>", methods=["POST"])
 def manual_delayed_survey_update(survey_id):
     if session.get("role") != "admin":
@@ -2313,6 +2341,8 @@ def reports():
     if session.get("role") != "admin":
         return redirect("/")
 
+    _ensure_weekly_survey_plan_schema()
+
     from datetime import datetime, timedelta
     project_start = datetime(2026, 6, 22)
     today = datetime.utcnow()
@@ -2345,6 +2375,8 @@ def reports():
 def save_weekly_report():
     if not session.get("user_id") or session.get("role") != "admin":
         return redirect("/")
+
+    _ensure_weekly_survey_plan_schema()
 
     weeks = request.form.getlist("week_no")
     columns = (

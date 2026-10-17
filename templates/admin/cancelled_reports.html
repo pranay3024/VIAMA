@@ -71,13 +71,11 @@
         <p class="result-count">{{ records|length }} survey{{ '' if records|length == 1 else 's' }} shown</p>
         <div class="report-table-wrap">
             <table class="cancel-table">
-                <thead><tr><th>Sr. No.</th><th>Week</th><th>Team</th><th>Section No.</th><th>UPC Number</th><th>Reason of cancellation</th><th>Recorded</th></tr></thead>
+                <thead><tr><th>Sr. No.</th><th>Section No.</th><th>UPC Number</th><th>Reason of cancellation</th></tr></thead>
                 <tbody>
                 {% for item in records %}
                     <tr>
                         <td class="serial">{{ loop.index }}</td>
-                        <td>{{ item.week_no if item.week_no else '—' }}</td>
-                        <td><span class="team-label">{{ item.team }}</span></td>
                         <td>{{ item.section_no or '-' }}</td>
                         <td>{{ item.upc_code or '-' }}</td>
                         <td class="reason-label">
@@ -92,10 +90,9 @@
                                 </form>
                             {% endif %}
                         </td>
-                        <td>{{ item.recorded_at.strftime('%d %b %Y') if item.recorded_at else '-' }}</td>
                     </tr>
                 {% else %}
-                    <tr><td class="empty-state" colspan="7">No cancelled surveys match these filters.</td></tr>
+                    <tr><td class="empty-state" colspan="4">No cancelled surveys match these filters.</td></tr>
                 {% endfor %}
                 </tbody>
             </table>

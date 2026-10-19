@@ -111,6 +111,7 @@
                         <th title="Last video upload time recorded in the RoadVision GCS bucket. Falls back to the captain-reported time for stretches the bucket has never seen.">Bucket Video Upload Time</th>
                         <th>Survey End Date</th>
                         <th>Dates Approval</th>
+                        <th>Survey Form Approved</th>
                         <th>Survey Form Email</th>
                         <th>Defect Report Sent</th>
                         <th>Working Days Delay</th>
@@ -138,6 +139,7 @@
                         <td>
                             <strong style="color:{{ 'green' if survey.survey_dates_approved else '#a33' }};">{{ 'YES' if survey.survey_dates_approved else 'NO' }}</strong>
                         </td>
+                        <td><strong style="color:{{ 'green' if survey.survey_form_approved else '#a33' }};">{{ 'YES' if survey.survey_form_approved else 'NO' }}</strong></td>
                         <td>
                             {% if survey.raw_video_email_sent_at %}
                                 Sent<br>{{ survey.display_raw_video_email_sent_at.strftime('%d/%m/%Y %I:%M %p') }} IST
@@ -163,7 +165,7 @@
                         </td>
                     </tr>
                 {% else %}
-                    <tr><td colspan="12">No surveys with a survey form in Week {{ selected_week }}.</td></tr>
+                    <tr><td colspan="13">No surveys with a survey form in Week {{ selected_week }}.</td></tr>
                 {% endfor %}
                 </tbody>
             </table>

@@ -221,7 +221,7 @@ def manual_delayed_survey_update(survey_id):
     methods=["POST"],
 )
 def approve_survey_dates(survey_id):
-    if session.get("role") != "admin":
+    if session.get("role") not in ("admin", "aftab"):
         return redirect("/")
 
     survey = Survey.query.get_or_404(survey_id)
@@ -263,7 +263,11 @@ def approve_survey_dates(survey_id):
 
 @admin_bp.route("/admin/delayed-surveys", methods=["GET", "POST"])
 def delayed_surveys():
-    if session.get("role") != "admin":
+    user_role = session.get("role")
+    if user_role not in ("admin", "aftab"):
+        return redirect("/")
+
+    if request.method == "POST" and user_role != "admin":
         return redirect("/")
 
     message = None
@@ -600,8 +604,13 @@ def delayed_surveys():
     # Render page
     # ============================================================
 
+    template = (
+        "aftab/delayed_surveys.html"
+        if user_role == "aftab"
+        else "admin/delayed_surveys.html"
+    )
     return render_template(
-        "admin/delayed_surveys.html",
+        template,
         delayed_surveys=delayed,
         current_week_no=current_week_no,
         selected_week=selected_week,
@@ -2362,12 +2371,21 @@ def reports():
     for (start_time,) in cancelled_starts:
         week_no = ((start_time.date() - project_start.date()).days // 7) + 1
         cancelled_by_week[week_no] = cancelled_by_week.get(week_no, 0) + 1
+    weekly_chart_data = [
+        {
+            "week": week,
+            "conducted": saved_plans.get(week).conducted if saved_plans.get(week) else 0,
+            "scheduled": saved_plans.get(week).total_scheduled if saved_plans.get(week) and saved_plans.get(week).total_scheduled is not None else 0,
+        }
+        for week in weeks
+    ]
 
     return render_template(
         "admin/reports.html",
         weeks=weeks,
         plans=saved_plans,
         cancelled_by_week=cancelled_by_week,
+        weekly_chart_data=weekly_chart_data,
     )
 
 
@@ -2478,6 +2496,40 @@ def cancelled_survey_report():
 
     latest_week = max((record["week_no"] or 0 for record in records), default=0)
     weeks = range(1, max(current_week, latest_week) + 1)
+    plan_rows = WeeklySurveyPlan.query.all()
+    plans_by_week = {plan.week_no: plan for plan in plan_rows}
+    chart_query = Survey.query.with_entities(Survey.start_time).filter(
+        _cancelled_survey_criterion(),
+        Survey.start_time >= project_start,
+        Survey.start_time < project_start + timedelta(days=max(current_week, latest_week) * 7),
+    )
+    if selected_team:
+        chart_query = chart_query.filter(Survey.state.in_(states_for_team(selected_team)))
+    chart_cancelled = {}
+    for (start_time,) in chart_query.all():
+        week_no = ((start_time.date() - project_start.date()).days // 7) + 1
+        chart_cancelled[week_no] = chart_cancelled.get(week_no, 0) + 1
+    scheduled_by_team = {
+        "Krish": "north_east",
+        "Godbole": "odisha",
+        "Aspizo": "up_jh",
+    }
+    cancellation_chart_data = []
+    for week in weeks:
+        plan = plans_by_week.get(week)
+        if plan and selected_team:
+            scheduled = getattr(plan, scheduled_by_team[selected_team]) or 0
+        elif plan:
+            scheduled = plan.total_scheduled
+            if scheduled is None:
+                scheduled = (plan.north_east or 0) + (plan.up_jh or 0) + (plan.odisha or 0)
+        else:
+            scheduled = 0
+        cancellation_chart_data.append({
+            "week": week,
+            "cancelled": chart_cancelled.get(week, 0),
+            "scheduled": scheduled,
+        })
 
     return render_template(
         "admin/cancelled_reports.html",
@@ -2487,6 +2539,55 @@ def cancelled_survey_report():
         selected_week=selected_week,
         selected_team=selected_team,
         current_week=current_week,
+        cancellation_chart_data=cancellation_chart_data,
+    )
+
+
+@admin_bp.route("/reports/km-completed")
+def km_completed_report():
+    if not session.get("user_id") or session.get("role") != "admin":
+        return redirect("/")
+
+    from core.config import TEAMS, states_for_team
+    from datetime import datetime, timedelta
+
+    project_start = datetime(2026, 6, 22)
+    current_week = max(1, ((datetime.utcnow().date() - project_start.date()).days // 7) + 1)
+    weeks = range(1, current_week + 1)
+    start_week = safe_week(request.args.get("start_week")) or current_week
+    end_week = safe_week(request.args.get("end_week")) or start_week
+    start_week = min(max(start_week, 1), current_week)
+    end_week = min(max(end_week, 1), current_week)
+    if start_week > end_week:
+        start_week, end_week = end_week, start_week
+
+    selected_team = request.args.get("team", "")
+    if selected_team not in TEAMS:
+        selected_team = ""
+
+    start_date = project_start + timedelta(days=(start_week - 1) * 7)
+    end_date = project_start + timedelta(days=end_week * 7)
+    query = Survey.query.filter(
+        Survey.status == "completed",
+        Survey.start_time >= start_date,
+        Survey.start_time < end_date,
+    )
+    if selected_team:
+        query = query.filter(Survey.state.in_(states_for_team(selected_team)))
+
+    completed_surveys = query.all()
+    total_km = sum(survey.section_length or 0 for survey in completed_surveys)
+
+    return render_template(
+        "admin/km_completed.html",
+        weeks=weeks,
+        current_week=current_week,
+        start_week=start_week,
+        end_week=end_week,
+        teams=tuple((key, data["display"]) for key, data in TEAMS.items()),
+        selected_team=selected_team,
+        survey_count=len(completed_surveys),
+        total_km=round(total_km, 2),
     )
 
 

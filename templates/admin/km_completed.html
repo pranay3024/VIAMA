@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Completed KM Report</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}">
+    <style>
+        .km-page { width: 100%; max-width: none; box-sizing: border-box; margin: 0; padding: 22px 24px 48px; color: #20333b; }
+        .km-panel { padding: 22px; border: 1px solid #f1d0b1; border-radius: 6px; background: #fff; }
+        .km-heading { display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; }
+        .km-heading h2 { margin: 0; font-size: 22px; }
+        .km-subtitle { margin: 7px 0 22px; color: #62747a; }
+        .km-filters { display: flex; align-items: end; flex-wrap: wrap; gap: 12px; }
+        .km-filters label { display: grid; gap: 6px; min-width: 150px; color: #42585f; font-size: 13px; font-weight: 650; }
+        .km-filters select { min-height: 40px; padding: 8px 10px; border: 1px solid #d8b995; border-radius: 4px; background: #fff; font: inherit; }
+        .km-button { min-height: 40px; padding: 8px 14px; border: 0; border-radius: 4px; background: #ff7a00; color: #fff; font: inherit; font-weight: 650; text-decoration: none; cursor: pointer; }
+        .km-button:hover { background: #ea580c; }
+        .km-result { margin-top: 24px; padding: 22px 0 4px; border-top: 1px solid #f1e2d5; }
+        .km-value { margin: 0; color: #c2410c; font-size: 36px; font-weight: 750; }
+        .km-meta { margin: 6px 0 0; color: #62747a; font-size: 15px; }
+        .top-navbar { position: static; }
+        @media (max-width: 640px) { .km-page { padding: 16px 12px 28px; } .km-panel { padding: 16px 12px; } }
+    </style>
+</head>
+<body>
+<div class="top-navbar">
+    <div class="nav-left">
+        <img src="{{ url_for('static', filename='images/viama_logo.png') }}" class="logo-img" alt="VIAMA">
+        <div class="welcome-text"><h2>KM Completed</h2><p>Completed survey distance by week and team</p></div>
+    </div>
+    <a href="{{ url_for('admin.reports') }}" class="logout-btn">Back to Reports</a>
+</div>
+<main class="km-page">
+    <section class="km-panel" aria-labelledby="km-title">
+        <div class="km-heading"><h2 id="km-title">Completed distance</h2></div>
+        <p class="km-subtitle">Choose the same week for a single-week total, or a start and end week for a range.</p>
+        <form class="km-filters" method="GET" action="{{ url_for('admin.km_completed_report') }}">
+            <label>From week
+                <select name="start_week">{% for week in weeks %}<option value="{{ week }}" {% if start_week == week %}selected{% endif %}>{{ week }}</option>{% endfor %}</select>
+            </label>
+            <label>To week
+                <select name="end_week">{% for week in weeks %}<option value="{{ week }}" {% if end_week == week %}selected{% endif %}>{{ week }}</option>{% endfor %}</select>
+            </label>
+            <label>Team
+                <select name="team"><option value="">All teams</option>{% for key, label in teams %}<option value="{{ key }}" {% if selected_team == key %}selected{% endif %}>{{ label }}</option>{% endfor %}</select>
+            </label>
+            <button class="km-button" type="submit">Calculate KM</button>
+        </form>
+        <div class="km-result" aria-live="polite">
+            <p class="km-value">{{ '%.2f'|format(total_km) }} km</p>
+            <p class="km-meta">Weeks {{ start_week }}–{{ end_week }} · {{ survey_count }} completed survey(s)</p>
+        </div>
+    </section>
+</main>
+</body>
+</html>

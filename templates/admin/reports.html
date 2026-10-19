@@ -24,6 +24,10 @@
         .flash-message.error { background: #fbe9e7; color: #8a3029; }
         .chart-wrap { width: 100%; overflow-x: auto; }
         #weekly-chart { display: block; width: 100%; min-width: 620px; height: 300px; }
+        .chart-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 18px; margin-top: 12px; }
+        .chart-card { min-width: 0; padding: 12px; border: 1px solid #f1e2d5; border-radius: 4px; }
+        .chart-card h3 { margin: 0 0 10px; font-size: 16px; }
+        .chart-card svg { display: block; width: 100%; min-width: 460px; height: 260px; }
         .chart-legend { display: flex; gap: 20px; color: #52676d; font-size: 13px; }
         .legend-mark { display: inline-block; width: 11px; height: 11px; margin-right: 6px; border-radius: 2px; background: #ff7a00; }
         .legend-mark.conducted { background: #c2410c; border-radius: 50%; }
@@ -31,6 +35,7 @@
         @media (max-width: 700px) {
             .reports-page { padding: 16px 12px 28px; }
             .report-panel { padding: 16px 12px; }
+            .chart-grid { grid-template-columns: 1fr; }
         }
     </style>
 </head>
@@ -51,11 +56,24 @@
     <section class="report-panel" aria-labelledby="weekly-title">
         <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;">
             <h2 id="weekly-title">Weekly survey schedule</h2>
-            <a class="report-button" style="text-decoration:none;display:inline-flex;align-items:center;" href="{{ url_for('admin.cancelled_survey_report') }}">Cancelled survey report</a>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                <a class="report-button" style="text-decoration:none;display:inline-flex;align-items:center;" href="{{ url_for('admin.cancelled_survey_report') }}">Cancelled survey report</a>
+                <a class="report-button" style="text-decoration:none;display:inline-flex;align-items:center;background:#c2410c;" href="{{ url_for('admin.km_completed_report') }}">KM Completed</a>
+            </div>
         </div>
         <p class="report-subtitle">Enter the scheduled surveys for each region. The weekly total and graph update as you type.</p>
-        <div class="chart-legend"><span><i class="legend-mark conducted"></i>Conducted</span><span><i class="legend-mark"></i>Scheduled</span></div>
-        <div class="chart-wrap"><svg id="weekly-chart" viewBox="0 0 1000 300" role="img" aria-label="Weekly scheduled and conducted survey counts"></svg></div>
+        <div class="chart-grid">
+            <div class="chart-card">
+                <h3>Conducted vs scheduled</h3>
+                <div class="chart-legend"><span><i class="legend-mark conducted"></i>Conducted</span><span><i class="legend-mark"></i>Scheduled</span></div>
+                <div class="chart-wrap"><svg id="weekly-chart" viewBox="0 0 1000 300" role="img" aria-label="Weekly conducted and scheduled surveys"></svg></div>
+            </div>
+            <div class="chart-card">
+                <h3>Cancelled vs scheduled</h3>
+                <div class="chart-legend"><span><i class="legend-mark cancelled"></i>Cancelled</span><span><i class="legend-mark"></i>Scheduled</span></div>
+                <div class="chart-wrap"><svg id="cancelled-chart" viewBox="0 0 1000 300" role="img" aria-label="Weekly cancelled and scheduled surveys"></svg></div>
+            </div>
+        </div>
 
         <form method="POST" action="{{ url_for('admin.save_weekly_report') }}">
             <div class="report-table-wrap">
@@ -86,15 +104,12 @@
 
 <script>
     const weeklyRows = [...document.querySelectorAll("#weekly-table tbody tr")];
-    const chart = document.getElementById("weekly-chart");
+    const weeklyChartData = {{ weekly_chart_data|tojson }};
+    const weeklyChart = document.getElementById("weekly-chart");
+    const cancelledChart = document.getElementById("cancelled-chart");
 
-    function renderWeeklyChart() {
-        const values = weeklyRows.map((row) => ({
-            week: row.dataset.week,
-              scheduled: Math.max(0, Number(row.querySelector('[name="total_scheduled"]').value) || 0),
-              conducted: Math.max(0, Number(row.querySelector('[name="conducted"]').value) || 0),
-        }));
-        const maxValue = Math.max(5, ...values.flatMap((item) => [item.scheduled, item.conducted]));
+    function renderBarChart(chart, values, series) {
+        const maxValue = Math.max(5, ...values.flatMap((item) => series.map((entry) => Number(item[entry.key]) || 0)));
         const left = 42;
         const right = 986;
         const top = 18;
@@ -107,21 +122,40 @@
         }).join("");
         const bars = values.map((item, index) => {
             const center = left + step * (index + 0.5);
-            const height = bottom - y(item.scheduled);
-            const width = Math.min(28, step * 0.54);
-            return `<rect x="${center - width / 2}" y="${y(item.scheduled)}" width="${width}" height="${height}" rx="2" fill="#ff7a00"><title>Week ${item.week}: ${item.scheduled} scheduled</title></rect><text x="${center}" y="268" text-anchor="middle" fill="#52676d" font-size="11">${item.week}</text>`;
+            const groupWidth = Math.min(step * 0.72, 58);
+            const barWidth = groupWidth / series.length;
+            const weekBars = series.map((entry, seriesIndex) => {
+                const value = Math.max(0, Number(item[entry.key]) || 0);
+                const height = bottom - y(value);
+                const x = center - groupWidth / 2 + seriesIndex * barWidth;
+                return `<rect x="${x}" y="${y(value)}" width="${Math.max(2, barWidth - 3)}" height="${height}" rx="2" fill="${entry.color}"><title>Week ${item.week}: ${value} ${entry.label.toLowerCase()}</title></rect>`;
+            }).join("");
+            return `${weekBars}<text x="${center}" y="268" text-anchor="middle" fill="#52676d" font-size="11">${item.week}</text>`;
         }).join("");
-        const points = values.map((item, index) => `${left + step * (index + 0.5)},${y(item.conducted)}`).join(" ");
-        const markers = values.map((item, index) => {
-            const center = left + step * (index + 0.5);
-            return `<circle cx="${center}" cy="${y(item.conducted)}" r="4" fill="#c2410c"><title>Week ${item.week}: ${item.conducted} conducted</title></circle>`;
-        }).join("");
-        chart.innerHTML = `${grid}${bars}<polyline points="${points}" fill="none" stroke="#c2410c" stroke-width="3" stroke-linejoin="round"/>${markers}<text x="${right}" y="290" text-anchor="end" fill="#62747a" font-size="11">Week</text>`;
-
+        chart.innerHTML = `${grid}${bars}<text x="${right}" y="290" text-anchor="end" fill="#62747a" font-size="11">Week</text>`;
     }
 
-    document.getElementById("weekly-table").addEventListener("input", renderWeeklyChart);
-    renderWeeklyChart();
+    function currentWeeklyValues() {
+        return weeklyRows.map((row) => ({
+            week: row.dataset.week,
+            scheduled: Math.max(0, Number(row.querySelector('[name="total_scheduled"]').value) || 0),
+            conducted: Math.max(0, Number(row.querySelector('[name="conducted"]').value) || 0),
+        }));
+    }
+
+    function renderWeeklyCharts() {
+        renderBarChart(weeklyChart, currentWeeklyValues(), [
+            { key: "conducted", label: "Conducted", color: "#c2410c" },
+            { key: "scheduled", label: "Scheduled", color: "#ff7a00" },
+        ]);
+        renderBarChart(cancelledChart, weeklyChartData.map((item) => ({ ...item })), [
+            { key: "cancelled", label: "Cancelled", color: "#c2410c" },
+            { key: "scheduled", label: "Scheduled", color: "#ff7a00" },
+        ]);
+    }
+
+    document.getElementById("weekly-table").addEventListener("input", renderWeeklyCharts);
+    renderWeeklyCharts();
 </script>
 </body>
 </html>

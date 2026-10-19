@@ -46,6 +46,9 @@ def login():
                 if user.role == "admin":
                     return redirect("/admin")
 
+                if user.role == "aftab":
+                    return redirect("/admin/delayed-surveys")
+
                 if user.role == "captain":
                     return redirect("/captain-home")
                 

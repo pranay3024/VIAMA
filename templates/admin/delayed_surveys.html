@@ -122,6 +122,7 @@
                         <th>Working Days Delay</th>
                         <th>Match Status</th>
                         <th>Manual Correction</th>
+                        <th>Raw Excel Received</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -152,31 +153,7 @@
                         <td>{{ survey.extracted_survey_start_date.strftime('%d/%m/%Y') if survey.extracted_survey_start_date else '-' }}</td>
                         <td>{{ survey.extracted_survey_end_date.strftime('%d/%m/%Y') if survey.extracted_survey_end_date else '-' }}</td>
                         <td>
-                            {% if survey.survey_dates_approved %}
-                                <strong style="color:green;">YES</strong>
-                                {% if survey.survey_dates_approved_at %}
-                                    <br>{{ survey.display_survey_dates_approved_at.strftime('%d/%m/%Y %I:%M %p') }} IST
-                                {% endif %}
-                                {% if survey.survey_form_approved and not survey.raw_video_email_sent_at %}
-                                    <form method="post" action="{{ url_for('admin.approve_survey_dates', survey_id=survey.id) }}">
-                                        <input type="hidden" name="week" value="{{ selected_week }}">
-                                        <input type="hidden" name="team" value="{{ selected_team }}">
-                                        <input type="hidden" name="state" value="{{ selected_state }}">
-                                        <input type="hidden" name="delay" value="{{ selected_delay }}">
-                                        <button type="submit" class="search-btn">Retry Email</button>
-                                    </form>
-                                {% endif %}
-                            {% elif survey.extracted_survey_start_date and survey.extracted_survey_end_date %}
-                                <form method="post" action="{{ url_for('admin.approve_survey_dates', survey_id=survey.id) }}">
-                                    <input type="hidden" name="week" value="{{ selected_week }}">
-                                    <input type="hidden" name="team" value="{{ selected_team }}">
-                                    <input type="hidden" name="state" value="{{ selected_state }}">
-                                    <input type="hidden" name="delay" value="{{ selected_delay }}">
-                                    <button type="submit" class="search-btn">Approve Dates</button>
-                                </form>
-                            {% else %}
-                                Pending dates
-                            {% endif %}
+                            <strong style="color:{{ 'green' if survey.survey_dates_approved else '#a33' }};">{{ 'YES' if survey.survey_dates_approved else 'NO' }}</strong>
                         </td>
                         <td>
                             {% if survey.raw_video_email_sent_at %}
@@ -196,17 +173,24 @@
                         <td>{{ '%.0f%%'|format((survey.defect_report_sent_confidence or 0) * 100) }}</td>
                         <td style="color:red;font-weight:bold;">{{ survey.defect_report_delay_days if survey.defect_report_delay_days is not none else '-' }}</td>
                         <td>{{ survey.defect_report_match_status if survey.defect_report_match_status else '-' }}</td>
-                                                <td>
+                        <td>
                             <form method="post" action="{{ url_for('admin.manual_delayed_survey_update', survey_id=survey.id, week=selected_week, team=selected_team or None, state=selected_state or None) }}">
                                 <input type="date" name="manual_start_date" value="{{ survey.extracted_survey_start_date.isoformat() if survey.extracted_survey_start_date else '' }}" title="Manual survey start date">
                                 <input type="date" name="manual_end_date" value="{{ survey.extracted_survey_end_date.isoformat() if survey.extracted_survey_end_date else '' }}" title="Manual survey end date">
-                               <input type="date" name="manual_sent_at" value="{{ survey.defect_report_sent_at.strftime('%Y-%m-%d') if survey.defect_report_sent_at else '' }}" title="Manual defect report sent date">
+                                <input type="date" name="manual_sent_at" value="{{ survey.defect_report_sent_at.strftime('%Y-%m-%d') if survey.defect_report_sent_at else '' }}" title="Manual defect report sent date">
                                 <button type="submit" class="search-btn">Save</button>
                             </form>
                         </td>
+                        <td>
+                            {% if survey.raw_video_excel_file %}
+                                <a href="{{ survey.raw_video_excel_file }}" target="_blank" rel="noopener">YES (View)</a>
+                            {% else %}
+                                <span style="color:#a33;font-weight:bold;">NO</span>
+                            {% endif %}
+                        </td>
                     </tr>
                 {% else %}
-                    <tr><td colspan="18">No surveys with a survey form in Week {{ selected_week }}.</td></tr>
+                    <tr><td colspan="19">No surveys with a survey form in Week {{ selected_week }}.</td></tr>
                 {% endfor %}
                 </tbody>
             </table>

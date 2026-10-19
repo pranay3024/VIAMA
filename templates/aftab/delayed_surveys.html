@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Aftab | Survey Processing</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}">
+    <style>
+        .aftab-content { width: 100%; box-sizing: border-box; padding: 20px 18px 36px; }
+        .aftab-filters { display: flex; align-items: end; flex-wrap: wrap; gap: 10px; margin-bottom: 16px; }
+        .aftab-filters label { display: grid; gap: 5px; color: #34464d; font-size: 13px; font-weight: 650; }
+        .aftab-filters select, .aftab-filters input { min-height: 38px; padding: 7px 9px; border: 1px solid #d8b995; border-radius: 4px; background: #fff; font: inherit; }
+        .aftab-summary { margin-bottom: 14px; padding: 12px 14px; border: 1px solid #f1d0b1; border-left: 4px solid #ff7a00; border-radius: 4px; background: #fff8ef; }
+        .aftab-table-wrap { overflow: auto; background: #fff; }
+        .aftab-table { width: 100%; min-width: 1250px; border-collapse: collapse; font-size: 14px; }
+        .aftab-table th, .aftab-table td { padding: 9px 10px; border-bottom: 1px solid #e5e7eb; text-align: center; vertical-align: middle; }
+        .aftab-table th { position: sticky; top: 0; z-index: 2; background: #ff7a00; color: #fff; font-size: 13px; }
+        .aftab-table tbody tr:hover { background: #fff8ef; }
+        .aftab-action { display: inline-block; padding: 7px 10px; border: 0; border-radius: 4px; background: #ff7a00; color: #fff; cursor: pointer; font: inherit; font-weight: 650; }
+        .aftab-action:hover { background: #ea580c; }
+        .approved { color: #188044; font-weight: 700; }
+        .pending { color: #a33; font-weight: 700; }
+        .received { color: #188044; font-weight: 700; }
+        .missing { color: #a33; font-weight: 700; }
+        .date-form { display: grid; justify-items: center; gap: 5px; }
+        .date-form input[type="hidden"] { display: none; }
+        .flash-line { margin-bottom: 10px; }
+        @media (max-width: 700px) { .aftab-content { padding: 14px 10px 24px; } }
+    </style>
+</head>
+<body>
+<div class="top-navbar">
+    <div class="nav-left">
+        <img src="{{ url_for('static', filename='images/viama_logo.png') }}" class="logo-img" alt="VIAMA">
+        <div class="welcome-text"><h2>Survey Processing</h2><p>Aftab · delayed survey review</p></div>
+    </div>
+    <a href="/logout" class="logout-btn">Logout</a>
+</div>
+
+<main class="aftab-content">
+    {% if message %}<div class="flash-line alert-popup">{{ message }}</div>{% endif %}
+    {% with notices = get_flashed_messages(with_categories=true) %}
+        {% for category, notice in notices %}<div class="flash-line alert-popup">{{ notice }}</div>{% endfor %}
+    {% endwith %}
+
+    <form class="aftab-filters" method="get" id="filter-form">
+        <label>Week
+            <select name="week" onchange="this.form.submit()">{% for week in week_options %}<option value="{{ week }}" {% if selected_week == week %}selected{% endif %}>Week {{ week }}{% if week == current_week_no %} (current){% endif %}</option>{% endfor %}</select>
+        </label>
+        <label>Team
+            <select name="team" onchange="this.form.submit()">
+                <option value="">All Teams</option>
+                <option value="Krish" {% if selected_team == 'Krish' %}selected{% endif %}>Krish (North-East)</option>
+                <option value="Godbole" {% if selected_team == 'Godbole' %}selected{% endif %}>Godbole (Odisha)</option>
+                <option value="Aspizo" {% if selected_team == 'Aspizo' %}selected{% endif %}>Aspizo (UP-Jharkhand)</option>
+            </select>
+        </label>
+        <label>State
+            <select name="state" onchange="this.form.submit()">
+                <option value="">All States</option>
+                {% for state_value, state_label in [('WEST BENGAL', 'West Bengal'), ('ODISHA', 'Odisha'), ('UP', 'UP'), ('JHARKHAND', 'Jharkhand'), ('BIHAR', 'Bihar'), ('ASSAM', 'Assam'), ('MEGHALAYA', 'Meghalaya')] %}
+                    <option value="{{ state_value }}" {% if selected_state == state_value %}selected{% endif %}>{{ state_label }}</option>
+                {% endfor %}
+            </select>
+        </label>
+        <label>Delay filter
+            <select name="delay" onchange="this.form.submit()">
+                <option value="">All</option>
+                <option value="0" {% if selected_delay == '0' %}selected{% endif %}>0 days</option>
+                <option value="1" {% if selected_delay == '1' %}selected{% endif %}>&gt;= 1 day</option>
+                <option value="3" {% if selected_delay == '3' %}selected{% endif %}>&gt;= 3 days</option>
+                <option value="5" {% if selected_delay == '5' %}selected{% endif %}>&gt;= 5 days</option>
+                <option value="7" {% if selected_delay == '7' %}selected{% endif %}>&gt;= 7 days</option>
+                {% for d in delay_options %}{% if d not in [0,1,3,5,7] %}<option value="{{ d }}" {% if selected_delay == d|string %}selected{% endif %}>{{ d }} days</option>{% endif %}{% endfor %}
+                <option value="custom" {% if selected_delay == 'custom' %}selected{% endif %}>Custom...</option>
+            </select>
+        </label>
+        {% if selected_delay == 'custom' %}<input type="number" name="delay_custom" min="0" value="{{ selected_delay_custom or '' }}" placeholder="exact days" onchange="this.form.submit()">{% endif %}
+        <a href="{{ url_for('admin.delayed_surveys') }}" class="search-btn">Clear Filters</a>
+    </form>
+
+    <section class="aftab-summary">
+        <strong>Week {{ selected_week }}</strong>{% if selected_week == current_week_no %} (current week){% endif %}
+        · {{ week_start.strftime('%d/%m/%Y') }} to {{ week_end_display.strftime('%d/%m/%Y') }}
+        · {{ delayed_surveys|length }} surveys with a survey form
+    </section>
+
+    <div class="aftab-table-wrap">
+        <table class="aftab-table">
+            <thead><tr>
+                <th>S.No.</th><th>UPC Code</th><th>Stretch / Cycle</th><th>Section Length (km)</th>
+                <th>PDF Upload Time</th><th>End Time</th><th>Bucket Video Upload Time</th>
+                <th>Survey Start Date</th><th>Survey End Date</th><th>Dates Approval</th>
+                <th>Survey Form Email</th><th>Raw Excel Received</th>
+            </tr></thead>
+            <tbody>
+            {% for survey in delayed_surveys %}
+                <tr>
+                    <td>{{ loop.index }}</td>
+                    <td>{{ survey.upc_code or '-' }}</td>
+                    <td>{{ survey.section_no }}_Cycle{{ survey.cycle_no }}</td>
+                    <td>{{ '%.2f'|format(survey.section_length) if survey.section_length else '-' }}</td>
+                    <td>{{ survey.display_pdf_upload_time.strftime('%d/%m/%Y %I:%M %p') if survey.display_pdf_upload_time else '-' }}</td>
+                    <td>{{ survey.display_end_time.strftime('%d/%m/%Y %I:%M %p') if survey.display_end_time else '-' }}</td>
+                    <td>
+                        {% if survey.bucket_video_upload_time %}
+                            {{ survey.display_video_upload_time.strftime('%d/%m/%Y %I:%M %p') }}
+                        {% elif survey.display_video_upload_time %}
+                            {{ survey.display_video_upload_time.strftime('%d/%m/%Y %I:%M %p') }}
+                        {% else %}-{% endif %}
+                    </td>
+                    <td>{{ survey.extracted_survey_start_date.strftime('%d/%m/%Y') if survey.extracted_survey_start_date else '-' }}</td>
+                    <td>{{ survey.extracted_survey_end_date.strftime('%d/%m/%Y') if survey.extracted_survey_end_date else '-' }}</td>
+                    <td>
+                        {% if survey.survey_dates_approved %}
+                            <span class="approved">YES</span>
+                            {% if survey.survey_form_approved and not survey.raw_video_email_sent_at %}
+                                <form class="date-form" method="post" action="{{ url_for('admin.approve_survey_dates', survey_id=survey.id) }}">
+                                    <input type="hidden" name="week" value="{{ selected_week }}"><input type="hidden" name="team" value="{{ selected_team }}"><input type="hidden" name="state" value="{{ selected_state }}"><input type="hidden" name="delay" value="{{ selected_delay }}">
+                                    <button class="aftab-action" type="submit">Retry Email</button>
+                                </form>
+                            {% endif %}
+                        {% elif survey.extracted_survey_start_date and survey.extracted_survey_end_date %}
+                            <form class="date-form" method="post" action="{{ url_for('admin.approve_survey_dates', survey_id=survey.id) }}">
+                                <input type="hidden" name="week" value="{{ selected_week }}"><input type="hidden" name="team" value="{{ selected_team }}"><input type="hidden" name="state" value="{{ selected_state }}"><input type="hidden" name="delay" value="{{ selected_delay }}">
+                                <button class="aftab-action" type="submit">Approve Dates</button>
+                            </form>
+                        {% else %}<span class="pending">Pending dates</span>{% endif %}
+                    </td>
+                    <td>
+                        {% if survey.raw_video_email_sent_at %}Sent<br>{{ survey.display_raw_video_email_sent_at.strftime('%d/%m/%Y %I:%M %p') }} IST
+                        {% elif survey.survey_dates_approved and survey.survey_form_approved %}Ready to retry
+                        {% elif survey.survey_dates_approved %}Waiting for form approval
+                        {% elif survey.survey_form_approved %}Waiting for dates approval
+                        {% else %}Waiting for approvals{% endif %}
+                    </td>
+                    <td>{% if survey.raw_video_excel_file %}<a href="{{ survey.raw_video_excel_file }}" target="_blank" rel="noopener">Received</a>{% else %}<span class="missing">NO</span>{% endif %}</td>
+                </tr>
+            {% else %}
+                <tr><td colspan="12">No surveys with a survey form in Week {{ selected_week }}.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</main>
+</body>
+</html>

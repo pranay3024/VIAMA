@@ -117,6 +117,37 @@ def _cancelled_survey_criterion():
     )
 
 
+def _raw_xlsx_label_for_survey(survey, raw_files):
+    identifiers = {
+        "".join(character for character in str(value or "") if character.isalnum()).casefold()
+        for value in (survey.section_no, survey.upc_code, survey.stretch_code)
+    }
+    identifiers.discard("")
+    if not identifiers or survey.cycle_no is None:
+        return None
+
+    is_night = str(survey.survey_type or "").strip().casefold() == "night"
+    for raw_file in raw_files:
+        try:
+            cycle_no = int(raw_file.get("cycle"))
+        except (TypeError, ValueError):
+            continue
+        if cycle_no != survey.cycle_no:
+            continue
+
+        dn = str(raw_file.get("dn") or "").strip().casefold()
+        if (dn == "night") != is_night:
+            continue
+
+        label = str(raw_file.get("label") or "")
+        normalized_label = "".join(
+            character for character in label if character.isalnum()
+        ).casefold()
+        if normalized_label in identifiers:
+            return label
+    return None
+
+
 def _ensure_weekly_survey_plan_schema():
     if current_app.extensions.get("weekly_survey_plan_schema_ready"):
         return
@@ -594,6 +625,21 @@ def delayed_surveys():
                 if survey.video_upload_time else None
             )
         )
+
+    try:
+        from utils.raw_xlsx import list_raw_xlsx_files
+
+        raw_xlsx_files = list_raw_xlsx_files()
+    except Exception as exc:
+        log.warning("RoadVision raw XLSX inventory unavailable: %s", exc)
+        raw_xlsx_files = []
+
+    for survey in delayed:
+        survey.raw_video_api_label = _raw_xlsx_label_for_survey(
+            survey,
+            raw_xlsx_files,
+        )
+        survey.raw_video_api_received = bool(survey.raw_video_api_label)
 
     total_delay_days = sum(
         survey.defect_report_delay_days or 0

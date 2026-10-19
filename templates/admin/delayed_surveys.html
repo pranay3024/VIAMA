@@ -159,6 +159,8 @@
                         <td>
                             {% if survey.raw_video_excel_file %}
                                 <a href="{{ survey.raw_video_excel_file }}" target="_blank" rel="noopener">YES (View)</a>
+                            {% elif survey.raw_video_api_received %}
+                                <span title="RoadVision file: {{ survey.raw_video_api_label }}; cycle {{ survey.cycle_no }}">YES (RoadVision)</span>
                             {% else %}
                                 <span style="color:#a33;font-weight:bold;">NO</span>
                             {% endif %}

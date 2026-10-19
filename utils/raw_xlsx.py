@@ -1,6 +1,7 @@
 """Download the RoadVision raw-video spreadsheet for a survey stretch."""
 
 import os
+import json
 import re
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
@@ -8,7 +9,31 @@ from urllib.request import Request, urlopen
 
 
 API_URL = "https://gis.roadvision.ai/api/raw-xlsx"
+LIST_API_URL = f"{API_URL}/list"
 TIMEOUT_SECONDS = 20
+LIST_TIMEOUT_SECONDS = 5
+
+
+def list_raw_xlsx_files():
+    """Return the RoadVision raw-XLSX inventory metadata."""
+    api_key = (os.getenv("RV_RAW_XLSX_API_KEY") or "").strip()
+    if not api_key:
+        raise RuntimeError("RV_RAW_XLSX_API_KEY is not configured")
+
+    request = Request(
+        LIST_API_URL,
+        headers={"X-API-Key": api_key, "Accept": "application/json"},
+    )
+    try:
+        with urlopen(request, timeout=LIST_TIMEOUT_SECONDS) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+    except (HTTPError, URLError, TimeoutError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise RuntimeError("RoadVision raw XLSX inventory is unavailable") from exc
+
+    files = payload.get("files") if isinstance(payload, dict) else None
+    if not isinstance(files, list):
+        raise RuntimeError("RoadVision returned an invalid raw XLSX inventory")
+    return files
 
 
 def download_raw_xlsx(section_no, cycle_no, survey_type):

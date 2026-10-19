@@ -154,7 +154,15 @@
                             <button type="submit" class="aftab-action">Save</button>
                         </form>
                     </td>
-                    <td>{% if survey.raw_video_excel_file %}<a href="{{ survey.raw_video_excel_file }}" target="_blank" rel="noopener">Received</a>{% else %}<span class="missing">NO</span>{% endif %}</td>
+                    <td>
+                        {% if survey.raw_video_excel_file %}
+                            <a href="{{ survey.raw_video_excel_file }}" target="_blank" rel="noopener">Received</a>
+                        {% elif survey.raw_video_api_received %}
+                            <span title="RoadVision file: {{ survey.raw_video_api_label }}; cycle {{ survey.cycle_no }}">Received (RoadVision)</span>
+                        {% else %}
+                            <span class="missing">NO</span>
+                        {% endif %}
+                    </td>
                 </tr>
             {% else %}
                 <tr><td colspan="20">No surveys with a survey form in Week {{ selected_week }}.</td></tr>

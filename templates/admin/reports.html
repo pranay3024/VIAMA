@@ -31,6 +31,7 @@
         .chart-legend { display: flex; gap: 20px; color: #52676d; font-size: 13px; }
         .legend-mark { display: inline-block; width: 11px; height: 11px; margin-right: 6px; border-radius: 2px; background: #ff7a00; }
         .legend-mark.conducted { background: #c2410c; border-radius: 50%; }
+        .legend-mark.cancelled { background: #1f4e79; }
         .top-navbar { position: static; }
         @media (max-width: 700px) {
             .reports-page { padding: 16px 12px 28px; }
@@ -149,7 +150,7 @@
             { key: "scheduled", label: "Scheduled", color: "#ff7a00" },
         ]);
         renderBarChart(cancelledChart, weeklyChartData.map((item) => ({ ...item })), [
-            { key: "cancelled", label: "Cancelled", color: "#c2410c" },
+            { key: "cancelled", label: "Cancelled", color: "#1f4e79" },
             { key: "scheduled", label: "Scheduled", color: "#ff7a00" },
         ]);
     }

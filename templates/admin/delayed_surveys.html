@@ -108,20 +108,13 @@
                         <th>UPC Code</th>
                         <th>Stretch / Cycle</th>
                         <th>Section Length (km)</th>
-                        <th>Survey PDF</th>
-                        <th>PDF Upload Time</th>
-                        <th>End Time</th>
                         <th title="Last video upload time recorded in the RoadVision GCS bucket. Falls back to the captain-reported time for stretches the bucket has never seen.">Bucket Video Upload Time</th>
-                        <th>Survey Start Date</th>
                         <th>Survey End Date</th>
                         <th>Dates Approval</th>
                         <th>Survey Form Email</th>
-                        <th>End Date Confidence</th>
                         <th>Defect Report Sent</th>
-                        <th>Gmail Sent Confidence</th>
                         <th>Working Days Delay</th>
                         <th>Match Status</th>
-                        <th>Manual Correction</th>
                         <th>Raw Excel Received</th>
                     </tr>
                 </thead>
@@ -133,15 +126,6 @@
                         <td>{{ survey.section_no }}_Cycle{{ survey.cycle_no }}</td>
                         <td>{{ '%.2f'|format(survey.section_length) if survey.section_length else '-' }}</td>
                         <td>
-                            {% if survey.end_survey_pdf %}
-                                <a href="{{ survey.end_survey_pdf }}" class="view-btn" target="_blank" rel="noopener">View</a>
-                            {% else %}
-                                -
-                            {% endif %}
-                        </td>
-                        <td>{{ survey.display_pdf_upload_time.strftime('%d/%m/%Y %I:%M %p') if survey.display_pdf_upload_time else '-' }}</td>
-                        <td>{{ survey.display_end_time.strftime('%d/%m/%Y %I:%M %p') if survey.display_end_time else '-' }}</td>
-                        <td>
                             {% if survey.bucket_video_upload_time %}
                                 <span title="From the RoadVision GCS bucket (stretch {{ survey.bucket_match_keys|join(', ') }}, cycle {{ survey.cycle_no }}{% if survey.bucket_match_keys|length > 1 %} - latest of the covered stretches{% endif %})">{{ survey.display_video_upload_time.strftime('%d/%m/%Y %I:%M %p') }}</span>
                             {% elif survey.display_video_upload_time %}
@@ -150,7 +134,6 @@
                                 -
                             {% endif %}
                         </td>
-                        <td>{{ survey.extracted_survey_start_date.strftime('%d/%m/%Y') if survey.extracted_survey_start_date else '-' }}</td>
                         <td>{{ survey.extracted_survey_end_date.strftime('%d/%m/%Y') if survey.extracted_survey_end_date else '-' }}</td>
                         <td>
                             <strong style="color:{{ 'green' if survey.survey_dates_approved else '#a33' }};">{{ 'YES' if survey.survey_dates_approved else 'NO' }}</strong>
@@ -168,19 +151,9 @@
                                 Waiting for approvals
                             {% endif %}
                         </td>
-                        <td>{{ '%.0f%%'|format((survey.survey_end_date_confidence or 0) * 100) }}</td>
                         <td>{{ survey.defect_report_sent_at.strftime('%d/%m/%Y') if survey.defect_report_sent_at else '-' }}</td>
-                        <td>{{ '%.0f%%'|format((survey.defect_report_sent_confidence or 0) * 100) }}</td>
                         <td style="color:red;font-weight:bold;">{{ survey.defect_report_delay_days if survey.defect_report_delay_days is not none else '-' }}</td>
                         <td>{{ survey.defect_report_match_status if survey.defect_report_match_status else '-' }}</td>
-                        <td>
-                            <form method="post" action="{{ url_for('admin.manual_delayed_survey_update', survey_id=survey.id, week=selected_week, team=selected_team or None, state=selected_state or None) }}">
-                                <input type="date" name="manual_start_date" value="{{ survey.extracted_survey_start_date.isoformat() if survey.extracted_survey_start_date else '' }}" title="Manual survey start date">
-                                <input type="date" name="manual_end_date" value="{{ survey.extracted_survey_end_date.isoformat() if survey.extracted_survey_end_date else '' }}" title="Manual survey end date">
-                                <input type="date" name="manual_sent_at" value="{{ survey.defect_report_sent_at.strftime('%Y-%m-%d') if survey.defect_report_sent_at else '' }}" title="Manual defect report sent date">
-                                <button type="submit" class="search-btn">Save</button>
-                            </form>
-                        </td>
                         <td>
                             {% if survey.raw_video_excel_file %}
                                 <a href="{{ survey.raw_video_excel_file }}" target="_blank" rel="noopener">YES (View)</a>
@@ -190,7 +163,7 @@
                         </td>
                     </tr>
                 {% else %}
-                    <tr><td colspan="19">No surveys with a survey form in Week {{ selected_week }}.</td></tr>
+                    <tr><td colspan="12">No surveys with a survey form in Week {{ selected_week }}.</td></tr>
                 {% endfor %}
                 </tbody>
             </table>

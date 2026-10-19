@@ -16,6 +16,7 @@
         .aftab-table th, .aftab-table td { padding: 9px 10px; border-bottom: 1px solid #e5e7eb; text-align: center; vertical-align: middle; }
         .aftab-table th { position: sticky; top: 0; z-index: 2; background: #ff7a00; color: #fff; font-size: 13px; }
         .aftab-table tbody tr:hover { background: #fff8ef; }
+        .aftab-table th:nth-child(18), .aftab-table td:nth-child(18) { width: 220px; min-width: 220px; }
         .aftab-action { display: inline-block; padding: 7px 10px; border: 0; border-radius: 4px; background: #ff7a00; color: #fff; cursor: pointer; font: inherit; font-weight: 650; }
         .aftab-action:hover { background: #ea580c; }
         .approved { color: #188044; font-weight: 700; }
@@ -24,6 +25,9 @@
         .missing { color: #a33; font-weight: 700; }
         .date-form { display: grid; justify-items: center; gap: 5px; }
         .date-form input[type="hidden"] { display: none; }
+        .manual-form { display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; width: 100%; }
+        .manual-form input[type="date"] { box-sizing: border-box; width: 100%; min-width: 0; }
+        .manual-form button { width: 100%; }
         .flash-line { margin-bottom: 10px; }
         @media (max-width: 700px) { .aftab-content { padding: 14px 10px 24px; } }
     </style>
@@ -89,9 +93,10 @@
         <table class="aftab-table">
             <thead><tr>
                 <th>S.No.</th><th>UPC Code</th><th>Stretch / Cycle</th><th>Section Length (km)</th>
-                <th>PDF Upload Time</th><th>End Time</th><th>Bucket Video Upload Time</th>
-                <th>Survey Start Date</th><th>Survey End Date</th><th>Dates Approval</th>
-                <th>Survey Form Email</th><th>Raw Excel Received</th>
+                <th>Survey PDF</th><th>PDF Upload Time</th><th>End Time</th><th>Bucket Video Upload Time</th>
+                <th>Survey Start Date</th><th>Survey End Date</th><th>End Date Confidence</th><th>Dates Approval</th>
+                <th>Survey Form Email</th><th>Defect Report Sent</th><th>Gmail Sent Confidence</th>
+                <th>Working Days Delay</th><th>Match Status</th><th>Manual Correction</th><th>Raw Excel Received</th>
             </tr></thead>
             <tbody>
             {% for survey in delayed_surveys %}
@@ -100,6 +105,7 @@
                     <td>{{ survey.upc_code or '-' }}</td>
                     <td>{{ survey.section_no }}_Cycle{{ survey.cycle_no }}</td>
                     <td>{{ '%.2f'|format(survey.section_length) if survey.section_length else '-' }}</td>
+                    <td>{% if survey.end_survey_pdf %}<a href="{{ survey.end_survey_pdf }}" target="_blank" rel="noopener">View</a>{% else %}-{% endif %}</td>
                     <td>{{ survey.display_pdf_upload_time.strftime('%d/%m/%Y %I:%M %p') if survey.display_pdf_upload_time else '-' }}</td>
                     <td>{{ survey.display_end_time.strftime('%d/%m/%Y %I:%M %p') if survey.display_end_time else '-' }}</td>
                     <td>
@@ -111,6 +117,7 @@
                     </td>
                     <td>{{ survey.extracted_survey_start_date.strftime('%d/%m/%Y') if survey.extracted_survey_start_date else '-' }}</td>
                     <td>{{ survey.extracted_survey_end_date.strftime('%d/%m/%Y') if survey.extracted_survey_end_date else '-' }}</td>
+                    <td>{{ '%.0f%%'|format((survey.survey_end_date_confidence or 0) * 100) }}</td>
                     <td>
                         {% if survey.survey_dates_approved %}
                             <span class="approved">YES</span>
@@ -134,10 +141,22 @@
                         {% elif survey.survey_form_approved %}Waiting for dates approval
                         {% else %}Waiting for approvals{% endif %}
                     </td>
+                    <td>{{ survey.defect_report_sent_at.strftime('%d/%m/%Y') if survey.defect_report_sent_at else '-' }}</td>
+                    <td>{{ '%.0f%%'|format((survey.defect_report_sent_confidence or 0) * 100) }}</td>
+                    <td style="color:red;font-weight:bold;">{{ survey.defect_report_delay_days if survey.defect_report_delay_days is not none else '-' }}</td>
+                    <td>{{ survey.defect_report_match_status if survey.defect_report_match_status else '-' }}</td>
+                    <td>
+                        <form class="manual-form" method="post" action="{{ url_for('admin.manual_delayed_survey_update', survey_id=survey.id, week=selected_week, team=selected_team or None, state=selected_state or None, delay=selected_delay or None) }}">
+                            <input type="date" name="manual_start_date" value="{{ survey.extracted_survey_start_date.isoformat() if survey.extracted_survey_start_date else '' }}" title="Manual survey start date">
+                            <input type="date" name="manual_end_date" value="{{ survey.extracted_survey_end_date.isoformat() if survey.extracted_survey_end_date else '' }}" title="Manual survey end date">
+                            <input type="date" name="manual_sent_at" value="{{ survey.defect_report_sent_at.strftime('%Y-%m-%d') if survey.defect_report_sent_at else '' }}" title="Manual defect report sent date">
+                            <button type="submit" class="aftab-action">Save</button>
+                        </form>
+                    </td>
                     <td>{% if survey.raw_video_excel_file %}<a href="{{ survey.raw_video_excel_file }}" target="_blank" rel="noopener">Received</a>{% else %}<span class="missing">NO</span>{% endif %}</td>
                 </tr>
             {% else %}
-                <tr><td colspan="12">No surveys with a survey form in Week {{ selected_week }}.</td></tr>
+                <tr><td colspan="19">No surveys with a survey form in Week {{ selected_week }}.</td></tr>
             {% endfor %}
             </tbody>
         </table>

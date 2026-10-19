@@ -147,7 +147,7 @@ def _ensure_weekly_survey_plan_schema():
 
 @admin_bp.route("/admin/delayed-surveys/manual/<int:survey_id>", methods=["POST"])
 def manual_delayed_survey_update(survey_id):
-    if session.get("role") != "admin":
+    if session.get("role") not in ("admin", "aftab"):
         return redirect("/")
 
     survey = Survey.query.get_or_404(survey_id)

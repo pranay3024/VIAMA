@@ -10,8 +10,11 @@ from unittest.mock import MagicMock, patch
 from flask import Flask
 
 from extensions import db
+from models.db_models import Survey
 import google_drive
 import utils.approved_survey_email as approved_email
+import utils.approved_survey_defect_email as defect_email
+import utils.defect_report_api as defect_api
 import utils.microsoft_graph_mail as graph_mail
 import utils.raw_xlsx as raw_xlsx
 
@@ -35,6 +38,8 @@ class ApprovedSurveyEmailTests(unittest.TestCase):
             id=42,
             raw_video_email_sent_at=None,
             raw_video_email_message_id=None,
+            defect_report_email_sent_at=None,
+            defect_report_email_message_id=None,
             survey_dates_approved=dates_approved,
             survey_form_approved=True,
             extracted_survey_start_date=date(2026, 10, 1),
@@ -93,6 +98,11 @@ class ApprovedSurveyEmailTests(unittest.TestCase):
                 "send_microsoft_graph_email",
                 return_value="graph-id",
             ) as send,
+            patch.object(
+                defect_email,
+                "send_approved_survey_defect_email",
+                return_value="waiting_for_defect_report",
+            ) as defect_send,
             patch.object(approved_email.db.session, "commit"),
         ):
             result = approved_email.send_approved_survey_email(survey.id)
@@ -107,6 +117,95 @@ class ApprovedSurveyEmailTests(unittest.TestCase):
             [(b"PK-xlsx", "Raw_Video_S-1_Cycle1.xlsx")],
         )
         self.assertEqual(survey.raw_video_email_message_id, "graph-id")
+        defect_send.assert_called_once_with(survey.id)
+
+    def test_defect_email_waits_until_raw_email_was_sent(self):
+        survey = self.make_survey()
+        with (
+            patch.object(Survey, "query", self.make_query(survey)),
+            patch.object(defect_email, "list_defect_report_files") as inventory,
+            patch.object(defect_email.db.session, "rollback"),
+        ):
+            result = defect_email.send_approved_survey_defect_email(survey.id)
+
+        self.assertEqual(result, "waiting_for_raw_email")
+        inventory.assert_not_called()
+
+    def test_defect_email_sends_matching_report_using_defect_template(self):
+        survey = self.make_survey()
+        survey.raw_video_email_sent_at = datetime(2026, 10, 16)
+        report = {"label": "S-1", "cycle": 1, "dn": "day"}
+        with (
+            patch.object(Survey, "query", self.make_query(survey)),
+            patch.object(defect_email, "list_defect_report_files", return_value=[report]),
+            patch.object(defect_email, "find_defect_report_file", return_value=report),
+            patch.object(
+                defect_email,
+                "download_defect_report",
+                return_value=(b"PK-defect", "Defect_Report_S-1_Cycle1_Day.xlsx"),
+            ),
+            patch.object(
+                defect_email,
+                "send_microsoft_graph_email",
+                return_value="defect-graph-id",
+            ) as send,
+            patch.object(defect_email.db.session, "commit"),
+        ):
+            result = defect_email.send_approved_survey_defect_email(survey.id)
+
+        self.assertEqual(result, "sent")
+        self.assertEqual(send.call_args.kwargs["to_email"], "mail.hunterrr@gmail.com")
+        self.assertEqual(send.call_args.kwargs["from_email"], "projects9@adorpower.com")
+        self.assertIn("Submission of Survey Report", send.call_args.kwargs["subject"])
+        self.assertEqual(send.call_args.kwargs["attachment_bytes"], b"PK-defect")
+        self.assertEqual(survey.defect_report_email_message_id, "defect-graph-id")
+
+    def test_defect_download_requests_day_report_with_matching_cycle(self):
+        response = MagicMock()
+        response.__enter__.return_value.read.return_value = b"PK-defect"
+        with (
+            patch.dict(os.environ, {"RV_DEFECT_REPORT_API_KEY": "defect-key"}),
+            patch.object(defect_api, "urlopen", return_value=response) as open_url,
+        ):
+            content, filename = defect_api.download_defect_report(
+                "N0908601002UP", 7, "Day"
+            )
+
+        request = open_url.call_args.args[0]
+        self.assertEqual(content, b"PK-defect")
+        self.assertEqual(
+            filename,
+            "Defect_Report_N0908601002UP_Cycle7_Day.xlsx",
+        )
+        self.assertEqual(
+            parse_qs(urlparse(request.full_url).query),
+            {"stretch": ["N0908601002UP"], "cycle": ["7"], "dn": ["day"]},
+        )
+        self.assertEqual(request.get_header("X-api-key"), "defect-key")
+
+    def test_pending_defect_processor_sends_only_matching_inventory_rows(self):
+        query = MagicMock()
+        query.filter.return_value.order_by.return_value.limit.return_value.all.return_value = [
+            (1900, "N/09086/01002/UP", "N/09086/01002/UP", 7, "Day"),
+        ]
+        report = {"label": "N0908601002UP", "cycle": 7, "dn": "day"}
+        with (
+            patch.object(defect_email.db.session, "query", return_value=query),
+            patch.object(defect_email, "list_defect_report_files", return_value=[report]),
+            patch.object(defect_email, "find_defect_report_file", return_value=report),
+            patch.object(
+                defect_email,
+                "send_approved_survey_defect_email",
+                return_value="sent",
+            ) as send,
+        ):
+            result = defect_email.process_pending_approved_defect_emails(limit=20)
+
+        self.assertEqual(
+            result,
+            {"checked": 1, "sent": 1, "waiting_for_defect_report": 0, "failed": 0},
+        )
+        send.assert_called_once_with(1900, inventory=[report])
 
     def test_email_waits_without_error_when_raw_xlsx_is_not_listed(self):
         survey = self.make_survey()
@@ -235,6 +334,26 @@ class ApprovedSurveyEmailTests(unittest.TestCase):
             raw_xlsx.raw_xlsx_is_listed(
                 "N/09086/01002/UP", "N/09086/01002/UP", 7, "Night", files
             )
+        )
+
+    def test_defect_inventory_matches_section_upc_cycle_and_day_night(self):
+        files = [
+            {"label": "N0908601002UP", "cycle": 7, "dn": "day"},
+            {"label": "124", "cycle": 2, "dn": "night"},
+        ]
+
+        self.assertEqual(
+            defect_api.find_defect_report_file(
+                "N/09086/01002/UP", "N/09086/01002/UP", 7, "Day", files
+            ),
+            files[0],
+        )
+        self.assertEqual(
+            defect_api.find_defect_report_file("124", "124", 2, "Night", files),
+            files[1],
+        )
+        self.assertIsNone(
+            defect_api.find_defect_report_file("124", "124", 2, "Day", files)
         )
 
     def test_graph_sender_uses_app_token_and_both_attachments(self):

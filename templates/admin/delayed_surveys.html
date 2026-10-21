@@ -113,10 +113,12 @@
                         <th>Dates Approval</th>
                         <th>Survey Form Approved</th>
                         <th>Survey Form Email</th>
-                        <th>Defect Report Sent</th>
+                        <th>Original Defect Email Date (Gmail)</th>
                         <th>Working Days Delay</th>
                         <th>Match Status</th>
                         <th>Raw Excel Received</th>
+                        <th>Defect Report Received</th>
+                        <th>Defect Report Email Sent</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -165,9 +167,29 @@
                                 <span style="color:#a33;font-weight:bold;">NO</span>
                             {% endif %}
                         </td>
+                        <td>
+                            {% if not survey.raw_video_email_sent_at %}
+                                Waiting for raw email
+                            {% elif survey.defect_report_api_received %}
+                                <strong style="color:green;">YES</strong>
+                            {% else %}
+                                <strong style="color:#a33;">NO</strong>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if survey.defect_report_email_sent_at %}
+                                Sent<br>{{ survey.display_defect_report_email_sent_at.strftime('%d/%m/%Y %I:%M %p') }} IST
+                            {% elif survey.raw_video_email_sent_at and survey.defect_report_api_received %}
+                                Ready to send
+                            {% elif survey.raw_video_email_sent_at %}
+                                Waiting for report
+                            {% else %}
+                                Waiting for raw email
+                            {% endif %}
+                        </td>
                     </tr>
                 {% else %}
-                    <tr><td colspan="13">No surveys with a survey form in Week {{ selected_week }}.</td></tr>
+                    <tr><td colspan="15">No surveys with a survey form in Week {{ selected_week }}.</td></tr>
                 {% endfor %}
                 </tbody>
             </table>

@@ -274,6 +274,8 @@ class Survey(db.Model):
     survey_dates_approved_at = db.Column(db.DateTime, nullable=True)
     raw_video_email_sent_at = db.Column(db.DateTime, nullable=True)
     raw_video_email_message_id = db.Column(db.String(255), nullable=True)
+    defect_report_email_sent_at = db.Column(db.DateTime, nullable=True)
+    defect_report_email_message_id = db.Column(db.String(255), nullable=True)
     survey_start_date_confidence = db.Column(db.Float, nullable=True)
     extracted_ae_ie_sc_name = db.Column(db.String(255), nullable=True)
     extracted_piu_name = db.Column(db.String(255), nullable=True)

@@ -21,8 +21,17 @@ def approved_survey_email_sync():
     if not _authorised():
         return jsonify({"error": "forbidden"}), 403
 
-    summary = process_pending_approved_survey_emails(limit=20, max_seconds=240)
-    status = 503 if summary.get("failed") else 200
+    from utils.approved_survey_email import process_pending_approved_survey_emails
+    from utils.approved_survey_defect_email import process_pending_approved_defect_emails
+
+    raw_result = process_pending_approved_survey_emails(limit=20, max_seconds=100)
+    defect_result = process_pending_approved_defect_emails(limit=20, max_seconds=100)
+    summary = {"raw_video_emails": raw_result, "defect_report_emails": defect_result}
+    status = (
+        503
+        if raw_result.get("failed") or defect_result.get("failed")
+        else 200
+    )
     return jsonify(summary), status
 
 

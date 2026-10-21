@@ -646,6 +646,41 @@ def delayed_surveys():
         )
         survey.raw_video_api_received = bool(survey.raw_video_api_label)
 
+    defect_report_files = []
+    if any(survey.raw_video_email_sent_at for survey in delayed):
+        try:
+            from utils.defect_report_api import (
+                find_defect_report_file,
+                list_defect_report_files,
+            )
+
+            defect_report_files = list_defect_report_files()
+            for survey in delayed:
+                report = (
+                    find_defect_report_file(
+                        survey.section_no,
+                        survey.upc_code,
+                        survey.cycle_no,
+                        survey.survey_type,
+                        defect_report_files,
+                    )
+                    if survey.raw_video_email_sent_at
+                    else None
+                )
+                survey.defect_report_api_label = report.get("label") if report else None
+                survey.defect_report_api_received = report is not None
+        except Exception as exc:
+            log.warning("RoadVision defect-report inventory unavailable: %s", exc)
+            for survey in delayed:
+                survey.defect_report_api_label = None
+                survey.defect_report_api_received = False
+
+    for survey in delayed:
+        survey.display_defect_report_email_sent_at = (
+            survey.defect_report_email_sent_at + ist_offset
+            if survey.defect_report_email_sent_at else None
+        )
+
     total_delay_days = sum(
         survey.defect_report_delay_days or 0
         for survey in summary_surveys

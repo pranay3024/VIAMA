@@ -104,6 +104,17 @@ def send_approved_survey_email(survey_id, inventory=None):
         ).replace(tzinfo=None)
         survey.raw_video_email_message_id = message_id
         db.session.commit()
+        try:
+            from utils.approved_survey_defect_email import (
+                send_approved_survey_defect_email,
+            )
+
+            send_approved_survey_defect_email(survey.id)
+        except Exception:
+            log.exception(
+                "defect report email attempt failed for survey %s",
+                survey.id,
+            )
         return "sent"
     except RawXlsxUnavailable:
         db.session.rollback()

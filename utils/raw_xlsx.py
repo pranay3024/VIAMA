@@ -14,6 +14,41 @@ TIMEOUT_SECONDS = 20
 LIST_TIMEOUT_SECONDS = 5
 
 
+class RawXlsxUnavailable(RuntimeError):
+    """The matching raw XLSX is not ready or the upstream is temporarily down."""
+
+
+def raw_xlsx_is_listed(section_no, upc_code, cycle_no, survey_type, files):
+    """Whether the inventory contains this survey's stretch, cycle and day/night."""
+    if cycle_no is None:
+        return False
+
+    labels = set()
+    for value in (section_no, upc_code):
+        for part in re.split(r"\s*&\s*", str(value or "")):
+            label = re.sub(r"[^A-Za-z0-9]", "", part).upper()
+            if label:
+                labels.add(label)
+
+    if not labels:
+        return False
+
+    expected_dn = "night" if str(survey_type or "").strip().casefold() == "night" else ""
+    for item in files or []:
+        if not isinstance(item, dict):
+            continue
+        label = re.sub(r"[^A-Za-z0-9]", "", str(item.get("label") or "")).upper()
+        try:
+            item_cycle = int(item.get("cycle"))
+        except (TypeError, ValueError):
+            continue
+        item_dn = str(item.get("dn") or "").strip().casefold()
+        if label in labels and item_cycle == int(cycle_no) and item_dn == expected_dn:
+            return True
+
+    return False
+
+
 def list_raw_xlsx_files():
     """Return the RoadVision raw-XLSX inventory metadata."""
     api_key = (os.getenv("RV_RAW_XLSX_API_KEY") or "").strip()
@@ -28,11 +63,11 @@ def list_raw_xlsx_files():
         with urlopen(request, timeout=LIST_TIMEOUT_SECONDS) as response:
             payload = json.loads(response.read().decode("utf-8"))
     except (HTTPError, URLError, TimeoutError, UnicodeDecodeError, json.JSONDecodeError) as exc:
-        raise RuntimeError("RoadVision raw XLSX inventory is unavailable") from exc
+        raise RawXlsxUnavailable("RoadVision raw XLSX inventory is unavailable") from exc
 
     files = payload.get("files") if isinstance(payload, dict) else None
     if not isinstance(files, list):
-        raise RuntimeError("RoadVision returned an invalid raw XLSX inventory")
+        raise RawXlsxUnavailable("RoadVision returned an invalid raw XLSX inventory")
     return files
 
 
@@ -58,14 +93,21 @@ def download_raw_xlsx(section_no, cycle_no, survey_type):
     try:
         with urlopen(request, timeout=TIMEOUT_SECONDS) as response:
             content = response.read()
-    except (HTTPError, URLError, TimeoutError) as exc:
-        raise RuntimeError(
+    except HTTPError as exc:
+        if exc.code not in (404, 502, 503, 504):
+            raise
+        raise RawXlsxUnavailable(
+            f"RoadVision raw XLSX download failed for stretch {stretch}, "
+            f"cycle {cycle_no}"
+        ) from exc
+    except (URLError, TimeoutError) as exc:
+        raise RawXlsxUnavailable(
             f"RoadVision raw XLSX download failed for stretch {stretch}, "
             f"cycle {cycle_no}"
         ) from exc
 
     if not content.startswith(b"PK"):
-        raise RuntimeError(
+        raise RawXlsxUnavailable(
             f"RoadVision returned an invalid raw XLSX for stretch {stretch}, "
             f"cycle {cycle_no}"
         )

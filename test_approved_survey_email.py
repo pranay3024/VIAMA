@@ -75,6 +75,16 @@ class ApprovedSurveyEmailTests(unittest.TestCase):
             patch.object(approved_email, "download_file_from_drive", return_value=b"%PDF"),
             patch.object(
                 approved_email,
+                "list_raw_xlsx_files",
+                return_value=[{"label": "S-1", "cycle": 1, "dn": ""}],
+            ),
+            patch.object(
+                approved_email,
+                "raw_xlsx_is_listed",
+                return_value=True,
+            ),
+            patch.object(
+                approved_email,
                 "download_raw_xlsx",
                 return_value=(b"PK-xlsx", "Raw_Video_S-1_Cycle1.xlsx"),
             ),
@@ -98,22 +108,93 @@ class ApprovedSurveyEmailTests(unittest.TestCase):
         )
         self.assertEqual(survey.raw_video_email_message_id, "graph-id")
 
-    def test_raw_xlsx_failure_does_not_send_email(self):
+    def test_email_waits_without_error_when_raw_xlsx_is_not_listed(self):
         survey = self.make_survey()
         with (
             patch.object(approved_email.Survey, "query", self.make_query(survey)),
-            patch.object(approved_email, "download_file_from_drive", return_value=b"%PDF"),
             patch.object(
                 approved_email,
-                "download_raw_xlsx",
-                side_effect=RuntimeError("not found"),
+                "list_raw_xlsx_files",
+                return_value=[],
+            ),
+            patch.object(approved_email, "download_file_from_drive") as download_pdf,
+            patch.object(approved_email, "send_microsoft_graph_email") as send,
+            patch.object(approved_email.db.session, "rollback"),
+        ):
+            result = approved_email.send_approved_survey_email(survey.id)
+
+        self.assertEqual(result, "waiting_for_raw_xlsx")
+        download_pdf.assert_not_called()
+        send.assert_not_called()
+
+    def test_email_waits_without_error_when_inventory_is_unavailable(self):
+        survey = self.make_survey()
+        with (
+            patch.object(approved_email.Survey, "query", self.make_query(survey)),
+            patch.object(
+                approved_email,
+                "list_raw_xlsx_files",
+                side_effect=raw_xlsx.RawXlsxUnavailable("API unavailable"),
             ),
             patch.object(approved_email, "send_microsoft_graph_email") as send,
             patch.object(approved_email.db.session, "rollback"),
         ):
-            with self.assertRaisesRegex(RuntimeError, "not found"):
-                approved_email.send_approved_survey_email(survey.id)
+            result = approved_email.send_approved_survey_email(survey.id)
 
+        self.assertEqual(result, "waiting_for_raw_xlsx")
+        send.assert_not_called()
+
+    def test_pending_processor_skips_missing_sheet_and_sends_ready_survey(self):
+        query = MagicMock()
+        query.filter.return_value.order_by.return_value.limit.return_value.all.return_value = [
+            (41, "124", "124", 2, "Day"),
+            (42, "N/09086/01002/UP", "N/09086/01002/UP", 7, "Day"),
+        ]
+        with (
+            patch.object(approved_email.db.session, "query", return_value=query),
+            patch.object(
+                approved_email,
+                "list_raw_xlsx_files",
+                return_value=[{"label": "N0908601002UP", "cycle": 7, "dn": ""}],
+            ),
+            patch.object(
+                approved_email,
+                "send_approved_survey_email",
+                return_value="sent",
+            ) as send,
+        ):
+            result = approved_email.process_pending_approved_survey_emails(limit=1)
+
+        self.assertEqual(
+            result,
+            {"checked": 1, "sent": 1, "waiting_for_raw_xlsx": 1, "failed": 0},
+        )
+        send.assert_called_once_with(42, inventory=[
+            {"label": "N0908601002UP", "cycle": 7, "dn": ""},
+        ])
+
+    def test_email_waits_without_error_when_raw_xlsx_download_is_unavailable(self):
+        survey = self.make_survey()
+        with (
+            patch.object(approved_email.Survey, "query", self.make_query(survey)),
+            patch.object(
+                approved_email,
+                "list_raw_xlsx_files",
+                return_value=[{"label": "S-1", "cycle": 1, "dn": ""}],
+            ),
+            patch.object(approved_email, "raw_xlsx_is_listed", return_value=True),
+            patch.object(approved_email, "download_file_from_drive", return_value=b"%PDF"),
+            patch.object(
+                approved_email,
+                "download_raw_xlsx",
+                side_effect=raw_xlsx.RawXlsxUnavailable("API down"),
+            ),
+            patch.object(approved_email, "send_microsoft_graph_email") as send,
+            patch.object(approved_email.db.session, "rollback"),
+        ):
+            result = approved_email.send_approved_survey_email(survey.id)
+
+        self.assertEqual(result, "waiting_for_raw_xlsx")
         send.assert_not_called()
 
     def test_raw_xlsx_maps_section_cycle_and_night_type(self):
@@ -133,6 +214,28 @@ class ApprovedSurveyEmailTests(unittest.TestCase):
             {"stretch": ["140"], "cycle": ["14"], "dn": ["night"]},
         )
         self.assertEqual(request.get_header("X-api-key"), "test-key")
+
+    def test_raw_xlsx_inventory_matches_normalized_upc_and_cycle(self):
+        files = [
+            {"label": "N0908601002UP", "cycle": 7, "dn": ""},
+            {"label": "124", "cycle": 2, "dn": ""},
+        ]
+
+        self.assertTrue(
+            raw_xlsx.raw_xlsx_is_listed(
+                "N/09086/01002/UP", "N/09086/01002/UP", 7, "Day", files
+            )
+        )
+        self.assertFalse(
+            raw_xlsx.raw_xlsx_is_listed(
+                "N/09086/01002/UP", "N/09086/01002/UP", 6, "Day", files
+            )
+        )
+        self.assertFalse(
+            raw_xlsx.raw_xlsx_is_listed(
+                "N/09086/01002/UP", "N/09086/01002/UP", 7, "Night", files
+            )
+        )
 
     def test_graph_sender_uses_app_token_and_both_attachments(self):
         token_response = MagicMock()

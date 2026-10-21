@@ -83,13 +83,17 @@ You should see:
 | Path | Schedule |
 |---|---|
 | `/cron/video-count-sync` | `0 2 * * *` |
+| `/cron/approved-survey-emails` | `0 */5 * * *` |
 
-That is **02:00 UTC = 07:30 IST**, daily.
+The video-count sync remains at **02:00 UTC = 07:30 IST**, daily. Approved
+survey emails are retried at 00:00, 05:00, 10:00, 15:00, and 20:00 UTC,
+with up to 20 ready emails per run. Cron is calendar-based, so the interval
+from 20:00 UTC to the next 00:00 UTC run is four hours.
 
-> **Hobby plan allows exactly one cron invocation per day.** The schedule above is
-> already within that limit. If you upgrade to Pro and want the shortfalls to
-> self-heal faster as uploads land, change the `schedule` in `vercel.json` to
-> e.g. `0 */6 * * *` (every 6 hours) and redeploy.
+> **Vercel Hobby allows only one cron invocation per day.** The two-hour email
+> schedule requires Pro or Enterprise; on Hobby, the deployment will reject this
+> cron schedule. The retry function handles at most 20 emails or four minutes
+> per invocation, whichever comes first.
 
 ---
 

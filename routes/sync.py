@@ -15,6 +15,17 @@ sync_bp = Blueprint(
 )
 
 
+@sync_bp.route("/cron/approved-survey-emails")
+def approved_survey_email_sync():
+    """Retry approved survey emails whose matching raw XLSX has arrived."""
+    if not _authorised():
+        return jsonify({"error": "forbidden"}), 403
+
+    summary = process_pending_approved_survey_emails(limit=20, max_seconds=240)
+    status = 503 if summary.get("failed") else 200
+    return jsonify(summary), status
+
+
 def _authorised():
     """Allow either the cron secret or a logged-in admin."""
 

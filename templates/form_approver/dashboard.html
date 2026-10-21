@@ -10,6 +10,21 @@
     <link rel="stylesheet"
           href="{{ url_for('static',
           filename='css/admin.css') }}">
+    <style>
+        .pending-forms-dialog { width: min(860px, calc(100vw - 32px)); max-width: none; max-height: min(78vh, 720px); padding: 0; border: 1px solid #f1d0b1; border-radius: 8px; color: #20333b; }
+        .pending-forms-dialog::backdrop { background: rgba(9, 18, 35, .62); }
+        .pending-forms-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 18px 22px; border-bottom: 1px solid #f1e2d5; }
+        .pending-forms-head h2 { margin: 0; font-size: 20px; }
+        .pending-forms-count { margin: 5px 0 0; color: #62747a; font-size: 14px; }
+        .pending-forms-close { width: 36px; height: 36px; border: 0; border-radius: 4px; background: #f3f4f6; color: #20333b; font-size: 22px; cursor: pointer; }
+        .pending-forms-body { max-height: calc(78vh - 78px); overflow: auto; padding: 14px 20px 20px; }
+        .pending-forms-table { width: 100%; border-collapse: collapse; font-size: 15px; }
+        .pending-forms-table th, .pending-forms-table td { padding: 11px 10px; border-bottom: 1px solid #e5e7eb; text-align: left; }
+        .pending-forms-table th { position: sticky; top: 0; background: #ff7a00; color: #fff; }
+        .pending-forms-view { display: inline-block; padding: 7px 12px; border-radius: 4px; background: #ff7a00; color: #fff; font-weight: 650; text-decoration: none; white-space: nowrap; }
+        .pending-forms-empty { padding: 24px 10px; color: #62747a; text-align: center; }
+        @media (max-width: 600px) { .pending-forms-body { padding: 10px; } .pending-forms-table th, .pending-forms-table td { padding: 9px 7px; } }
+    </style>
 
 </head>
 <body>
@@ -731,5 +746,74 @@
 
     </div>
 
+    <dialog class="pending-forms-dialog" id="pending-forms-dialog" aria-labelledby="pending-forms-title">
+        <div class="pending-forms-head">
+            <div>
+                <h2 id="pending-forms-title">Pending survey form approvals</h2>
+                <p class="pending-forms-count" id="pending-forms-count" aria-live="polite"></p>
+            </div>
+            <button class="pending-forms-close" id="pending-forms-close" type="button" aria-label="Close pending survey forms">&times;</button>
+        </div>
+        <div class="pending-forms-body">
+            <table class="pending-forms-table">
+                <thead><tr><th>Cycle</th><th>UPC Code</th><th>Section No.</th><th>Survey Form</th></tr></thead>
+                <tbody id="pending-forms-rows"></tbody>
+            </table>
+        </div>
+    </dialog>
+    <script>
+        (() => {
+            const dialog = document.getElementById("pending-forms-dialog");
+            const rows = document.getElementById("pending-forms-rows");
+            const count = document.getElementById("pending-forms-count");
+            const refreshMilliseconds = 15 * 60 * 1000;
+            const endpoint = "{{ url_for('form_approver.pending_survey_forms') }}";
+
+            document.getElementById("pending-forms-close").addEventListener("click", () => dialog.close());
+
+            async function refreshPendingForms() {
+                try {
+                    const response = await fetch(endpoint, {
+                        credentials: "same-origin",
+                        cache: "no-store",
+                    });
+                    if (!response.ok) return;
+
+                    const payload = await response.json();
+                    const items = Array.isArray(payload.items) ? payload.items : [];
+                    rows.replaceChildren();
+
+                    for (const item of items) {
+                        const row = document.createElement("tr");
+                        for (const value of [item.cycle, item.upc_code, item.section_no]) {
+                            const cell = document.createElement("td");
+                            cell.textContent = value ?? "-";
+                            row.appendChild(cell);
+                        }
+
+                        const viewCell = document.createElement("td");
+                        const viewLink = document.createElement("a");
+                        viewLink.className = "pending-forms-view";
+                        viewLink.href = item.form_url;
+                        viewLink.target = "_blank";
+                        viewLink.rel = "noopener noreferrer";
+                        viewLink.textContent = "View";
+                        viewCell.appendChild(viewLink);
+                        row.appendChild(viewCell);
+                        rows.appendChild(row);
+                    }
+
+                    count.textContent = `${items.length} form${items.length === 1 ? "" : "s"} awaiting approval`;
+                    if (items.length && !dialog.open) dialog.showModal();
+                    if (!items.length && dialog.open) dialog.close();
+                } catch (error) {
+                    console.error("Could not refresh pending survey forms", error);
+                }
+            }
+
+            refreshPendingForms();
+            window.setInterval(refreshPendingForms, refreshMilliseconds);
+        })();
+    </script>
 </body>
 </html>

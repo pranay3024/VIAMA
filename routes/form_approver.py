@@ -14,6 +14,8 @@ import logging
 from datetime import datetime, timedelta, timezone
 
 from flask import Blueprint
+from flask import flash
+from flask import jsonify
 from flask import redirect
 from flask import render_template
 from flask import request
@@ -116,6 +118,33 @@ def _survey_sort_key():
 # ---------------------------------------------------------------------------
 # Dashboard
 # ---------------------------------------------------------------------------
+
+@form_approver_bp.route("/form-approver/pending-survey-forms")
+def pending_survey_forms():
+    if _require_role():
+        return jsonify({"error": "unauthorized"}), 403
+
+    pending = (
+        Survey.query.filter(
+            Survey.show_on_dashboard.is_(True),
+            Survey.end_survey_pdf.isnot(None),
+            Survey.survey_form_approved.is_(False),
+            Survey.status != "cancelled",
+        )
+        .order_by(Survey.start_time.asc().nullslast(), Survey.id.asc())
+        .all()
+    )
+    return jsonify({
+        "items": [
+            {
+                "cycle": survey.cycle_no,
+                "upc_code": survey.upc_code or "-",
+                "section_no": survey.section_no or "-",
+                "form_url": survey.end_survey_pdf,
+            }
+            for survey in pending
+        ]
+    })
 
 @form_approver_bp.route("/form-approver")
 def dashboard():
@@ -444,7 +473,14 @@ def survey_form_approval(survey_id):
         try:
             from utils.approved_survey_email import send_approved_survey_email
 
-            send_approved_survey_email(survey.id)
+            result = send_approved_survey_email(survey.id)
+            if result == "sent":
+                flash("Survey form approved and email sent.", "success")
+            elif result == "waiting_for_raw_xlsx":
+                flash(
+                    "Survey form approved. Waiting for the raw-video Excel; the email will send automatically when it is available.",
+                    "success",
+                )
         except Exception:
             db.session.rollback()
             log.exception("Approved survey email failed for survey %s", survey.id)

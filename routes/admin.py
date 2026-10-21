@@ -276,6 +276,11 @@ def approve_survey_dates(survey_id):
                 flash("Dates approved. The survey-form email was already sent.", "info")
             elif result == "waiting_for_approval":
                 flash("Dates approved. Waiting for survey form approval.", "success")
+            elif result == "waiting_for_raw_xlsx":
+                flash(
+                    "Dates approved. Waiting for the raw-video Excel; the email will send automatically when it is available.",
+                    "success",
+                )
             elif result == "missing_survey_data":
                 flash("Dates approved, but the survey PDF is not available.", "warning")
         except Exception:

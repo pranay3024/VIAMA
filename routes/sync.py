@@ -1,5 +1,6 @@
 import hmac
 import os
+import time
 
 from flask import Blueprint
 from flask import jsonify
@@ -14,6 +15,16 @@ sync_bp = Blueprint(
     __name__
 )
 
+#: Total wall-clock budget for one /cron/approved-survey-emails invocation.
+#: Vercel terminates a function that overruns its max duration (300s on Hobby)
+#: and never retries a failed cron invocation, so the budget has to sit below
+#: the limit with room for the last email in flight.
+CRON_EMAIL_MAX_SECONDS = 240
+
+#: Emails sent per phase in one invocation. Both phases run in the same
+#: invocation, so this is the per-day throughput of the whole route.
+CRON_EMAIL_LIMIT = 10
+
 
 @sync_bp.route("/cron/approved-survey-emails")
 def approved_survey_email_sync():
@@ -24,8 +35,16 @@ def approved_survey_email_sync():
     from utils.approved_survey_email import process_pending_approved_survey_emails
     from utils.approved_survey_defect_email import process_pending_approved_defect_emails
 
-    raw_result = process_pending_approved_survey_emails(limit=20, max_seconds=100)
-    defect_result = process_pending_approved_defect_emails(limit=20, max_seconds=100)
+    deadline = time.monotonic() + CRON_EMAIL_MAX_SECONDS
+
+    raw_result = process_pending_approved_survey_emails(
+        limit=CRON_EMAIL_LIMIT,
+        max_seconds=max(1, int(deadline - time.monotonic())),
+    )
+    defect_result = process_pending_approved_defect_emails(
+        limit=CRON_EMAIL_LIMIT,
+        max_seconds=max(1, int(deadline - time.monotonic())),
+    )
     summary = {"raw_video_emails": raw_result, "defect_report_emails": defect_result}
     status = (
         503

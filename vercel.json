@@ -17,6 +17,10 @@
     {
       "path": "/cron/video-count-sync",
       "schedule": "0 2 * * *"
+    },
+    {
+      "path": "/cron/approved-survey-emails",
+      "schedule": "0 3 * * *"
     }
   ]
 }

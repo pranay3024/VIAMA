@@ -73,10 +73,16 @@ vercel env add CRON_SECRET production
 ## 2. Deploy
 
 ```bash
+python check_cron_schedules.py   # refuses anything Vercel would reject
 vercel --prod
 ```
 
 or push to the branch connected to the Vercel project.
+
+> The guard is not optional in practice. A cron expression that fires more than
+> once a day makes Vercel **drop the deployment silently** — no entry in the
+> Deployments list, no error anywhere, and production keeps serving the
+> previous build. See "The cron schedule breaks the deployment" below.
 
 ---
 
@@ -89,17 +95,15 @@ You should see:
 | Path | Schedule |
 |---|---|
 | `/cron/video-count-sync` | `0 2 * * *` |
-| `/cron/approved-survey-emails` | `0 */5 * * *` |
+| `/cron/approved-survey-emails` | `0 3 * * *` |
 
 The video-count sync remains at **02:00 UTC = 07:30 IST**, daily. Approved
-survey emails are retried at 00:00, 05:00, 10:00, 15:00, and 20:00 UTC,
-with up to 20 ready emails per run. Cron is calendar-based, so the interval
-from 20:00 UTC to the next 00:00 UTC run is four hours.
+survey emails are retried at **03:00 UTC = 08:30 IST**, daily, with up to 10
+emails per phase per run.
 
-> **Vercel Hobby allows only one cron invocation per day.** The two-hour email
-> schedule requires Pro or Enterprise; on Hobby, the deployment will reject this
-> cron schedule. The retry function handles at most 20 emails or four minutes
-> per invocation, whichever comes first.
+> **Every cron on this project must fire at most once per day.** Vercel Hobby
+> rejects any expression that runs more often, and the rejection kills the
+> deployment. See "The cron schedule breaks the deployment" below.
 
 ---
 
@@ -225,10 +229,42 @@ touches nothing, including the dashboard trigger. Set it back to `1` to resume.
 
 ---
 
+## The cron schedule breaks the deployment
+
+**Symptom:** you push, and production keeps serving the *old* build. Nothing
+new appears in the Deployments list, nothing appears in the Activity log, and a
+manually triggered Deploy Hook answers `{"job": {"state": "PENDING"}}` without
+producing a build.
+
+**Cause:** Vercel Hobby accounts may only run cron jobs **once per day**. A
+schedule that fires more often is rejected at deploy time with:
+
+```
+Hobby accounts are limited to daily cron jobs. This cron expression
+(0 */5 * * *) would run more than once per day. Upgrade to the Pro plan to
+unlock all Cron Jobs features on Vercel.
+```
+
+A GitHub-triggered deployment that fails this validation is dropped **silently**,
+which is why it reads as "the portal is still on the old code" rather than as
+an error. Only `vercel --prod` from the CLI shows the message above.
+
+**Fix:** every `schedule` in `vercel.json` must fire at most once a day. Run
+
+```bash
+python check_cron_schedules.py
+```
+
+before deploying. It parses every cron expression, rejects any that fires more
+than once a day, and checks that each cron path still has a route in `routes/`.
+
+---
+
 ## Troubleshooting
 
 | Symptom | Cause | Fix |
 |---|---|---|
+| Production still serves the old build after a push | A cron expression fires more than once a day — Vercel drops the deployment silently | Run `python check_cron_schedules.py`, fix the schedule, redeploy. See "The cron schedule breaks the deployment" above |
 | `503 {"error":"upstream_unavailable"}` | `RV_DASHBOARD_TOKEN` missing, or the RoadVision VM is down | Check the env var is set **and** that you redeployed after adding it |
 | `403 {"error":"forbidden"}` | `CRON_SECRET` mismatch | Value in Vercel must match what you send in `X-Cron-Secret` |
 | Summary shows `considered: 0` | No surveys completed in the last 10 days | Widen with `?days=30` to confirm the query works |
@@ -236,7 +272,7 @@ touches nothing, including the dashboard trigger. Set it back to `1` to resume.
 | `500` referencing `video_count_matched` | Migration didn't run on this database | `python migrate_video_count_check.py` |
 | `500` referencing survey date-approval or raw-email fields | Approval/email migration didn't run on this database | `python migrate_survey_date_approval_email.py` |
 | Approved-survey email fails to send | Gmail OAuth identity is not `adordashcam@gmail.com` or a verified Send mail as alias | Reauthorize the Gmail token for that sender with `gmail.compose` scope, then redeploy |
-| Cron never fires | Env vars added but not redeployed, or Hobby daily cap already used | Redeploy; check Settings → Cron Jobs → last run |
+| Cron never fires | Env vars added but not redeployed, or the cron was removed from `vercel.json` | Redeploy; check Settings → Cron Jobs → last run |
 | Rescheduled survey never auto-cancelled | `RESCHEDULED_EXPIRY=0` is set, or it is already Sunday 23:30 IST and the sweep has not run | Check the tick's `rescheduled_expiry` result; `would_cancel: 0` with `candidates > 0` means the rows are still in date |
 
 ---

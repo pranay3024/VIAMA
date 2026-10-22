@@ -4861,6 +4861,9 @@ def tick():
     if should("raw_emails"):
         results["raw_emails"] = _safely(lambda: _raw_emails(dry_run))
 
+    if should("survey_emails"):
+        results["survey_emails"] = _safely(lambda: _survey_emails(dry_run))
+
     if should("weekly_reset"):
         results["weekly_reset"] = _safely(lambda: _weekly_reset(dry_run))
 
@@ -4943,8 +4946,6 @@ def _rescheduled_expiry(dry_run):
     from core.engine import expire_rescheduled_surveys
 
     return expire_rescheduled_surveys(dry_run=dry_run)
-
-
 def _raw_emails(dry_run):
     from utils.approved_survey_email import send_pending_raw_emails_now
 
@@ -4952,7 +4953,36 @@ def _raw_emails(dry_run):
         from utils.approved_survey_email import pending_raw_email_count
 
         return {"skipped": "dry_run", "pending": pending_raw_email_count()}
+
     return send_pending_raw_emails_now()
+
+
+def _survey_emails(dry_run):
+    """Drain the approved-survey mail backlog: raw video and defect report.
+
+    The dashboard pickup sends one mail per page load, which is the right
+    shape for "the file I was waiting for just arrived" but far too slow for
+    a backlog.  This job does what the cron does, on demand, so a batch of
+    files that RoadVision published together goes out in one go.
+    """
+    from utils.approved_survey_email import run_approved_email_phases
+
+    if dry_run:
+        from utils.approved_survey_defect_email import defect_candidates_pending
+        from utils.approved_survey_email import pending_raw_email_count
+
+        return {
+            "skipped": "dry_run",
+            "pending_raw": pending_raw_email_count(),
+            "pending_defect": defect_candidates_pending(),
+        }
+
+    return run_approved_email_phases(
+        raw_limit=25,
+        defect_limit=25,
+        max_seconds=240,
+    )
+
 
 
 # ==========================================================================

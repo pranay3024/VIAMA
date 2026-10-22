@@ -38,8 +38,10 @@ INSTANT_TRIGGER_LIMIT = 1
 INSTANT_TRIGGER_MAX_SECONDS = 25
 
 #: The defect-report mail follows the same rule as the raw one: one per
-#: dashboard load, on its own short budget.
-DEFECT_TRIGGER_LIMIT = 1
+#: dashboard load, on its own short budget.  RoadVision publishes the defect
+#: reports in batches rather than one at a time, so a little more than one
+#: per load keeps a batch from taking days to clear.
+DEFECT_TRIGGER_LIMIT = 3
 DEFECT_TRIGGER_MAX_SECONDS = 25
 
 
@@ -386,6 +388,76 @@ def send_pending_raw_emails_now(
             "failed": 0,
             "skipped": "pickup failed",
         }
+
+
+def run_approved_email_phases(
+    raw_limit=10,
+    defect_limit=10,
+    max_seconds=240,
+):
+    """Run both mail phases in one pass, sharing one read of each inventory.
+
+    The raw-video phase mails the survey-form PDF + XLSX; the defect-report
+    phase mails the defect XLSX for a survey whose raw mail has already gone
+    out.  Both are bounded by the same wall-clock budget, so a slow
+    RoadVision API cannot make the caller run past its own deadline.
+
+    Returns ``{"raw_video_emails": {...}, "defect_report_emails": {...}}``.
+    """
+    from utils.received_timestamps import (
+        fetch_inventories,
+        record_received_timestamps,
+    )
+
+    deadline = time.monotonic() + max_seconds
+
+    inventories = fetch_inventories()
+    record_received_timestamps(inventories)
+
+    if inventories.get("raw") is None:
+        raw_result = {
+            "skipped": "the RoadVision raw-video inventory is unavailable",
+            "checked": 0,
+            "sent": 0,
+            "waiting_for_raw_xlsx": 0,
+            "failed": 0,
+        }
+    else:
+        raw_result = process_pending_approved_survey_emails(
+            limit=raw_limit,
+            max_seconds=max(1, int(deadline - time.monotonic())),
+            inventory=inventories["raw"],
+        )
+
+    if not defect_report_email_enabled():
+        defect_result = {
+            "skipped": "disabled via DEFECT_REPORT_EMAIL=0",
+            "checked": 0,
+            "sent": 0,
+            "failed": 0,
+        }
+    elif inventories.get("defect") is None:
+        defect_result = {
+            "skipped": "the RoadVision defect-report inventory is unavailable",
+            "checked": 0,
+            "sent": 0,
+            "failed": 0,
+        }
+    else:
+        from utils.approved_survey_defect_email import (
+            process_pending_approved_defect_emails,
+        )
+
+        defect_result = process_pending_approved_defect_emails(
+            limit=defect_limit,
+            max_seconds=max(1, int(deadline - time.monotonic())),
+            inventory=inventories["defect"],
+        )
+
+    return {
+        "raw_video_emails": raw_result,
+        "defect_report_emails": defect_result,
+    }
 
 
 def _pickup_defect_emails(inventories):

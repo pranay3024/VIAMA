@@ -22,9 +22,11 @@ sync_bp = Blueprint(
 #: the limit with room for the last email in flight.
 CRON_EMAIL_MAX_SECONDS = 240
 
-#: Emails sent per phase in one invocation. Both phases run in the same
-#: invocation, so this is the per-day throughput of the whole route.
-CRON_EMAIL_LIMIT = 10
+#: Emails sent per phase in one invocation.  Both phases run in the same
+#: invocation, and the route fires four times a day, so this is the daily
+#: throughput of the whole route.  RoadVision publishes the defect reports in
+#: batches, so the limit has to be big enough to clear a batch in one go.
+CRON_EMAIL_LIMIT = 25
 
 
 @sync_bp.route("/cron/approved-survey-emails")
@@ -33,60 +35,16 @@ def approved_survey_email_sync():
     if not _authorised():
         return jsonify({"error": "forbidden"}), 403
 
-    from utils.approved_survey_email import process_pending_approved_survey_emails
-    from utils.received_timestamps import (
-        fetch_inventories,
-        record_received_timestamps,
+    from utils.approved_survey_email import run_approved_email_phases
+
+    summary = run_approved_email_phases(
+        raw_limit=CRON_EMAIL_LIMIT,
+        defect_limit=CRON_EMAIL_LIMIT,
+        max_seconds=CRON_EMAIL_MAX_SECONDS,
     )
 
-    deadline = time.monotonic() + CRON_EMAIL_MAX_SECONDS
-
-    # One read of each inventory, shared by the stamps and both mail phases.
-    inventories = fetch_inventories()
-    record_received_timestamps(inventories)
-
-    if inventories.get("raw") is None:
-        raw_result = {
-            "skipped": "the RoadVision raw-video inventory is unavailable",
-            "checked": 0,
-            "sent": 0,
-            "waiting_for_raw_xlsx": 0,
-            "failed": 0,
-        }
-    else:
-        raw_result = process_pending_approved_survey_emails(
-            limit=CRON_EMAIL_LIMIT,
-            max_seconds=max(1, int(deadline - time.monotonic())),
-            inventory=inventories["raw"],
-        )
-
-    if defect_report_email_enabled():
-        from utils.approved_survey_defect_email import (
-            process_pending_approved_defect_emails,
-        )
-
-        if inventories.get("defect") is None:
-            defect_result = {
-                "skipped": "the RoadVision defect-report inventory is unavailable",
-                "checked": 0,
-                "sent": 0,
-                "failed": 0,
-            }
-        else:
-            defect_result = process_pending_approved_defect_emails(
-                limit=CRON_EMAIL_LIMIT,
-                max_seconds=max(1, int(deadline - time.monotonic())),
-                inventory=inventories["defect"],
-            )
-    else:
-        defect_result = {
-            "skipped": "disabled via DEFECT_REPORT_EMAIL=0",
-            "checked": 0,
-            "sent": 0,
-            "failed": 0,
-        }
-
-    summary = {"raw_video_emails": raw_result, "defect_report_emails": defect_result}
+    raw_result = summary["raw_video_emails"]
+    defect_result = summary["defect_report_emails"]
     status = (
         503
         if raw_result.get("failed") or defect_result.get("failed")

@@ -1114,6 +1114,61 @@ class ApprovedSurveyCronTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 403)
 
+    def test_the_tick_can_drain_the_backlog_on_demand(self):
+        from core.endpoints import _survey_emails
+
+        with (
+            patch.dict(os.environ, {"DEFECT_REPORT_EMAIL": "1"}),
+            patch.object(
+                received_timestamps,
+                "fetch_inventories",
+                return_value={"raw": [], "defect": []},
+            ) as inventory,
+            patch.object(received_timestamps, "record_received_timestamps"),
+            patch.object(
+                approved_email,
+                "process_pending_approved_survey_emails",
+                return_value={"checked": 0, "sent": 0, "failed": 0},
+            ) as raw_send,
+            patch.object(
+                defect_email,
+                "process_pending_approved_defect_emails",
+                return_value={"checked": 3, "sent": 3, "failed": 0},
+            ) as defect_send,
+        ):
+            result = _survey_emails(False)
+
+        self.assertEqual(result["raw_video_emails"]["sent"], 0)
+        self.assertEqual(result["defect_report_emails"]["sent"], 3)
+        raw_send.assert_called_once()
+        defect_send.assert_called_once()
+        # One read of each inventory, shared by both phases.
+        self.assertEqual(inventory.call_count, 1)
+
+    def test_both_phases_share_one_inventory_read(self):
+        with (
+            patch.dict(os.environ, {"DEFECT_REPORT_EMAIL": "1"}),
+            patch.object(
+                received_timestamps,
+                "fetch_inventories",
+                return_value={"raw": [], "defect": []},
+            ) as inventory,
+            patch.object(received_timestamps, "record_received_timestamps"),
+            patch.object(
+                approved_email,
+                "process_pending_approved_survey_emails",
+                return_value={"checked": 0, "sent": 0, "failed": 0},
+            ),
+            patch.object(
+                defect_email,
+                "process_pending_approved_defect_emails",
+                return_value={"checked": 0, "sent": 0, "failed": 0},
+            ),
+        ):
+            approved_email.run_approved_email_phases()
+
+        self.assertEqual(inventory.call_count, 1)
+
 
 class ReceivedTimestampTests(unittest.TestCase):
     """The portal records the moment it first saw each RoadVision file."""

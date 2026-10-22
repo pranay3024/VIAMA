@@ -107,18 +107,24 @@ You should see:
 |---|---|
 | `/cron/video-count-sync` | `0 2 * * *` |
 | `/cron/approved-survey-emails` | `0 3 * * *` |
+| `/cron/approved-survey-emails` | `0 9 * * *` |
+| `/cron/approved-survey-emails` | `0 15 * * *` |
+| `/cron/approved-survey-emails` | `0 21 * * *` |
 
 The video-count sync remains at **02:00 UTC = 07:30 IST**, daily. Approved
-survey emails are retried at **03:00 UTC = 08:30 IST**, daily, with up to 10
-emails per phase per run.
+survey emails are retried **four times a day** — 03:00, 09:00, 15:00 and
+21:00 UTC (08:30, 14:30, 20:30 and 02:30 IST) — with up to 25 emails per
+phase per run.
 
-Only the **raw-video email** (survey form PDF + raw XLSX) goes out today. The
-defect-report mailing is switched off — see "Defect-report mail is switched
-off" below.
+Both mails go out: the **raw-video email** (survey form PDF + raw XLSX) and
+the **defect-report email**, which is on by default — see "Defect-report
+mail" below.
 
 > **Every cron on this project must fire at most once per day.** Vercel Hobby
 > rejects any expression that runs more often, and the rejection kills the
-> deployment. See "The cron schedule breaks the deployment" below.
+> deployment. See "The cron schedule breaks the deployment" below. Several
+> *separate* daily entries are fine — that is how the mail route gets four
+> runs a day on a Hobby plan.
 
 ---
 
@@ -157,9 +163,10 @@ The surveys waiting for a defect mail are **not lost** — they stay
 is turned on. The admin dashboard's *Defect Report Email Sent* column shows
 the same thing.
 
-With the switch on, the backlog drains on its own: one defect mail per
-dashboard load, ten per cron run. A survey whose report has not landed in
-RoadVision yet is simply left for the next round.
+With the switch on, the backlog drains on its own: three defect mails per
+dashboard load, 25 per cron run, four cron runs a day. A survey whose report
+has not landed in RoadVision yet is simply left for the next round — the
+portal cannot mail a file the API does not have.
 
 ### When the files arrived
 
@@ -189,17 +196,24 @@ callback. So the portal learns that a file has landed by **asking**.
 
 | Trigger | What it covers | Limit |
 |---|---|---|
-| Dashboard load (`/admin`, `/form-approver`) | The file that just arrived — this is the fast path | 1 raw email + 1 defect email per load, 25 s budget each |
-| `POST /api/v1/jobs/tick` | Quiet days when nobody logs in | 1 email per tick |
-| `/cron/approved-survey-emails` (03:00 UTC) | The backlog | 10 emails per run, per mail |
+| Dashboard load (`/admin`, `/form-approver`) | The file that just arrived — this is the fast path | 1 raw email + 3 defect emails per load, 25 s budget each |
+| `POST /api/v1/jobs/tick?only=raw_emails` | Quiet days when nobody logs in | 1 email per tick |
+| `POST /api/v1/jobs/tick?only=survey_emails` | The backlog, on demand | 25 raw + 25 defect emails |
+| `/cron/approved-survey-emails` (03:00, 09:00, 15:00, 21:00 UTC) | The backlog | 25 emails per phase, per run |
 
 So in practice: an admin opens the dashboard and the mail for a file that has
 just landed goes out in the same request. If nobody opens a dashboard, the
-daily cron still sends it at 08:30 IST.
+cron still sends it — four times a day, not once.
 
-The dashboard pickup is deliberately tiny — one email, a short budget, and it
-never raises. A dashboard must not hang or break because a remote API is
+The dashboard pickup is deliberately tiny — a few emails, a short budget, and
+it never raises. A dashboard must not hang or break because a remote API is
 slow, and the cron is there for everything the fast path does not cover.
+
+> **RoadVision publishes the defect reports in batches.** One batch of
+> nineteen files appeared at once on 2026-10-21. A limit of one mail per
+> dashboard load would have taken days to clear that, which is why the defect
+> phase sends three per load, the cron sends 25 per run and the cron runs four
+> times a day.
 
 > **Truly instant (no page load at all) needs RoadVision to call us when a
 > file is uploaded.** That endpoint now exists — see "Mailing the raw video
@@ -354,10 +368,10 @@ There is deliberately **no in-process timer**. Vercel freezes the function the
 moment the response is written, so a background thread fires minutes late or never,
 and fails silently in production only.
 
-The dashboard trigger is what makes this work on the current Hobby plan, whose one
-daily cron slot is already used by `/cron/video-count-sync`. If you upgrade to Pro
-and want the job to run without anyone opening a dashboard, point a second cron at
-the tick endpoint — it runs every job, and `?only=` narrows it:
+The dashboard trigger is what makes this work on the current Hobby plan, whose cron
+entries may only fire once a day. If you upgrade to Pro and want the job to run
+without anyone opening a dashboard, point a cron at the tick endpoint — it runs
+every job, and `?only=` narrows it:
 
 ```json
 {"path": "/api/v1/jobs/tick", "schedule": "0 9 * * *"}
@@ -491,7 +505,9 @@ than once a day, and checks that each cron path still has a route in `routes/`.
 | A defect-report XLSX email goes out when it should not | `DEFECT_REPORT_EMAIL` is set to `0` in Vercel, or the default was changed in code | Set `DEFECT_REPORT_EMAIL=0` in Vercel and redeploy. See "Defect-report mail" above |
 | Cron never fires | Env vars added but not redeployed, or the cron was removed from `vercel.json` | Redeploy; check Settings → Cron Jobs → last run |
 | Rescheduled survey never auto-cancelled | `RESCHEDULED_EXPIRY=0` is set, or it is already Sunday 23:30 IST and the sweep has not run | Check the tick's `rescheduled_expiry` result; `would_cancel: 0` with `candidates > 0` means the rows are still in date |
-| Raw-video email did not go out when the file arrived | Nothing asked the API: no dashboard was loaded and the daily cron has not run yet | Open `/admin` or `/form-approver` (the pickup runs on load), or wait for the 03:00 UTC cron. See "When the raw-video email goes out" above |
+| Raw-video email did not go out when the file arrived | Nothing asked the API: no dashboard was loaded and the cron has not run yet | Open `/admin` or `/form-approver` (the pickup runs on load), or wait for the next cron run (03:00, 09:00, 15:00 or 21:00 UTC). See "When the raw-video email goes out" above |
+| Defect-report email did not go out although the survey's raw XLSX is there | The defect report is a **separate** RoadVision API — the raw XLSX being present says nothing about it | Look for that stretch, cycle and shift in `https://gis.roadvision.ai/api/defect-report/list`. The mail goes out on the next dashboard load or cron run once the file is there |
+| The defect backlog is clearing too slowly | RoadVision publishes the reports in batches, so a batch of ~20 lands at once | `POST /api/v1/jobs/tick?only=survey_emails` drains up to 25 raw + 25 defect mails in one go |
 | RoadVision upload callback answers `403` | `RV_WEBHOOK_SECRET` on the two sides does not match (or `CRON_SECRET` differs) | The secret the caller sends must equal `RV_WEBHOOK_SECRET`, falling back to `CRON_SECRET`. See "Mailing the raw video without waiting for a page load" above |
 | Raw-video email not sent even though the file is in the API | `gis.roadvision.ai` is unreachable, so the pickup cannot see the file | The pickup waits 5 s and gives up; it tries again on the next load or cron. Check the host is up: `curl -sI https://gis.roadvision.ai/api/raw-xlsx/list` |
 

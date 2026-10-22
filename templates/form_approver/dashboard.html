@@ -766,10 +766,32 @@
             const dialog = document.getElementById("pending-forms-dialog");
             const rows = document.getElementById("pending-forms-rows");
             const count = document.getElementById("pending-forms-count");
-            const refreshMilliseconds = 15 * 60 * 1000;
+            // The list is polled once an hour, and the popup is allowed to open
+            // once an hour. Before this it re-opened on every page load and
+            // every fifteen minutes, which made it a nuisance rather than a
+            // reminder.
+            const refreshMilliseconds = 60 * 60 * 1000;
+            const reopenMilliseconds = 60 * 60 * 1000;
+            const lastShownKey = "viama.pendingForms.lastShown";
             const endpoint = "{{ url_for('form_approver.pending_survey_forms') }}";
 
             document.getElementById("pending-forms-close").addEventListener("click", () => dialog.close());
+
+            function lastShownAt() {
+                try {
+                    return Number(window.localStorage.getItem(lastShownKey) || 0) || 0;
+                } catch (error) {
+                    return 0;
+                }
+            }
+
+            function rememberShown() {
+                try {
+                    window.localStorage.setItem(lastShownKey, String(Date.now()));
+                } catch (error) {
+                    /* private mode: the popup simply opens on every visit */
+                }
+            }
 
             async function refreshPendingForms() {
                 try {
@@ -781,6 +803,7 @@
 
                     const payload = await response.json();
                     const items = Array.isArray(payload.items) ? payload.items : [];
+                    const weeks = Number(payload.weeks) || 0;
                     rows.replaceChildren();
 
                     for (const item of items) {
@@ -803,9 +826,21 @@
                         rows.appendChild(row);
                     }
 
-                    count.textContent = `${items.length} form${items.length === 1 ? "" : "s"} awaiting approval`;
-                    if (items.length && !dialog.open) dialog.showModal();
-                    if (!items.length && dialog.open) dialog.close();
+                    const scope = weeks ? ` in the last ${weeks} weeks` : "";
+                    count.textContent = `${items.length} form${items.length === 1 ? "" : "s"} awaiting approval${scope}`;
+
+                    if (!items.length) {
+                        if (dialog.open) dialog.close();
+                        return;
+                    }
+
+                    // Open at most once an hour, and not again just because the
+                    // page was reloaded.
+                    if (dialog.open) return;
+                    if (Date.now() - lastShownAt() < reopenMilliseconds) return;
+
+                    rememberShown();
+                    dialog.showModal();
                 } catch (error) {
                     console.error("Could not refresh pending survey forms", error);
                 }

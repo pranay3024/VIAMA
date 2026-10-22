@@ -119,10 +119,25 @@ def _survey_sort_key():
 # Dashboard
 # ---------------------------------------------------------------------------
 
+#: The pending-forms popup lists the forms that still need an approval.  Only
+#: the two most recent project weeks are listed - the popup is a "what needs
+#: you now" list, not an archive of every form since the project started (830
+#: rows and growing).  Older forms stay on the dashboard and in the approval
+#: table, they are just not repeated in the popup.
+_PENDING_FORMS_WEEKS = 2
+
+
 @form_approver_bp.route("/form-approver/pending-survey-forms")
 def pending_survey_forms():
     if _require_role():
         return jsonify({"error": "unauthorized"}), 403
+
+    # The current project week and the one before it.
+    utc_now = datetime.utcnow()
+    current_week_no = _current_week_no(utc_now)
+    first_week_no = max(1, current_week_no - _PENDING_FORMS_WEEKS + 1)
+    week_start = _PROJECT_START + timedelta(days=(first_week_no - 1) * 7)
+    week_end = week_start + timedelta(days=_PENDING_FORMS_WEEKS * 7)
 
     pending = (
         Survey.query.filter(
@@ -130,11 +145,14 @@ def pending_survey_forms():
             Survey.end_survey_pdf.isnot(None),
             Survey.survey_form_approved.is_(False),
             Survey.status != "cancelled",
+            Survey.start_time >= week_start,
+            Survey.start_time < week_end,
         )
         .order_by(Survey.start_time.asc().nullslast(), Survey.id.asc())
         .all()
     )
     return jsonify({
+        "weeks": _PENDING_FORMS_WEEKS,
         "items": [
             {
                 "cycle": survey.cycle_no,
@@ -143,7 +161,7 @@ def pending_survey_forms():
                 "form_url": survey.end_survey_pdf,
             }
             for survey in pending
-        ]
+        ],
     })
 
 @form_approver_bp.route("/form-approver")

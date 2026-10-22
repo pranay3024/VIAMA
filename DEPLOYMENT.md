@@ -174,10 +174,71 @@ The dashboard pickup is deliberately tiny — one email, a short budget, and it
 never raises. A dashboard must not hang or break because a remote API is
 slow, and the cron is there for everything the fast path does not cover.
 
-> **Truly instant (no page load at all) is not possible from this side.** It
-> needs RoadVision to call us when a file is uploaded. If that is ever on the
-> table, the portal already has a place to put it: a job in
-> `POST /api/v1/jobs/tick`.
+> **Truly instant (no page load at all) needs RoadVision to call us when a
+> file is uploaded.** That endpoint now exists — see "Mailing the raw video
+> without waiting for a page load" below.
+
+---
+
+## Mailing the raw video without waiting for a page load
+
+Three ways to get the mail out with nobody opening a dashboard. Pick one.
+
+### 1. RoadVision calls us when it uploads (instant, free)
+
+The portal has an endpoint that accepts the upload notice and mails that
+survey straight away:
+
+```
+POST https://viama-three.vercel.app/api/v1/jobs/raw-video-upload
+X-Webhook-Secret: <RV_WEBHOOK_SECRET>
+Content-Type: application/json
+
+{"label": "N0908601002UP", "cycle": 7, "dn": "day"}
+```
+
+- `label` — the stretch, spelled the way the RoadVision inventory spells it.
+  `stretch`, `section_no` and `upc_code` are accepted as aliases.
+- `cycle` — the cycle number.
+- `dn` — `day`, `night`, or empty. Both `""` and `"day"` mean the day survey.
+
+A list works too: `{"files": [ ... ]}` or a bare JSON array. The reply says
+what happened:
+
+```json
+{"entries": 1, "matched": 1, "sent": 1, "failed": 0, "not_sent": 0}
+```
+
+If the label does not match any survey we hold (the two systems spell
+stretches differently), the endpoint falls back to the ordinary pickup, which
+reads the inventory itself and matches it properly — so a mismatched label
+never means a lost mail.
+
+Set `RV_WEBHOOK_SECRET` in the Vercel dashboard (any random string). If it is
+not set, `CRON_SECRET` is used instead, so a deployment that already has a
+secret needs nothing new.
+
+### 2. Something else calls the tick endpoint (every few minutes, no code)
+
+Anything that can make an HTTPS POST can drive the pickup — a free cron
+service, a GitHub Actions schedule, or a `cron` entry on the RoadVision VM:
+
+```
+POST https://viama-three.vercel.app/api/v1/jobs/tick?only=raw_emails
+X-Cron-Secret: <CRON_SECRET>
+```
+
+This costs one Vercel function invocation per call. Vercel Hobby includes
+1,000,000 invocations and 4 CPU-hours a month, so a five-minute poll (~8,600
+invocations, ~2 CPU-hours) fits, but it is a real cost — a fifteen-minute poll
+(~2,900 invocations) is comfortable.
+
+### 3. Upgrade to Vercel Pro ($20/month)
+
+Pro allows a cron to run every minute, so `*/5 * * * *` on
+`/cron/approved-survey-emails` would work with nobody else involved. Hobby
+allows a cron to fire **once per day only** — that is the rule that forces
+all of the above.
 
 ---
 
@@ -404,6 +465,8 @@ than once a day, and checks that each cron path still has a route in `routes/`.
 | Cron never fires | Env vars added but not redeployed, or the cron was removed from `vercel.json` | Redeploy; check Settings → Cron Jobs → last run |
 | Rescheduled survey never auto-cancelled | `RESCHEDULED_EXPIRY=0` is set, or it is already Sunday 23:30 IST and the sweep has not run | Check the tick's `rescheduled_expiry` result; `would_cancel: 0` with `candidates > 0` means the rows are still in date |
 | Raw-video email did not go out when the file arrived | Nothing asked the API: no dashboard was loaded and the daily cron has not run yet | Open `/admin` or `/form-approver` (the pickup runs on load), or wait for the 03:00 UTC cron. See "When the raw-video email goes out" above |
+| RoadVision upload callback answers `403` | `RV_WEBHOOK_SECRET` on the two sides does not match (or `CRON_SECRET` differs) | The secret the caller sends must equal `RV_WEBHOOK_SECRET`, falling back to `CRON_SECRET`. See "Mailing the raw video without waiting for a page load" above |
+| Raw-video email not sent even though the file is in the API | `gis.roadvision.ai` is unreachable, so the pickup cannot see the file | The pickup waits 5 s and gives up; it tries again on the next load or cron. Check the host is up: `curl -sI https://gis.roadvision.ai/api/raw-xlsx/list` |
 
 ---
 

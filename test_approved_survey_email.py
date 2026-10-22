@@ -724,6 +724,212 @@ class InstantRawEmailPickupTests(unittest.TestCase):
         pickup.assert_not_called()
 
 
+class UploadCallbackTests(unittest.TestCase):
+    """RoadVision pushes the upload; the portal mails it straight away."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.app = Flask(__name__)
+        cls.app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite://"
+        db.init_app(cls.app)
+
+    def setUp(self):
+        self.app_context = self.app.app_context()
+        self.app_context.push()
+
+    def tearDown(self):
+        self.app_context.pop()
+
+    def candidates(self):
+        return [
+            (100, "N/09086/01002/UP", "N/09086/01002/UP", 7, "Day"),
+            (101, "140", "140", 14, "Night"),
+        ]
+
+    def test_upload_entry_mails_the_matching_survey_only(self):
+        with (
+            patch.object(
+                approved_email,
+                "pending_raw_email_candidates",
+                return_value=self.candidates(),
+            ),
+            patch.object(
+                approved_email,
+                "send_approved_survey_email",
+                return_value="sent",
+            ) as send,
+        ):
+            result = approved_email.send_raw_emails_for_inventory_items(
+                [{"label": "N/09086/01002/UP", "cycle": 7, "dn": "day"}]
+            )
+
+        self.assertEqual(result["matched"], 1)
+        self.assertEqual(result["sent"], 1)
+        send.assert_called_once()
+        self.assertEqual(send.call_args.args[0], 100)
+
+    def test_upload_entry_that_matches_nothing_sends_nothing(self):
+        with (
+            patch.object(
+                approved_email,
+                "pending_raw_email_candidates",
+                return_value=self.candidates(),
+            ),
+            patch.object(
+                approved_email,
+                "send_approved_survey_email",
+                return_value="sent",
+            ) as send,
+        ):
+            result = approved_email.send_raw_emails_for_inventory_items(
+                [{"label": "999", "cycle": 3, "dn": "day"}]
+            )
+
+        self.assertEqual(result["matched"], 0)
+        send.assert_not_called()
+
+    def test_night_upload_does_not_mail_the_day_survey(self):
+        with (
+            patch.object(
+                approved_email,
+                "pending_raw_email_candidates",
+                return_value=self.candidates(),
+            ),
+            patch.object(
+                approved_email,
+                "send_approved_survey_email",
+                return_value="sent",
+            ) as send,
+        ):
+            result = approved_email.send_raw_emails_for_inventory_items(
+                [{"label": "140", "cycle": 14, "dn": "night"}]
+            )
+
+        self.assertEqual(result["matched"], 1)
+        self.assertEqual(send.call_args.args[0], 101)
+
+    def test_day_marker_is_accepted_as_well_as_an_empty_one(self):
+        self.assertTrue(
+            raw_xlsx.raw_xlsx_is_listed(
+                "124", "124", 2, "Day", [{"label": "124", "cycle": 2, "dn": "day"}]
+            )
+        )
+        self.assertTrue(
+            raw_xlsx.raw_xlsx_is_listed(
+                "124", "124", 2, "Day", [{"label": "124", "cycle": 2, "dn": ""}]
+            )
+        )
+        self.assertFalse(
+            raw_xlsx.raw_xlsx_is_listed(
+                "124", "124", 2, "Night", [{"label": "124", "cycle": 2, "dn": "day"}]
+            )
+        )
+
+
+class UploadCallbackEndpointTests(unittest.TestCase):
+    """The RoadVision upload callback, mounted where the API lives."""
+
+    @classmethod
+    def setUpClass(cls):
+        from core.endpoints import bp
+        from core.engine import register_error_handlers
+
+        cls.app = Flask(__name__)
+        cls.app.register_blueprint(bp, url_prefix="/api/v1")
+        register_error_handlers(cls.app)
+
+    def test_upload_callback_needs_the_secret(self):
+        with patch.dict(os.environ, {"RV_WEBHOOK_SECRET": "hook-secret"}):
+            client = self.app.test_client()
+            response = client.post(
+                "/api/v1/jobs/raw-video-upload",
+                json={"label": "140", "cycle": 14, "dn": "night"},
+            )
+
+        self.assertEqual(response.status_code, 403)
+
+    def test_upload_callback_sends_the_matching_survey(self):
+        with (
+            patch.dict(os.environ, {"RV_WEBHOOK_SECRET": "hook-secret"}),
+            patch.object(
+                approved_email,
+                "pending_raw_email_candidates",
+                return_value=[(101, "140", "140", 14, "Night")],
+            ),
+            patch.object(
+                approved_email,
+                "send_approved_survey_email",
+                return_value="sent",
+            ),
+        ):
+            client = self.app.test_client()
+            response = client.post(
+                "/api/v1/jobs/raw-video-upload",
+                json={"label": "140", "cycle": 14, "dn": "night"},
+                headers={"X-Webhook-Secret": "hook-secret"},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        data = response.get_json()["data"]
+        self.assertEqual(data["sent"], 1)
+        self.assertEqual(data["matched"], 1)
+        self.assertEqual(data["entries"], 1)
+
+    def test_upload_callback_accepts_a_list_of_entries(self):
+        with (
+            patch.dict(os.environ, {"RV_WEBHOOK_SECRET": "hook-secret"}),
+            patch.object(
+                approved_email,
+                "pending_raw_email_candidates",
+                return_value=[],
+            ),
+            patch.object(
+                approved_email,
+                "send_pending_raw_emails_now",
+                return_value={"sent": 0},
+            ) as fallback,
+        ):
+            client = self.app.test_client()
+            response = client.post(
+                "/api/v1/jobs/raw-video-upload",
+                json={"files": [{"stretch": "140", "cycle": 14, "dn": "night"}]},
+                headers={"X-Webhook-Secret": "hook-secret"},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json()["data"]["entries"], 1)
+        # Nothing matched the label, so the ordinary pickup runs instead.
+        fallback.assert_called_once()
+
+    def test_upload_callback_does_not_fall_back_when_it_matched(self):
+        with (
+            patch.dict(os.environ, {"RV_WEBHOOK_SECRET": "hook-secret"}),
+            patch.object(
+                approved_email,
+                "pending_raw_email_candidates",
+                return_value=[(101, "140", "140", 14, "Night")],
+            ),
+            patch.object(
+                approved_email,
+                "send_approved_survey_email",
+                return_value="sent",
+            ),
+            patch.object(
+                approved_email,
+                "send_pending_raw_emails_now",
+            ) as fallback,
+        ):
+            client = self.app.test_client()
+            response = client.post(
+                "/api/v1/jobs/raw-video-upload",
+                json={"label": "140", "cycle": 14, "dn": "night"},
+                headers={"X-Webhook-Secret": "hook-secret"},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        fallback.assert_not_called()
+
+
 class ApprovedSurveyCronTests(unittest.TestCase):
     """The cron sends the raw-video mail; the defect mail is one switch away."""
 

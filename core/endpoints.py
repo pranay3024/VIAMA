@@ -4808,6 +4808,7 @@ from flask import Blueprint, request
 from core.engine import require_auth, require_cron_secret
 from core.engine import json_body
 from core.engine import ok
+from core.engine import require_webhook_secret
 from core.config import UTC_WALL, as_utc, ist_now, iso, utc_now
 
 
@@ -4952,6 +4953,94 @@ def _raw_emails(dry_run):
 
         return {"skipped": "dry_run", "pending": pending_raw_email_count()}
     return send_pending_raw_emails_now()
+
+
+# ==========================================================================
+# ROADVISION UPLOAD CALLBACK
+#
+# The portal pulls the raw-video file from the RoadVision API, and the API
+# cannot push.  This endpoint is the push path: RoadVision calls it the
+# moment a raw-video file is written, and the mail for that survey goes out
+# in the same request - no waiting for a page load or for the daily cron.
+#
+# Body: one inventory entry, or a list of them, or ``{"files": [...]}``.
+#
+#     {"label": "N0908601002UP", "cycle": 7, "dn": "day"}
+#
+# ``label`` may also arrive as ``stretch``, ``section_no`` or ``upc_code``;
+# ``dn`` may be ``"day"``, ``"night"`` or empty.
+#
+# Auth: ``X-Webhook-Secret`` matching ``RV_WEBHOOK_SECRET`` (or
+# ``CRON_SECRET`` when no dedicated secret is set), or the same value as a
+# bearer token.
+# ==========================================================================
+
+
+@bp.post("/jobs/raw-video-upload")
+def raw_video_upload():
+    """
+    Send the raw-video email for a file RoadVision has just uploaded.
+
+    Only surveys that are approved and still waiting are mailed.  A file that
+    arrives before its survey is approved is left alone - the ordinary pickup
+    picks it up later.
+    """
+    require_webhook_secret()
+
+    # Deliberately lenient about the shape: the caller is another server, not
+    # the portal's own front end, so whatever it sends is normalised below.
+    body = request.get_json(silent=True)
+    entries = _raw_video_entries(body)
+
+    from utils.approved_survey_email import send_raw_emails_for_inventory_items
+
+    results = send_raw_emails_for_inventory_items(entries)
+    results["entries"] = len(entries)
+
+    if not results["matched"]:
+        # The label did not match any survey we know about - it may be
+        # spelled differently on the two sides.  Fall back to the ordinary
+        # pickup, which reads the inventory itself and matches it properly.
+        from utils.approved_survey_email import send_pending_raw_emails_now
+
+        results["fallback"] = send_pending_raw_emails_now()
+
+    return ok(results)
+
+
+def _raw_video_entries(body):
+    """Pull the inventory entries out of whatever shape the caller sent."""
+    if isinstance(body, dict):
+        if isinstance(body.get("files"), list):
+            raw_items = body["files"]
+        elif isinstance(body.get("file"), dict):
+            raw_items = [body["file"]]
+        else:
+            raw_items = [body]
+    elif isinstance(body, list):
+        raw_items = body
+    else:
+        raw_items = []
+
+    entries = []
+    for item in raw_items:
+        if not isinstance(item, dict):
+            continue
+        label = (
+            item.get("label")
+            or item.get("stretch")
+            or item.get("section_no")
+            or item.get("upc_code")
+            or ""
+        )
+        entries.append(
+            {
+                "label": str(label),
+                "cycle": item.get("cycle"),
+                "dn": item.get("dn") or item.get("day_night") or "",
+            }
+        )
+    return entries
 
 
 def _weekly_reset(dry_run):

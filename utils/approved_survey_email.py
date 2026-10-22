@@ -16,6 +16,7 @@ from utils.raw_xlsx import (
     download_raw_xlsx,
     list_raw_xlsx_files,
     raw_xlsx_is_listed,
+    raw_xlsx_item_matches,
 )
 
 
@@ -217,6 +218,57 @@ def process_pending_approved_survey_emails(limit=20, max_seconds=240):
             continue
         if result in results:
             results[result] += 1
+
+    return results
+
+
+def send_raw_emails_for_inventory_items(items):
+    """Send the raw email for inventory entries that have just arrived.
+
+    This is the push path: RoadVision tells us *which* stretch and cycle it
+    just wrote, so there is nothing to poll for and no waiting.  Only the
+    surveys that actually match the entry are mailed, and only if they are
+    approved and still waiting - a file that arrives before its survey is
+    approved is simply left for the ordinary pickup later.
+
+    Never raises.
+    """
+    entries = [item for item in (items or []) if isinstance(item, dict)]
+    results = {"matched": 0, "sent": 0, "failed": 0, "not_sent": 0}
+    if not entries:
+        return results
+
+    try:
+        candidates = pending_raw_email_candidates()
+    except Exception:
+        log.exception("could not read the pending raw email list")
+        return results
+
+    for survey_id, section_no, upc_code, cycle_no, survey_type in candidates:
+        matched = any(
+            raw_xlsx_item_matches(
+                item, section_no, upc_code, cycle_no, survey_type
+            )
+            for item in entries
+        )
+        if not matched:
+            continue
+
+        results["matched"] += 1
+        try:
+            outcome = send_approved_survey_email(survey_id, inventory=entries)
+        except Exception:
+            log.exception(
+                "raw survey email failed for survey %s (upload callback)",
+                survey_id,
+            )
+            results["failed"] += 1
+            continue
+
+        if outcome == "sent":
+            results["sent"] += 1
+        else:
+            results["not_sent"] += 1
 
     return results
 

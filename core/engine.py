@@ -819,6 +819,35 @@ def require_cron_secret():
 # ---------------------------------------------------------------------------
 
 
+def require_webhook_secret():
+    """
+    Auth for the RoadVision upload callback, which carries a shared secret.
+
+    Accepts ``X-Webhook-Secret: <secret>`` or ``Authorization: Bearer <secret>``.
+    Falls back to ``CRON_SECRET`` when no dedicated secret is set, so a
+    deployment that already has one secret needs nothing new.
+    """
+    expected = (
+        os.getenv("RV_WEBHOOK_SECRET") or os.getenv("CRON_SECRET") or ""
+    ).strip()
+    if not expected:
+        raise Forbidden(message="The raw-video webhook secret is not configured")
+
+    supplied = request.headers.get("X-Webhook-Secret", "").strip()
+    if not supplied:
+        header = request.headers.get("Authorization", "")
+        if header.lower().startswith("bearer "):
+            supplied = header[7:].strip()
+
+    if not supplied or not hmac.compare_digest(supplied, expected):
+        raise Forbidden(message="Invalid webhook secret")
+
+    g.api_client = ApiClient(
+        {"sub": "roadvision", "typ": "webhook", "scopes": ["jobs:run"]}
+    )
+    return g.api_client
+
+
 def resolve_actor(explicit_email=None, required=True, roles=None):
     """
     Resolve which portal user an identity-scoped endpoint acts as.

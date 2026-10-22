@@ -18,9 +18,22 @@ class RawXlsxUnavailable(RuntimeError):
     """The matching raw XLSX is not ready or the upstream is temporarily down."""
 
 
-def raw_xlsx_is_listed(section_no, upc_code, cycle_no, survey_type, files):
-    """Whether the inventory contains this survey's stretch, cycle and day/night."""
-    if cycle_no is None:
+def normalise_dn(value):
+    """Day/night marker as the portal means it: ``"night"`` or ``""`` for day.
+
+    RoadVision is not consistent about this field - the raw-XLSX inventory
+    leaves it empty for a day survey while the defect-report inventory spells
+    out ``"day"``.  Both mean the same thing, so both are accepted.
+    """
+    text = str(value or "").strip().casefold()
+    if text in ("night", "n", "night_shift"):
+        return "night"
+    return ""
+
+
+def raw_xlsx_item_matches(item, section_no, upc_code, cycle_no, survey_type):
+    """Whether one inventory entry is this survey's stretch, cycle and shift."""
+    if not isinstance(item, dict) or cycle_no is None:
         return False
 
     labels = set()
@@ -33,17 +46,25 @@ def raw_xlsx_is_listed(section_no, upc_code, cycle_no, survey_type, files):
     if not labels:
         return False
 
+    label = re.sub(r"[^A-Za-z0-9]", "", str(item.get("label") or "")).upper()
+    try:
+        item_cycle = int(item.get("cycle"))
+    except (TypeError, ValueError):
+        return False
+
     expected_dn = "night" if str(survey_type or "").strip().casefold() == "night" else ""
+    item_dn = normalise_dn(item.get("dn"))
+
+    return label in labels and item_cycle == int(cycle_no) and item_dn == expected_dn
+
+
+def raw_xlsx_is_listed(section_no, upc_code, cycle_no, survey_type, files):
+    """Whether the inventory contains this survey's stretch, cycle and day/night."""
+    if cycle_no is None:
+        return False
+
     for item in files or []:
-        if not isinstance(item, dict):
-            continue
-        label = re.sub(r"[^A-Za-z0-9]", "", str(item.get("label") or "")).upper()
-        try:
-            item_cycle = int(item.get("cycle"))
-        except (TypeError, ValueError):
-            continue
-        item_dn = str(item.get("dn") or "").strip().casefold()
-        if label in labels and item_cycle == int(cycle_no) and item_dn == expected_dn:
+        if raw_xlsx_item_matches(item, section_no, upc_code, cycle_no, survey_type):
             return True
 
     return False

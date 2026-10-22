@@ -62,7 +62,16 @@ filename='css/mobile.css') }}">
 
 {% endif %}
 
-        <form method="POST">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% for category, message in messages %}
+                <div role="alert"
+                     style="margin-bottom:12px; padding:12px; border-radius:8px; background:#fbe9e7; color:#8a3029;">
+                    {{ message }}
+                </div>
+            {% endfor %}
+        {% endwith %}
+
+                <form method="POST">
 
             <div class="form-group">
 

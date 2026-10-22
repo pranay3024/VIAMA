@@ -2081,7 +2081,7 @@ def mark_cancelled(assignment_id):
             "error"
         )
 
-        return redirect("/captain")
+        return redirect("/select-stretch")
 
 
     # =========================================================
@@ -2441,7 +2441,7 @@ def mark_rescheduled(assignment_id):
             "error"
         )
 
-        return redirect("/captain")
+        return redirect("/select-stretch")
 
 
     # =========================================================

@@ -175,6 +175,17 @@ def dashboard():
     except Exception:
         pass
 
+    # The raw-video mail goes out when the file has landed in the RoadVision API,
+    # but the API has no callback - the portal only finds out by asking. The daily
+    # cron asks once a day, so this screen asks as well: one inventory poll and at
+    # most one email per load, on a short budget. Idempotent, never raises.
+    try:
+        from utils.approved_survey_email import send_pending_raw_emails_now
+
+        send_pending_raw_emails_now()
+    except Exception:
+        pass
+
     state = request.args.get("state", "").strip()
     team = request.args.get("team", "").strip()
     cycle = request.args.get("cycle", "").strip()

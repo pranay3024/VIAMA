@@ -154,6 +154,33 @@ the same thing.
 
 ---
 
+## When the raw-video email goes out
+
+The raw-video email can only be sent once the file exists in the RoadVision
+API — the portal pulls it, RoadVision does not push it, and the API has no
+callback. So the portal learns that a file has landed by **asking**.
+
+| Trigger | What it covers | Limit |
+|---|---|---|
+| Dashboard load (`/admin`, `/form-approver`) | The file that just arrived — this is the fast path | 1 email per load, 25 s budget |
+| `POST /api/v1/jobs/tick` | Quiet days when nobody logs in | 1 email per tick |
+| `/cron/approved-survey-emails` (03:00 UTC) | The backlog | 10 emails per run |
+
+So in practice: an admin opens the dashboard and the mail for a file that has
+just landed goes out in the same request. If nobody opens a dashboard, the
+daily cron still sends it at 08:30 IST.
+
+The dashboard pickup is deliberately tiny — one email, a short budget, and it
+never raises. A dashboard must not hang or break because a remote API is
+slow, and the cron is there for everything the fast path does not cover.
+
+> **Truly instant (no page load at all) is not possible from this side.** It
+> needs RoadVision to call us when a file is uploaded. If that is ever on the
+> table, the portal already has a place to put it: a job in
+> `POST /api/v1/jobs/tick`.
+
+---
+
 ## 4. Smoke-test the deployed endpoint
 
 Replace `<CRON_SECRET>` with the real value.
@@ -376,6 +403,7 @@ than once a day, and checks that each cron path still has a route in `routes/`.
 | A defect-report XLSX email goes out when it should not | `DEFECT_REPORT_EMAIL` is set to `1` in Vercel | Set it back to `0` and redeploy. See "Defect-report mail is switched off" above |
 | Cron never fires | Env vars added but not redeployed, or the cron was removed from `vercel.json` | Redeploy; check Settings → Cron Jobs → last run |
 | Rescheduled survey never auto-cancelled | `RESCHEDULED_EXPIRY=0` is set, or it is already Sunday 23:30 IST and the sweep has not run | Check the tick's `rescheduled_expiry` result; `would_cancel: 0` with `candidates > 0` means the rows are still in date |
+| Raw-video email did not go out when the file arrived | Nothing asked the API: no dashboard was loaded and the daily cron has not run yet | Open `/admin` or `/form-approver` (the pickup runs on load), or wait for the 03:00 UTC cron. See "When the raw-video email goes out" above |
 
 ---
 

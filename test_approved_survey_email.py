@@ -582,6 +582,148 @@ class ApprovedSurveyEmailTests(unittest.TestCase):
         self.assertEqual(search_request.execute.call_count, 2)
 
 
+class InstantRawEmailPickupTests(unittest.TestCase):
+    """The dashboard pickup that mails a file the moment it lands."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.app = Flask(__name__)
+        cls.app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite://"
+        db.init_app(cls.app)
+
+    def setUp(self):
+        self.app_context = self.app.app_context()
+        self.app_context.push()
+
+    def tearDown(self):
+        self.app_context.pop()
+
+    def candidates(self, count=1):
+        return [
+            (100 + index, "S-1", "S-1", 1 + index, "Day") for index in range(count)
+        ]
+
+    def test_pickup_sends_the_email_when_the_file_has_landed(self):
+        with (
+            patch.object(
+                approved_email,
+                "pending_raw_email_candidates",
+                return_value=self.candidates(1),
+            ),
+            patch.object(
+                approved_email,
+                "list_raw_xlsx_files",
+                return_value=[{"label": "S-1", "cycle": 1, "dn": ""}],
+            ),
+            patch.object(approved_email, "raw_xlsx_is_listed", return_value=True),
+            patch.object(
+                approved_email,
+                "send_approved_survey_email",
+                return_value="sent",
+            ) as send,
+        ):
+            result = approved_email.send_pending_raw_emails_now()
+
+        self.assertEqual(result["sent"], 1)
+        send.assert_called_once()
+
+    def test_pickup_sends_at_most_one_email_per_load(self):
+        with (
+            patch.object(
+                approved_email,
+                "pending_raw_email_candidates",
+                return_value=self.candidates(3),
+            ),
+            patch.object(
+                approved_email,
+                "list_raw_xlsx_files",
+                return_value=[{"label": "S-1", "cycle": 1, "dn": ""}],
+            ),
+            patch.object(approved_email, "raw_xlsx_is_listed", return_value=True),
+            patch.object(
+                approved_email,
+                "send_approved_survey_email",
+                return_value="sent",
+            ) as send,
+        ):
+            result = approved_email.send_pending_raw_emails_now()
+
+        self.assertEqual(result["sent"], 1)
+        self.assertEqual(send.call_count, 1)
+
+    def test_pickup_does_not_call_the_api_when_nothing_is_pending(self):
+        with (
+            patch.object(
+                approved_email,
+                "pending_raw_email_candidates",
+                return_value=[],
+            ),
+            patch.object(approved_email, "list_raw_xlsx_files") as inventory,
+        ):
+            result = approved_email.send_pending_raw_emails_now()
+
+        self.assertEqual(result["sent"], 0)
+        inventory.assert_not_called()
+
+    def test_pickup_never_raises_when_the_inventory_api_is_broken(self):
+        with (
+            patch.object(
+                approved_email,
+                "pending_raw_email_candidates",
+                return_value=self.candidates(1),
+            ),
+            patch.object(
+                approved_email,
+                "list_raw_xlsx_files",
+                side_effect=RuntimeError("RV_RAW_XLSX_API_KEY is not configured"),
+            ),
+            patch.object(approved_email.db.session, "rollback"),
+        ):
+            result = approved_email.send_pending_raw_emails_now()
+
+        self.assertEqual(result["sent"], 0)
+        self.assertIn("skipped", result)
+
+    def test_pickup_stands_down_when_another_pickup_is_running(self):
+        with (
+            patch("core.engine._job_lock", return_value=False),
+            patch.object(
+                approved_email,
+                "pending_raw_email_candidates",
+                return_value=self.candidates(1),
+            ),
+            patch.object(
+                approved_email,
+                "send_approved_survey_email",
+                return_value="sent",
+            ) as send,
+        ):
+            result = approved_email.send_pending_raw_emails_now()
+
+        self.assertEqual(result["sent"], 0)
+        self.assertIn("skipped", result)
+        send.assert_not_called()
+
+    def test_tick_job_reports_pending_without_sending_in_dry_run(self):
+        from core.endpoints import _raw_emails
+
+        with (
+            patch.object(
+                approved_email,
+                "pending_raw_email_count",
+                return_value=26,
+            ),
+            patch.object(
+                approved_email,
+                "send_pending_raw_emails_now",
+            ) as pickup,
+        ):
+            result = _raw_emails(True)
+
+        self.assertEqual(result, {"skipped": "dry_run", "pending": 26})
+        pickup.assert_not_called()
+
+
 class ApprovedSurveyCronTests(unittest.TestCase):
     """The cron sends the raw-video mail; the defect mail is one switch away."""
 

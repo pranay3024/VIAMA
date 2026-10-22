@@ -24,6 +24,19 @@ FROM_EMAIL = "projects9@adorpower.com"
 log = logging.getLogger(__name__)
 
 
+#: How many raw emails one dashboard load may send.  The RoadVision API has
+#: no callback, so the portal only learns that a file has landed by asking it.
+#: The daily cron asks once a day; the dashboard asks on every load, so one
+#: email per load is enough to make "the file just arrived" feel immediate.
+#: The backlog is the cron's job, not the dashboard's.
+INSTANT_TRIGGER_LIMIT = 1
+
+#: Wall-clock budget for that one send.  A dashboard must never hang because
+#: a remote API is slow, so this is deliberately short: a send that does not
+#: fit is simply left for the cron.
+INSTANT_TRIGGER_MAX_SECONDS = 25
+
+
 def send_approved_survey_email(survey_id, inventory=None):
     """Send once both approvals and the matching raw XLSX are available."""
     survey = (
@@ -132,10 +145,9 @@ def send_approved_survey_email(survey_id, inventory=None):
         raise
 
 
-def process_pending_approved_survey_emails(limit=20, max_seconds=240):
-    """Try ready surveys without letting older missing sheets starve newer ones."""
-    started_at = time.monotonic()
-    candidates = (
+def pending_raw_email_candidates():
+    """Approved surveys that are still waiting for their raw-video email."""
+    return (
         db.session.query(
             Survey.id,
             Survey.section_no,
@@ -155,6 +167,17 @@ def process_pending_approved_survey_emails(limit=20, max_seconds=240):
         .limit(1000)
         .all()
     )
+
+
+def pending_raw_email_count():
+    """How many surveys are waiting for their raw-video email."""
+    return len(pending_raw_email_candidates())
+
+
+def process_pending_approved_survey_emails(limit=20, max_seconds=240):
+    """Try ready surveys without letting older missing sheets starve newer ones."""
+    started_at = time.monotonic()
+    candidates = pending_raw_email_candidates()
 
     results = {"checked": 0, "sent": 0, "waiting_for_raw_xlsx": 0, "failed": 0}
     if not candidates:
@@ -196,3 +219,59 @@ def process_pending_approved_survey_emails(limit=20, max_seconds=240):
             results[result] += 1
 
     return results
+
+
+def send_pending_raw_emails_now(
+    limit=INSTANT_TRIGGER_LIMIT,
+    max_seconds=INSTANT_TRIGGER_MAX_SECONDS,
+):
+    """Send a raw email whose file has just landed in the RoadVision API.
+
+    The RoadVision API has no callback and no "notify me when this file is
+    uploaded" endpoint, so the portal only learns that a raw-video file has
+    arrived by asking.  The daily cron asks once a day, which is far too slow
+    for the people waiting on the mail, so the dashboards ask as well: when
+    somebody loads a dashboard the inventory is polled once and anything that
+    is ready is sent straight away.
+
+    Two deliberate limits keep a dashboard load cheap and safe:
+
+    * ``limit`` - one email per load.  One is enough for "the file I was
+      waiting for just arrived"; the backlog belongs to the cron.
+    * ``max_seconds`` - a short wall-clock budget.  A slow remote API must
+      not turn into a slow dashboard.
+
+    Never raises.  A failure here has to stay invisible to the page: the
+    dashboards call this inside a ``try``/``except`` of their own, and the
+    email will still go out on the next load or on the cron.
+    """
+    from core.engine import _job_lock
+
+    try:
+        # One picker at a time.  Two dashboards loading at the same moment
+        # would otherwise both poll the inventory and race for the same mail.
+        if not _job_lock("viama_raw_email_pickup"):
+            return {
+                "checked": 0,
+                "sent": 0,
+                "waiting_for_raw_xlsx": 0,
+                "failed": 0,
+                "skipped": "another pickup is already running",
+            }
+        return process_pending_approved_survey_emails(
+            limit=limit,
+            max_seconds=max_seconds,
+        )
+    except Exception:
+        log.exception("raw video email pickup failed")
+        try:
+            db.session.rollback()
+        except Exception:
+            pass
+        return {
+            "checked": 0,
+            "sent": 0,
+            "waiting_for_raw_xlsx": 0,
+            "failed": 0,
+            "skipped": "pickup failed",
+        }

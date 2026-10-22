@@ -773,6 +773,28 @@ def admin_dashboard():
     except Exception:
         pass
 
+    # =====================================================
+    # RAW-VIDEO EMAIL PICKUP
+    #
+    # The raw-video mail goes out when the file has landed in
+    # the RoadVision API - but the API has no callback, so the
+    # portal only finds out by asking. The daily cron asks
+    # once a day, which is too slow for whoever is waiting on
+    # the mail, so the dashboard asks too: one inventory poll
+    # per load, one email per load, on a short budget.
+    #
+    # Same trade as the sweeps above - no in-process timer
+    # survives on Vercel - and it swallows its own errors, so
+    # it can never take this page down.
+    # =====================================================
+
+    try:
+        from utils.approved_survey_email import send_pending_raw_emails_now
+
+        send_pending_raw_emails_now()
+    except Exception:
+        pass
+
     from datetime import datetime, timedelta
     # #region agent log
     import json as _dbg_json, time as _dbg_time

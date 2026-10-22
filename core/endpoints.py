@@ -4857,6 +4857,9 @@ def tick():
             lambda: _rescheduled_expiry(dry_run)
         )
 
+    if should("raw_emails"):
+        results["raw_emails"] = _safely(lambda: _raw_emails(dry_run))
+
     if should("weekly_reset"):
         results["weekly_reset"] = _safely(lambda: _weekly_reset(dry_run))
 
@@ -4939,6 +4942,16 @@ def _rescheduled_expiry(dry_run):
     from core.engine import expire_rescheduled_surveys
 
     return expire_rescheduled_surveys(dry_run=dry_run)
+
+
+def _raw_emails(dry_run):
+    from utils.approved_survey_email import send_pending_raw_emails_now
+
+    if dry_run:
+        from utils.approved_survey_email import pending_raw_email_count
+
+        return {"skipped": "dry_run", "pending": pending_raw_email_count()}
+    return send_pending_raw_emails_now()
 
 
 def _weekly_reset(dry_run):

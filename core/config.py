@@ -22,6 +22,7 @@ Imports nothing from models/routes, so it is safe to import anywhere.
 #   EXPORT_COLUMNS  -> routes/admin.py:1054-1067
 # ==========================================================================
 
+import os
 from datetime import datetime, timedelta
 
 # ---------------------------------------------------------------------------
@@ -353,6 +354,41 @@ MEDIA_FIELDS = (
 DEAD_SURVEY_COLUMNS = ("settings_photo",)
 
 MAX_UPLOAD_BYTES = 25 * 1024 * 1024
+
+# ==========================================================================
+# feature switches
+# ==========================================================================
+
+#: Switches read from the environment at call time, so a value can be changed
+#: in the Vercel dashboard without a code change.  They follow the same shape
+#: as the existing kill switches (``RESCHEDULED_EXPIRY``, ``AUTO_RESCHEDULE``,
+#: ``VIDEO_COUNT_ON_COMPLETE``): a name that reads as ON, and a value of
+#: ``0``/``false``/``no``/``off`` that switches the feature off.
+#:
+#: Note the inversion: these default to OFF, because they guard mail that
+#: must not go out until somebody says so.
+
+#: The defect-report mailing.  OFF by default.
+#:
+#: The raw-video email (survey form PDF + raw XLSX) is the one the portal
+#: needs; the defect-report XLSX is a second, separate mail.  Both the cron
+#: phase in routes/sync.py and the chained send in
+#: utils/approved_survey_email.py consult this, so turning it on enables
+#: both at once and turning it off stops both at once.
+#:
+#: Set ``DEFECT_REPORT_EMAIL=1`` to switch the defect-report mail on.
+DEFECT_REPORT_EMAIL_DEFAULT = "0"
+
+
+def defect_report_email_enabled():
+    """True when the defect-report mailing is switched on.
+
+    Off unless ``DEFECT_REPORT_EMAIL`` is set to something other than
+    ``0``/``false``/``no``/``off``.
+    """
+    value = os.getenv("DEFECT_REPORT_EMAIL", DEFECT_REPORT_EMAIL_DEFAULT)
+    return value.strip().lower() not in ("0", "false", "no", "off")
+
 
 # ==========================================================================
 # timeutils

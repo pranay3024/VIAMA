@@ -73,16 +73,21 @@ vercel env add CRON_SECRET production
 ## 2. Deploy
 
 ```bash
-python check_cron_schedules.py   # refuses anything Vercel would reject
+python check_cron_schedules.py    # refuses anything Vercel would reject
+python check_database_schema.py   # refuses a database missing the columns the code selects
 vercel --prod
 ```
 
 or push to the branch connected to the Vercel project.
 
-> The guard is not optional in practice. A cron expression that fires more than
+> The guards are not optional in practice. A cron expression that fires more than
 > once a day makes Vercel **drop the deployment silently** — no entry in the
 > Deployments list, no error anywhere, and production keeps serving the
 > previous build. See "The cron schedule breaks the deployment" below.
+>
+> A build can also succeed and still crash on the first request when the
+> database is behind the code. See "The migration ran against the wrong
+> database" below.
 
 ---
 
@@ -101,9 +106,51 @@ The video-count sync remains at **02:00 UTC = 07:30 IST**, daily. Approved
 survey emails are retried at **03:00 UTC = 08:30 IST**, daily, with up to 10
 emails per phase per run.
 
+Only the **raw-video email** (survey form PDF + raw XLSX) goes out today. The
+defect-report mailing is switched off — see "Defect-report mail is switched
+off" below.
+
 > **Every cron on this project must fire at most once per day.** Vercel Hobby
 > rejects any expression that runs more often, and the rejection kills the
 > deployment. See "The cron schedule breaks the deployment" below.
+
+---
+
+## Defect-report mail is switched off
+
+The portal sends two different mails once a survey is approved:
+
+| Mail | Contains | State |
+|---|---|---|
+| **Raw-video email** | the survey-form PDF + the raw-video XLSX from RoadVision | **on** |
+| Defect-report email | the defect-report XLSX from RoadVision | **off** |
+
+The defect-report mail is off because it is a separate decision from the
+raw-video mail, and only the raw-video mail is wanted right now. It is
+controlled by one environment variable, read at send time:
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `DEFECT_REPORT_EMAIL` | `0` (off) | `1` sends the defect-report XLSX as well |
+
+The switch guards **both** places the defect mail could go out — the cron
+phase and the send chained onto the raw-video email — so it cannot leak from
+one while the other is off.
+
+**To start the defect mail later:** set `DEFECT_REPORT_EMAIL=1` in the Vercel
+dashboard and redeploy. No code change is needed.
+
+**While it is off** the cron summary says so, so an empty run is not a bug:
+
+```json
+{"raw_video_emails": {"checked": 3, "sent": 3, "waiting_for_raw_xlsx": 23, "failed": 0},
+ "defect_report_emails": {"skipped": "disabled via DEFECT_REPORT_EMAIL=0", "checked": 0, "sent": 0, "failed": 0}}
+```
+
+The surveys waiting for a defect mail are **not lost** — they stay
+`defect_report_email_sent_at = NULL` and are picked up the moment the switch
+is turned on. The admin dashboard's *Defect Report Email Sent* column shows
+the same thing.
 
 ---
 
@@ -229,6 +276,57 @@ touches nothing, including the dashboard trigger. Set it back to `1` to resume.
 
 ---
 
+## The migration ran against the wrong database
+
+**Symptom:** the build is green, but every page that touches the changed model
+returns 500 and the log says:
+
+```
+psycopg2.errors.UndefinedColumn: column surveys.defect_report_email_sent_at does not exist
+```
+
+**Cause:** `migrate_*.py` reads `DATABASE_URL` from `.env`, and there are two
+Supabase projects in play that are **not** interchangeable:
+
+| | Project | Role |
+|---|---|---|
+| Production | `nahcqrxmbzxuixqizdga` (ap-southeast-2) | The one Vercel connects to. The live database. |
+| Report copy | `zgmzbezgyvivmtkizzvg` (ap-south-1) | A snapshot taken on 2026-10-17 for reporting. It is stale — 41 surveys behind production when last compared. |
+
+The local `.env` points `DATABASE_URL` at the **report copy**, so a migration
+run from this checkout lands there and production keeps the old schema. The
+code is fine; the database is behind. This is exactly what happened on
+2026-10-22: `migrate_defect_report_email_delivery.py` was run against the copy,
+and production's `/admin` returned 500 until the same migration was applied to
+production.
+
+**Fix:** run the migration against production, then check before deploying.
+
+```bash
+# check what production is missing (reads PRODUCTION_DATABASE_URL)
+python check_database_schema.py
+
+# run a migration against production
+DATABASE_URL="$PRODUCTION_DATABASE_URL" python migrate_defect_report_email_delivery.py
+```
+
+On Windows PowerShell:
+
+```powershell
+$env:DATABASE_URL = $env:PRODUCTION_DATABASE_URL
+python migrate_defect_report_email_delivery.py
+```
+
+`check_database_schema.py` compares the schema the models expect against the
+schema the database has, and exits non-zero listing every missing table and
+column. It exits 0 only when the database is complete.
+
+> Keep `PRODUCTION_DATABASE_URL` set in `.env`. It is the single place that
+> names the live database, so a migration can never be aimed at the copy by
+> accident.
+
+---
+
 ## The cron schedule breaks the deployment
 
 **Symptom:** you push, and production keeps serving the *old* build. Nothing
@@ -265,13 +363,17 @@ than once a day, and checks that each cron path still has a route in `routes/`.
 | Symptom | Cause | Fix |
 |---|---|---|
 | Production still serves the old build after a push | A cron expression fires more than once a day — Vercel drops the deployment silently | Run `python check_cron_schedules.py`, fix the schedule, redeploy. See "The cron schedule breaks the deployment" above |
+| Production still serves the old build after a **successful** deploy | The deployment was a preview — a preview never changes the production alias | Run `vercel --prod`, or promote the deployment in the dashboard. Confirm with `curl -sI https://viama-three.vercel.app/cron/approved-survey-emails` — a `404` means the old build, `403` means the new one |
+| `500` referencing `defect_report_email_sent_at` | The migration ran against the report copy, not production | `python check_database_schema.py`, then run the migration against production. See "The migration ran against the wrong database" above |
 | `503 {"error":"upstream_unavailable"}` | `RV_DASHBOARD_TOKEN` missing, or the RoadVision VM is down | Check the env var is set **and** that you redeployed after adding it |
 | `403 {"error":"forbidden"}` | `CRON_SECRET` mismatch | Value in Vercel must match what you send in `X-Cron-Secret` |
 | Summary shows `considered: 0` | No surveys completed in the last 10 days | Widen with `?days=30` to confirm the query works |
 | All rows `no_bucket_data` | Section numbering drift between the two systems | See "Known data issues" below |
 | `500` referencing `video_count_matched` | Migration didn't run on this database | `python migrate_video_count_check.py` |
 | `500` referencing survey date-approval or raw-email fields | Approval/email migration didn't run on this database | `python migrate_survey_date_approval_email.py` |
+| `500` referencing `cancelled_survey_reports` | The weekly/cancellation report migration didn't run on this database | `python migrate_weekly_survey_reports.py` |
 | Approved-survey email fails to send | Gmail OAuth identity is not `adordashcam@gmail.com` or a verified Send mail as alias | Reauthorize the Gmail token for that sender with `gmail.compose` scope, then redeploy |
+| A defect-report XLSX email goes out when it should not | `DEFECT_REPORT_EMAIL` is set to `1` in Vercel | Set it back to `0` and redeploy. See "Defect-report mail is switched off" above |
 | Cron never fires | Env vars added but not redeployed, or the cron was removed from `vercel.json` | Redeploy; check Settings → Cron Jobs → last run |
 | Rescheduled survey never auto-cancelled | `RESCHEDULED_EXPIRY=0` is set, or it is already Sunday 23:30 IST and the sweep has not run | Check the tick's `rescheduled_expiry` result; `would_cancel: 0` with `candidates > 0` means the rows are still in date |
 

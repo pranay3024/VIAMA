@@ -5,6 +5,7 @@ import time
 from datetime import datetime, timezone
 
 from core.config import current_week_number, week_of
+from core.config import defect_report_email_enabled
 from extensions import db
 from google_drive import download_file_from_drive
 from models.db_models import Survey
@@ -104,15 +105,22 @@ def send_approved_survey_email(survey_id, inventory=None):
         ).replace(tzinfo=None)
         survey.raw_video_email_message_id = message_id
         db.session.commit()
-        try:
-            from utils.approved_survey_defect_email import (
-                send_approved_survey_defect_email,
-            )
+        if defect_report_email_enabled():
+            try:
+                from utils.approved_survey_defect_email import (
+                    send_approved_survey_defect_email,
+                )
 
-            send_approved_survey_defect_email(survey.id)
-        except Exception:
-            log.exception(
-                "defect report email attempt failed for survey %s",
+                send_approved_survey_defect_email(survey.id)
+            except Exception:
+                log.exception(
+                    "defect report email attempt failed for survey %s",
+                    survey.id,
+                )
+        else:
+            log.info(
+                "defect report email skipped for survey %s "
+                "(DEFECT_REPORT_EMAIL is off)",
                 survey.id,
             )
         return "sent"

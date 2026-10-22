@@ -17,6 +17,7 @@ import utils.approved_survey_defect_email as defect_email
 import utils.defect_report_api as defect_api
 import utils.microsoft_graph_mail as graph_mail
 import utils.raw_xlsx as raw_xlsx
+from routes.sync import sync_bp
 
 
 class ApprovedSurveyEmailTests(unittest.TestCase):
@@ -76,6 +77,7 @@ class ApprovedSurveyEmailTests(unittest.TestCase):
     def test_approved_email_sends_survey_pdf_and_raw_xlsx(self):
         survey = self.make_survey()
         with (
+            patch.dict(os.environ, {"DEFECT_REPORT_EMAIL": "0"}),
             patch.object(approved_email.Survey, "query", self.make_query(survey)),
             patch.object(approved_email, "download_file_from_drive", return_value=b"%PDF"),
             patch.object(
@@ -117,6 +119,45 @@ class ApprovedSurveyEmailTests(unittest.TestCase):
             [(b"PK-xlsx", "Raw_Video_S-1_Cycle1.xlsx")],
         )
         self.assertEqual(survey.raw_video_email_message_id, "graph-id")
+        # The defect-report mail is switched off by default.
+        defect_send.assert_not_called()
+
+    def test_approved_email_chains_defect_email_when_switched_on(self):
+        survey = self.make_survey()
+        with (
+            patch.dict(os.environ, {"DEFECT_REPORT_EMAIL": "1"}),
+            patch.object(approved_email.Survey, "query", self.make_query(survey)),
+            patch.object(approved_email, "download_file_from_drive", return_value=b"%PDF"),
+            patch.object(
+                approved_email,
+                "list_raw_xlsx_files",
+                return_value=[{"label": "S-1", "cycle": 1, "dn": ""}],
+            ),
+            patch.object(
+                approved_email,
+                "raw_xlsx_is_listed",
+                return_value=True,
+            ),
+            patch.object(
+                approved_email,
+                "download_raw_xlsx",
+                return_value=(b"PK-xlsx", "Raw_Video_S-1_Cycle1.xlsx"),
+            ),
+            patch.object(
+                approved_email,
+                "send_microsoft_graph_email",
+                return_value="graph-id",
+            ),
+            patch.object(
+                defect_email,
+                "send_approved_survey_defect_email",
+                return_value="sent",
+            ) as defect_send,
+            patch.object(approved_email.db.session, "commit"),
+        ):
+            result = approved_email.send_approved_survey_email(survey.id)
+
+        self.assertEqual(result, "sent")
         defect_send.assert_called_once_with(survey.id)
 
     def test_defect_email_waits_until_raw_email_was_sent(self):
@@ -539,6 +580,86 @@ class ApprovedSurveyEmailTests(unittest.TestCase):
         self.assertEqual(message_id, "gmail-id")
         self.assertEqual(send_request.execute.call_count, 1)
         self.assertEqual(search_request.execute.call_count, 2)
+
+
+class ApprovedSurveyCronTests(unittest.TestCase):
+    """The cron sends the raw-video mail; the defect mail is one switch away."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.app = Flask(__name__)
+        cls.app.register_blueprint(sync_bp)
+
+    def setUp(self):
+        self.app_context = self.app.app_context()
+        self.app_context.push()
+
+    def tearDown(self):
+        self.app_context.pop()
+
+    def call_cron(self, defect_switch):
+        with (
+            patch.dict(
+                os.environ,
+                {
+                    "CRON_SECRET": "cron-secret",
+                    "DEFECT_REPORT_EMAIL": defect_switch,
+                },
+            ),
+            patch.object(
+                approved_email,
+                "process_pending_approved_survey_emails",
+                return_value={
+                    "checked": 2,
+                    "sent": 2,
+                    "waiting_for_raw_xlsx": 0,
+                    "failed": 0,
+                },
+            ) as raw_send,
+            patch.object(
+                defect_email,
+                "process_pending_approved_defect_emails",
+                return_value={
+                    "checked": 1,
+                    "sent": 1,
+                    "waiting_for_defect_report": 0,
+                    "failed": 0,
+                },
+            ) as defect_send,
+        ):
+            client = self.app.test_client()
+            response = client.get(
+                "/cron/approved-survey-emails",
+                headers={"X-Cron-Secret": "cron-secret"},
+            )
+        return response, raw_send, defect_send
+
+    def test_cron_sends_raw_emails_and_skips_defect_emails_by_default(self):
+        response, raw_send, defect_send = self.call_cron("0")
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.get_json()
+        self.assertEqual(payload["raw_video_emails"]["sent"], 2)
+        self.assertIn("skipped", payload["defect_report_emails"])
+        raw_send.assert_called_once()
+        defect_send.assert_not_called()
+
+    def test_cron_runs_the_defect_phase_when_switched_on(self):
+        response, raw_send, defect_send = self.call_cron("1")
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.get_json()
+        self.assertEqual(payload["raw_video_emails"]["sent"], 2)
+        self.assertEqual(payload["defect_report_emails"]["sent"], 1)
+        raw_send.assert_called_once()
+        defect_send.assert_called_once()
+
+    def test_cron_rejects_a_request_without_the_secret(self):
+        with patch.dict(os.environ, {"CRON_SECRET": "cron-secret"}):
+            client = self.app.test_client()
+            response = client.get("/cron/approved-survey-emails")
+
+        self.assertEqual(response.status_code, 403)
 
 
 if __name__ == "__main__":

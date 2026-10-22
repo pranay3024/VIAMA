@@ -7,6 +7,7 @@ from flask import jsonify
 from flask import request
 from flask import session
 
+from core.config import defect_report_email_enabled
 from utils.video_count_sync import DEFAULT_WINDOW_DAYS
 from utils.video_count_sync import sync_recent
 
@@ -33,7 +34,6 @@ def approved_survey_email_sync():
         return jsonify({"error": "forbidden"}), 403
 
     from utils.approved_survey_email import process_pending_approved_survey_emails
-    from utils.approved_survey_defect_email import process_pending_approved_defect_emails
 
     deadline = time.monotonic() + CRON_EMAIL_MAX_SECONDS
 
@@ -41,10 +41,24 @@ def approved_survey_email_sync():
         limit=CRON_EMAIL_LIMIT,
         max_seconds=max(1, int(deadline - time.monotonic())),
     )
-    defect_result = process_pending_approved_defect_emails(
-        limit=CRON_EMAIL_LIMIT,
-        max_seconds=max(1, int(deadline - time.monotonic())),
-    )
+
+    if defect_report_email_enabled():
+        from utils.approved_survey_defect_email import (
+            process_pending_approved_defect_emails,
+        )
+
+        defect_result = process_pending_approved_defect_emails(
+            limit=CRON_EMAIL_LIMIT,
+            max_seconds=max(1, int(deadline - time.monotonic())),
+        )
+    else:
+        defect_result = {
+            "skipped": "disabled via DEFECT_REPORT_EMAIL=0",
+            "checked": 0,
+            "sent": 0,
+            "failed": 0,
+        }
+
     summary = {"raw_video_emails": raw_result, "defect_report_emails": defect_result}
     status = (
         503

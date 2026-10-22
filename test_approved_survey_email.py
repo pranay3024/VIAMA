@@ -17,6 +17,7 @@ import utils.approved_survey_defect_email as defect_email
 import utils.defect_report_api as defect_api
 import utils.microsoft_graph_mail as graph_mail
 import utils.raw_xlsx as raw_xlsx
+import utils.received_timestamps as received_timestamps
 from routes.sync import sync_bp
 
 
@@ -612,9 +613,18 @@ class InstantRawEmailPickupTests(unittest.TestCase):
             ),
             patch.object(
                 approved_email,
-                "list_raw_xlsx_files",
-                return_value=[{"label": "S-1", "cycle": 1, "dn": ""}],
+                "defect_report_email_enabled",
+                return_value=False,
             ),
+            patch.object(
+                received_timestamps,
+                "fetch_inventories",
+                return_value={
+                    "raw": [{"label": "S-1", "cycle": 1, "dn": ""}],
+                    "defect": [],
+                },
+            ),
+            patch.object(received_timestamps, "record_received_timestamps"),
             patch.object(approved_email, "raw_xlsx_is_listed", return_value=True),
             patch.object(
                 approved_email,
@@ -636,9 +646,18 @@ class InstantRawEmailPickupTests(unittest.TestCase):
             ),
             patch.object(
                 approved_email,
-                "list_raw_xlsx_files",
-                return_value=[{"label": "S-1", "cycle": 1, "dn": ""}],
+                "defect_report_email_enabled",
+                return_value=False,
             ),
+            patch.object(
+                received_timestamps,
+                "fetch_inventories",
+                return_value={
+                    "raw": [{"label": "S-1", "cycle": 1, "dn": ""}],
+                    "defect": [],
+                },
+            ),
+            patch.object(received_timestamps, "record_received_timestamps"),
             patch.object(approved_email, "raw_xlsx_is_listed", return_value=True),
             patch.object(
                 approved_email,
@@ -658,7 +677,20 @@ class InstantRawEmailPickupTests(unittest.TestCase):
                 "pending_raw_email_candidates",
                 return_value=[],
             ),
-            patch.object(approved_email, "list_raw_xlsx_files") as inventory,
+            patch.object(
+                defect_email,
+                "defect_candidates_pending",
+                return_value=False,
+            ),
+            patch.object(
+                approved_email,
+                "defect_report_email_enabled",
+                return_value=False,
+            ),
+            patch.object(
+                received_timestamps,
+                "fetch_inventories",
+            ) as inventory,
         ):
             result = approved_email.send_pending_raw_emails_now()
 
@@ -674,7 +706,12 @@ class InstantRawEmailPickupTests(unittest.TestCase):
             ),
             patch.object(
                 approved_email,
-                "list_raw_xlsx_files",
+                "defect_report_email_enabled",
+                return_value=False,
+            ),
+            patch.object(
+                received_timestamps,
+                "fetch_inventories",
                 side_effect=RuntimeError("RV_RAW_XLSX_API_KEY is not configured"),
             ),
             patch.object(approved_email.db.session, "rollback"),
@@ -722,6 +759,68 @@ class InstantRawEmailPickupTests(unittest.TestCase):
 
         self.assertEqual(result, {"skipped": "dry_run", "pending": 26})
         pickup.assert_not_called()
+
+    def test_pickup_mails_the_defect_report_when_the_switch_is_on(self):
+        with (
+            patch.object(
+                approved_email,
+                "defect_report_email_enabled",
+                return_value=True,
+            ),
+            patch.object(
+                approved_email,
+                "pending_raw_email_candidates",
+                return_value=[],
+            ),
+            patch.object(
+                defect_email,
+                "defect_candidates_pending",
+                return_value=True,
+            ),
+            patch.object(
+                received_timestamps,
+                "fetch_inventories",
+                return_value={"raw": [], "defect": [{"label": "S-1", "cycle": 1}]},
+            ),
+            patch.object(received_timestamps, "record_received_timestamps"),
+            patch.object(
+                defect_email,
+                "process_pending_approved_defect_emails",
+                return_value={"checked": 1, "sent": 1, "failed": 0},
+            ) as defect_send,
+        ):
+            result = approved_email.send_pending_raw_emails_now()
+
+        self.assertEqual(result["defect_report_emails"]["sent"], 1)
+        defect_send.assert_called_once()
+
+    def test_pickup_leaves_the_defect_report_alone_when_the_switch_is_off(self):
+        with (
+            patch.object(
+                approved_email,
+                "defect_report_email_enabled",
+                return_value=False,
+            ),
+            patch.object(
+                approved_email,
+                "pending_raw_email_candidates",
+                return_value=self.candidates(1),
+            ),
+            patch.object(
+                received_timestamps,
+                "fetch_inventories",
+                return_value={"raw": [], "defect": []},
+            ),
+            patch.object(received_timestamps, "record_received_timestamps"),
+            patch.object(
+                defect_email,
+                "process_pending_approved_defect_emails",
+            ) as defect_send,
+        ):
+            result = approved_email.send_pending_raw_emails_now()
+
+        self.assertIn("skipped", result["defect_report_emails"])
+        defect_send.assert_not_called()
 
 
 class UploadCallbackTests(unittest.TestCase):
@@ -955,6 +1054,12 @@ class ApprovedSurveyCronTests(unittest.TestCase):
                 },
             ),
             patch.object(
+                received_timestamps,
+                "fetch_inventories",
+                return_value={"raw": [], "defect": []},
+            ),
+            patch.object(received_timestamps, "record_received_timestamps"),
+            patch.object(
                 approved_email,
                 "process_pending_approved_survey_emails",
                 return_value={
@@ -982,7 +1087,7 @@ class ApprovedSurveyCronTests(unittest.TestCase):
             )
         return response, raw_send, defect_send
 
-    def test_cron_sends_raw_emails_and_skips_defect_emails_by_default(self):
+    def test_cron_sends_raw_emails_and_skips_defect_emails_when_switched_off(self):
         response, raw_send, defect_send = self.call_cron("0")
 
         self.assertEqual(response.status_code, 200)
@@ -1008,6 +1113,144 @@ class ApprovedSurveyCronTests(unittest.TestCase):
             response = client.get("/cron/approved-survey-emails")
 
         self.assertEqual(response.status_code, 403)
+
+
+class ReceivedTimestampTests(unittest.TestCase):
+    """The portal records the moment it first saw each RoadVision file."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.app = Flask(__name__)
+        cls.app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite://"
+        db.init_app(cls.app)
+        with cls.app.app_context():
+            db.create_all()
+
+    def setUp(self):
+        self.app_context = self.app.app_context()
+        self.app_context.push()
+        db.session.query(Survey).delete()
+        db.session.commit()
+
+    def tearDown(self):
+        db.session.rollback()
+        db.session.remove()
+        self.app_context.pop()
+
+    def make_survey(self, cycle_no=1, survey_type="Day"):
+        survey = Survey(
+            end_survey_pdf="https://drive.google.com/file/d/abc123/view",
+            status="completed",
+            section_no="N/09086/01002/UP",
+            upc_code="UP-NH-09086-01002-00",
+            cycle_no=cycle_no,
+            survey_type=survey_type,
+        )
+        db.session.add(survey)
+        db.session.commit()
+        return survey
+
+    def raw_inventory(self):
+        return {"raw": [{"label": "N0908601002UP", "cycle": 1, "dn": ""}], "defect": []}
+
+    def test_the_raw_video_is_stamped_when_it_is_in_the_inventory(self):
+        survey = self.make_survey()
+
+        summary = received_timestamps.record_received_timestamps(self.raw_inventory())
+
+        self.assertEqual(summary["raw_video_stamped"], 1)
+        db.session.refresh(survey)
+        self.assertIsNotNone(survey.raw_video_received_at)
+        self.assertIsNone(survey.defect_report_received_at)
+
+    def test_the_defect_report_is_stamped_separately(self):
+        survey = self.make_survey()
+
+        summary = received_timestamps.record_received_timestamps(
+            {
+                "raw": [],
+                "defect": [{"label": "N0908601002UP", "cycle": 1, "dn": "day"}],
+            }
+        )
+
+        self.assertEqual(summary["defect_report_stamped"], 1)
+        db.session.refresh(survey)
+        self.assertIsNotNone(survey.defect_report_received_at)
+        self.assertIsNone(survey.raw_video_received_at)
+
+    def test_a_file_that_is_seen_again_is_not_stamped_twice(self):
+        survey = self.make_survey()
+
+        received_timestamps.record_received_timestamps(self.raw_inventory())
+        db.session.refresh(survey)
+        first_seen = survey.raw_video_received_at
+
+        summary = received_timestamps.record_received_timestamps(self.raw_inventory())
+
+        self.assertEqual(summary["raw_video_stamped"], 0)
+        db.session.refresh(survey)
+        self.assertEqual(survey.raw_video_received_at, first_seen)
+
+    def test_a_survey_whose_file_has_not_landed_is_not_stamped(self):
+        survey = self.make_survey(cycle_no=9)
+
+        summary = received_timestamps.record_received_timestamps(self.raw_inventory())
+
+        self.assertEqual(summary["raw_video_stamped"], 0)
+        db.session.refresh(survey)
+        self.assertIsNone(survey.raw_video_received_at)
+
+    def test_a_night_survey_does_not_match_a_day_file(self):
+        survey = self.make_survey(survey_type="Night")
+
+        summary = received_timestamps.record_received_timestamps(self.raw_inventory())
+
+        self.assertEqual(summary["raw_video_stamped"], 0)
+        db.session.refresh(survey)
+        self.assertIsNone(survey.raw_video_received_at)
+
+    def test_nothing_is_stamped_when_the_inventory_cannot_be_read(self):
+        survey = self.make_survey()
+
+        summary = received_timestamps.record_received_timestamps(
+            {"raw": None, "defect": None}
+        )
+
+        self.assertEqual(summary["raw_video_stamped"], 0)
+        self.assertFalse(summary["raw_inventory"])
+        db.session.refresh(survey)
+        self.assertIsNone(survey.raw_video_received_at)
+
+    def test_the_upstream_timestamp_is_used_when_the_file_has_one(self):
+        survey = self.make_survey()
+
+        received_timestamps.record_received_timestamps(
+            {
+                "raw": [
+                    {
+                        "label": "N0908601002UP",
+                        "cycle": 1,
+                        "dn": "",
+                        "updated": "2026-10-19T09:35:54.950000+00:00",
+                    }
+                ],
+                "defect": [],
+            }
+        )
+
+        db.session.refresh(survey)
+        self.assertEqual(
+            survey.raw_video_received_at,
+            datetime(2026, 10, 19, 9, 35, 54, 950000),
+        )
+
+    def test_the_portal_notices_the_file_when_the_upstream_has_no_timestamp(self):
+        survey = self.make_survey()
+
+        received_timestamps.record_received_timestamps(self.raw_inventory())
+
+        db.session.refresh(survey)
+        self.assertIsNotNone(survey.raw_video_received_at)
 
 
 if __name__ == "__main__":

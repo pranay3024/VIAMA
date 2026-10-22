@@ -34,23 +34,50 @@ def approved_survey_email_sync():
         return jsonify({"error": "forbidden"}), 403
 
     from utils.approved_survey_email import process_pending_approved_survey_emails
+    from utils.received_timestamps import (
+        fetch_inventories,
+        record_received_timestamps,
+    )
 
     deadline = time.monotonic() + CRON_EMAIL_MAX_SECONDS
 
-    raw_result = process_pending_approved_survey_emails(
-        limit=CRON_EMAIL_LIMIT,
-        max_seconds=max(1, int(deadline - time.monotonic())),
-    )
+    # One read of each inventory, shared by the stamps and both mail phases.
+    inventories = fetch_inventories()
+    record_received_timestamps(inventories)
+
+    if inventories.get("raw") is None:
+        raw_result = {
+            "skipped": "the RoadVision raw-video inventory is unavailable",
+            "checked": 0,
+            "sent": 0,
+            "waiting_for_raw_xlsx": 0,
+            "failed": 0,
+        }
+    else:
+        raw_result = process_pending_approved_survey_emails(
+            limit=CRON_EMAIL_LIMIT,
+            max_seconds=max(1, int(deadline - time.monotonic())),
+            inventory=inventories["raw"],
+        )
 
     if defect_report_email_enabled():
         from utils.approved_survey_defect_email import (
             process_pending_approved_defect_emails,
         )
 
-        defect_result = process_pending_approved_defect_emails(
-            limit=CRON_EMAIL_LIMIT,
-            max_seconds=max(1, int(deadline - time.monotonic())),
-        )
+        if inventories.get("defect") is None:
+            defect_result = {
+                "skipped": "the RoadVision defect-report inventory is unavailable",
+                "checked": 0,
+                "sent": 0,
+                "failed": 0,
+            }
+        else:
+            defect_result = process_pending_approved_defect_emails(
+                limit=CRON_EMAIL_LIMIT,
+                max_seconds=max(1, int(deadline - time.monotonic())),
+                inventory=inventories["defect"],
+            )
     else:
         defect_result = {
             "skipped": "disabled via DEFECT_REPORT_EMAIL=0",

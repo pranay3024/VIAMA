@@ -22,6 +22,27 @@ FROM_EMAIL = "projects9@adorpower.com"
 log = logging.getLogger(__name__)
 
 
+def defect_candidates_pending():
+    """True when at least one survey is waiting for its defect-report mail.
+
+    A database-only check, so the caller can decide whether the RoadVision
+    host needs to be contacted at all.
+    """
+    return (
+        db.session.query(Survey.id)
+        .filter(
+            Survey.raw_video_email_sent_at.is_not(None),
+            Survey.defect_report_email_sent_at.is_(None),
+            Survey.survey_dates_approved.is_(True),
+            Survey.survey_form_approved.is_(True),
+            Survey.extracted_survey_start_date.is_not(None),
+            Survey.extracted_survey_end_date.is_not(None),
+        )
+        .first()
+        is not None
+    )
+
+
 def send_approved_survey_defect_email(survey_id, inventory=None):
     """Send the matching defect XLSX once the raw-video email was sent."""
     survey = (
@@ -108,7 +129,7 @@ def send_approved_survey_defect_email(survey_id, inventory=None):
         raise
 
 
-def process_pending_approved_defect_emails(limit=20, max_seconds=100):
+def process_pending_approved_defect_emails(limit=20, max_seconds=100, inventory=None):
     """Retry a bounded set of defect reports whose raw survey email was sent."""
     started_at = time.monotonic()
     candidates = (
@@ -135,11 +156,12 @@ def process_pending_approved_defect_emails(limit=20, max_seconds=100):
     if not candidates:
         return results
 
-    try:
-        inventory = list_defect_report_files()
-    except DefectReportUnavailable:
-        results["waiting_for_defect_report"] = len(candidates)
-        return results
+    if inventory is None:
+        try:
+            inventory = list_defect_report_files()
+        except DefectReportUnavailable:
+            results["waiting_for_defect_report"] = len(candidates)
+            return results
 
     ready_ids = []
     for survey_id, section_no, upc_code, cycle_no, survey_type in candidates:

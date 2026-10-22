@@ -163,6 +163,9 @@
                         {% else %}
                             <span class="missing">NO</span>
                         {% endif %}
+                        {% if survey.display_raw_video_received_at %}
+                            <br><span class="text-muted">{{ survey.display_raw_video_received_at.strftime('%d/%m/%Y %I:%M %p') }} IST</span>
+                        {% endif %}
                     </td>
                     <td>
                         {% if not survey.raw_video_email_sent_at %}
@@ -171,6 +174,9 @@
                             <span class="approved">YES</span>
                         {% else %}
                             <span class="missing">NO</span>
+                        {% endif %}
+                        {% if survey.display_defect_report_received_at %}
+                            <br><span class="text-muted">{{ survey.display_defect_report_received_at.strftime('%d/%m/%Y %I:%M %p') }} IST</span>
                         {% endif %}
                     </td>
                     <td>

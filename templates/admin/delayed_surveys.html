@@ -164,7 +164,10 @@
                             {% elif survey.raw_video_api_received %}
                                 <span title="RoadVision file: {{ survey.raw_video_api_label }}; cycle {{ survey.cycle_no }}">YES (RoadVision)</span>
                             {% else %}
-                                <span style="color:#a33;font-weight:bold;">NO</span>
+                                <strong style="color:#a33;">NO</strong>
+                            {% endif %}
+                            {% if survey.display_raw_video_received_at %}
+                                <br><span class="text-muted">{{ survey.display_raw_video_received_at.strftime('%d/%m/%Y %I:%M %p') }} IST</span>
                             {% endif %}
                         </td>
                         <td>
@@ -174,6 +177,9 @@
                                 <strong style="color:green;">YES</strong>
                             {% else %}
                                 <strong style="color:#a33;">NO</strong>
+                            {% endif %}
+                            {% if survey.display_defect_report_received_at %}
+                                <br><span class="text-muted">{{ survey.display_defect_report_received_at.strftime('%d/%m/%Y %I:%M %p') }} IST</span>
                             {% endif %}
                         </td>
                         <td>

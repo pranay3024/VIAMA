@@ -37,6 +37,11 @@ INSTANT_TRIGGER_LIMIT = 1
 #: fit is simply left for the cron.
 INSTANT_TRIGGER_MAX_SECONDS = 25
 
+#: The defect-report mail follows the same rule as the raw one: one per
+#: dashboard load, on its own short budget.
+DEFECT_TRIGGER_LIMIT = 1
+DEFECT_TRIGGER_MAX_SECONDS = 25
+
 
 def send_approved_survey_email(survey_id, inventory=None):
     """Send once both approvals and the matching raw XLSX are available."""
@@ -175,20 +180,27 @@ def pending_raw_email_count():
     return len(pending_raw_email_candidates())
 
 
-def process_pending_approved_survey_emails(limit=20, max_seconds=240):
+def process_pending_approved_survey_emails(
+    limit=20,
+    max_seconds=240,
+    inventory=None,
+    candidates=None,
+):
     """Try ready surveys without letting older missing sheets starve newer ones."""
     started_at = time.monotonic()
-    candidates = pending_raw_email_candidates()
+    if candidates is None:
+        candidates = pending_raw_email_candidates()
 
     results = {"checked": 0, "sent": 0, "waiting_for_raw_xlsx": 0, "failed": 0}
     if not candidates:
         return results
 
-    try:
-        inventory = list_raw_xlsx_files()
-    except RawXlsxUnavailable:
-        results["waiting_for_raw_xlsx"] = len(candidates)
-        return results
+    if inventory is None:
+        try:
+            inventory = list_raw_xlsx_files()
+        except RawXlsxUnavailable:
+            results["waiting_for_raw_xlsx"] = len(candidates)
+            return results
 
     ready_ids = []
     for survey_id, section_no, upc_code, cycle_no, survey_type in candidates:
@@ -286,6 +298,9 @@ def send_pending_raw_emails_now(
     somebody loads a dashboard the inventory is polled once and anything that
     is ready is sent straight away.
 
+    The same pass also stamps when each file arrived and mails the
+    defect report of a survey whose raw video has already gone out.
+
     Two deliberate limits keep a dashboard load cheap and safe:
 
     * ``limit`` - one email per load.  One is enough for "the file I was
@@ -298,6 +313,10 @@ def send_pending_raw_emails_now(
     email will still go out on the next load or on the cron.
     """
     from core.engine import _job_lock
+    from utils.received_timestamps import (
+        fetch_inventories,
+        record_received_timestamps,
+    )
 
     try:
         # One picker at a time.  Two dashboards loading at the same moment
@@ -310,10 +329,50 @@ def send_pending_raw_emails_now(
                 "failed": 0,
                 "skipped": "another pickup is already running",
             }
-        return process_pending_approved_survey_emails(
-            limit=limit,
-            max_seconds=max_seconds,
-        )
+
+        # The database is the only thing worth reading first: if no mail is
+        # owed, the RoadVision host is never contacted and the dashboard
+        # stays as fast as it was.
+        candidates = pending_raw_email_candidates()
+        defect_pending = False
+        if defect_report_email_enabled():
+            from utils.approved_survey_defect_email import defect_candidates_pending
+
+            defect_pending = defect_candidates_pending()
+
+        if not candidates and not defect_pending:
+            return {
+                "checked": 0,
+                "sent": 0,
+                "waiting_for_raw_xlsx": 0,
+                "failed": 0,
+                "skipped": "nothing is waiting to be mailed",
+            }
+
+        # One read of each inventory, shared by everything below: the stamps,
+        # the raw mail and the defect mail.  The RoadVision host can be slow,
+        # so reading it twice would be twice the waiting.
+        inventories = fetch_inventories()
+        record_received_timestamps(inventories)
+
+        if inventories.get("raw") is None:
+            results = {
+                "checked": 0,
+                "sent": 0,
+                "waiting_for_raw_xlsx": len(candidates),
+                "failed": 0,
+                "skipped": "the RoadVision raw-video inventory is unavailable",
+            }
+        else:
+            results = process_pending_approved_survey_emails(
+                limit=limit,
+                max_seconds=max_seconds,
+                inventory=inventories["raw"],
+                candidates=candidates,
+            )
+
+        results["defect_report_emails"] = _pickup_defect_emails(inventories)
+        return results
     except Exception:
         log.exception("raw video email pickup failed")
         try:
@@ -327,3 +386,37 @@ def send_pending_raw_emails_now(
             "failed": 0,
             "skipped": "pickup failed",
         }
+
+
+def _pickup_defect_emails(inventories):
+    """The defect-report phase of the pickup.
+
+    A defect report is mailed once the raw survey email has gone out and the
+    report for that same stretch, cycle and shift has landed in the
+    RoadVision inventory.  Same rules as the cron phase, same switch.
+    """
+    if not defect_report_email_enabled():
+        return {
+            "skipped": "disabled via DEFECT_REPORT_EMAIL=0",
+            "checked": 0,
+            "sent": 0,
+            "failed": 0,
+        }
+
+    if inventories.get("defect") is None:
+        return {
+            "skipped": "the RoadVision defect-report inventory is unavailable",
+            "checked": 0,
+            "sent": 0,
+            "failed": 0,
+        }
+
+    from utils.approved_survey_defect_email import (
+        process_pending_approved_defect_emails,
+    )
+
+    return process_pending_approved_defect_emails(
+        limit=DEFECT_TRIGGER_LIMIT,
+        max_seconds=DEFECT_TRIGGER_MAX_SECONDS,
+        inventory=inventories["defect"],
+    )

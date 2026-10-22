@@ -601,36 +601,6 @@ def delayed_surveys():
     except Exception:
         bucket_matched, bucket_missing, bucket_available = 0, len(delayed), False
 
-    for survey in delayed:
-        survey.display_survey_dates_approved_at = (
-            survey.survey_dates_approved_at + ist_offset
-            if survey.survey_dates_approved_at else None
-        )
-        survey.display_raw_video_email_sent_at = (
-            survey.raw_video_email_sent_at + ist_offset
-            if survey.raw_video_email_sent_at else None
-        )
-        survey.display_start_time = (
-            survey.start_time + ist_offset if survey.start_time else None
-        )
-        survey.display_end_time = (
-            survey.end_time + ist_offset if survey.end_time else None
-        )
-        survey.display_pdf_upload_time = (
-            survey.survey_pdf_uploaded_at + ist_offset
-            if survey.survey_pdf_uploaded_at and not survey.pdf_reupload_required
-            else None
-        )
-        # The GIS bucket is authoritative for when videos landed, so it replaces the
-        # captain's self-reported video_upload_time in this column. Surveys whose
-        # stretch the bucket has never seen fall back to what we recorded.
-        survey.display_video_upload_time = (
-            survey.bucket_video_upload_time or (
-                survey.video_upload_time + ist_offset
-                if survey.video_upload_time else None
-            )
-        )
-
     try:
         from utils.raw_xlsx import list_raw_xlsx_files
 
@@ -674,6 +644,56 @@ def delayed_surveys():
             for survey in delayed:
                 survey.defect_report_api_label = None
                 survey.defect_report_api_received = False
+
+    # The two inventories are already in hand, so this costs no extra call:
+    # stamp every survey whose file has arrived, not just this week's.
+    try:
+        from utils.received_timestamps import record_received_timestamps
+
+        record_received_timestamps(
+            {"raw": raw_xlsx_files, "defect": defect_report_files}
+        )
+    except Exception as exc:
+        log.warning("could not record the RoadVision received timestamps: %s", exc)
+
+    for survey in delayed:
+        survey.display_survey_dates_approved_at = (
+            survey.survey_dates_approved_at + ist_offset
+            if survey.survey_dates_approved_at else None
+        )
+        survey.display_raw_video_email_sent_at = (
+            survey.raw_video_email_sent_at + ist_offset
+            if survey.raw_video_email_sent_at else None
+        )
+        # When RoadVision says each file arrived.
+        survey.display_raw_video_received_at = (
+            survey.raw_video_received_at + ist_offset
+            if survey.raw_video_received_at else None
+        )
+        survey.display_defect_report_received_at = (
+            survey.defect_report_received_at + ist_offset
+            if survey.defect_report_received_at else None
+        )
+        survey.display_start_time = (
+            survey.start_time + ist_offset if survey.start_time else None
+        )
+        survey.display_end_time = (
+            survey.end_time + ist_offset if survey.end_time else None
+        )
+        survey.display_pdf_upload_time = (
+            survey.survey_pdf_uploaded_at + ist_offset
+            if survey.survey_pdf_uploaded_at and not survey.pdf_reupload_required
+            else None
+        )
+        # The GIS bucket is authoritative for when videos landed, so it replaces the
+        # captain's self-reported video_upload_time in this column. Surveys whose
+        # stretch the bucket has never seen fall back to what we recorded.
+        survey.display_video_upload_time = (
+            survey.bucket_video_upload_time or (
+                survey.video_upload_time + ist_offset
+                if survey.video_upload_time else None
+            )
+        )
 
     for survey in delayed:
         survey.display_defect_report_email_sent_at = (

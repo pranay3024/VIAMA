@@ -368,22 +368,25 @@ MAX_UPLOAD_BYTES = 25 * 1024 * 1024
 #: Note the inversion: these default to OFF, because they guard mail that
 #: must not go out until somebody says so.
 
-#: The defect-report mailing.  OFF by default.
+#: The defect-report mailing.  ON by default.
 #:
-#: The raw-video email (survey form PDF + raw XLSX) is the one the portal
-#: needs; the defect-report XLSX is a second, separate mail.  Both the cron
-#: phase in routes/sync.py and the chained send in
-#: utils/approved_survey_email.py consult this, so turning it on enables
-#: both at once and turning it off stops both at once.
+#: Two mails go out once a survey is approved: the raw-video mail (the
+#: survey-form PDF + the raw-video XLSX from RoadVision) and the defect-report
+#: mail (the defect-report XLSX from RoadVision).  Both the cron phase in
+#: routes/sync.py, the dashboard pickup and the send chained onto the
+#: raw-video email consult this, so turning it on enables every one of them
+#: and turning it off stops every one of them.
 #:
-#: Set ``DEFECT_REPORT_EMAIL=1`` to switch the defect-report mail on.
-DEFECT_REPORT_EMAIL_DEFAULT = "0"
+#: On by default: the defect report is mailed as soon as it lands for a
+#: survey whose raw video has already gone out.  Set ``DEFECT_REPORT_EMAIL=0``
+#: to stop it without a code change - that is the kill valve.
+DEFECT_REPORT_EMAIL_DEFAULT = "1"
 
 
 def defect_report_email_enabled():
     """True when the defect-report mailing is switched on.
 
-    Off unless ``DEFECT_REPORT_EMAIL`` is set to something other than
+    On unless ``DEFECT_REPORT_EMAIL`` is set to something among
     ``0``/``false``/``no``/``off``.
     """
     value = os.getenv("DEFECT_REPORT_EMAIL", DEFECT_REPORT_EMAIL_DEFAULT)

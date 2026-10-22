@@ -54,6 +54,12 @@ Before deploying defect-report email tracking, run
 It adds nullable delivery markers without changing existing Gmail-derived
 defect-report dates.
 
+Before deploying the "file received" timestamps, run
+`python migrate_received_timestamps.py` once against the target database. It
+adds `surveys.raw_video_received_at` and `surveys.defect_report_received_at`,
+both nullable, so a database without them would fail with
+`column surveys.raw_video_received_at does not exist`.
+
 The exact values are in your local
 `VIAMA-main/.env`. Copy them verbatim — no quotes, no trailing spaces.
 
@@ -116,28 +122,27 @@ off" below.
 
 ---
 
-## Defect-report mail is switched off
+## Defect-report mail
 
 The portal sends two different mails once a survey is approved:
 
-| Mail | Contains | State |
+| Mail | Contains | When |
 |---|---|---|
-| **Raw-video email** | the survey-form PDF + the raw-video XLSX from RoadVision | **on** |
-| Defect-report email | the defect-report XLSX from RoadVision | **off** |
+| **Raw-video email** | the survey-form PDF + the raw-video XLSX from RoadVision | once both approvals are recorded and the XLSX has landed |
+| Defect-report email | the defect-report XLSX from RoadVision | once the raw-video email has gone out **and** the report for that same stretch, cycle and shift has landed |
 
-The defect-report mail is off because it is a separate decision from the
-raw-video mail, and only the raw-video mail is wanted right now. It is
-controlled by one environment variable, read at send time:
+The defect-report mail is **on by default**. It is controlled by one
+environment variable, read at send time:
 
 | Variable | Default | Meaning |
 |---|---|---|
-| `DEFECT_REPORT_EMAIL` | `0` (off) | `1` sends the defect-report XLSX as well |
+| `DEFECT_REPORT_EMAIL` | `1` (on) | `0` stops the defect-report XLSX from going out |
 
-The switch guards **both** places the defect mail could go out — the cron
-phase and the send chained onto the raw-video email — so it cannot leak from
-one while the other is off.
+The switch guards **every** place the defect mail could go out — the cron
+phase, the dashboard pickup and the send chained onto the raw-video email —
+so it cannot leak from one while the other is off.
 
-**To start the defect mail later:** set `DEFECT_REPORT_EMAIL=1` in the Vercel
+**To stop the defect mail:** set `DEFECT_REPORT_EMAIL=0` in the Vercel
 dashboard and redeploy. No code change is needed.
 
 **While it is off** the cron summary says so, so an empty run is not a bug:
@@ -152,6 +157,28 @@ The surveys waiting for a defect mail are **not lost** — they stay
 is turned on. The admin dashboard's *Defect Report Email Sent* column shows
 the same thing.
 
+With the switch on, the backlog drains on its own: one defect mail per
+dashboard load, ten per cron run. A survey whose report has not landed in
+RoadVision yet is simply left for the next round.
+
+### When the files arrived
+
+Two columns on `surveys` record when each file landed in RoadVision:
+
+| Column | Set when |
+|---|---|
+| `raw_video_received_at` | the raw-video XLSX for that survey showed up in the inventory |
+| `defect_report_received_at` | the defect-report XLSX for that survey showed up in the inventory |
+
+They are stamped by the same code that mails the files (dashboard pickup and
+cron), and the admin dashboard shows them under *Raw Excel Received* and
+*Defect Report Received* in IST.
+
+The value is the timestamp RoadVision itself reports for the file, so it is
+the arrival time and not the time the portal happened to notice. When an
+inventory entry carries no timestamp, the moment the portal noticed the file
+is recorded instead.
+
 ---
 
 ## When the raw-video email goes out
@@ -162,9 +189,9 @@ callback. So the portal learns that a file has landed by **asking**.
 
 | Trigger | What it covers | Limit |
 |---|---|---|
-| Dashboard load (`/admin`, `/form-approver`) | The file that just arrived — this is the fast path | 1 email per load, 25 s budget |
+| Dashboard load (`/admin`, `/form-approver`) | The file that just arrived — this is the fast path | 1 raw email + 1 defect email per load, 25 s budget each |
 | `POST /api/v1/jobs/tick` | Quiet days when nobody logs in | 1 email per tick |
-| `/cron/approved-survey-emails` (03:00 UTC) | The backlog | 10 emails per run |
+| `/cron/approved-survey-emails` (03:00 UTC) | The backlog | 10 emails per run, per mail |
 
 So in practice: an admin opens the dashboard and the mail for a file that has
 just landed goes out in the same request. If nobody opens a dashboard, the
@@ -461,7 +488,7 @@ than once a day, and checks that each cron path still has a route in `routes/`.
 | `500` referencing survey date-approval or raw-email fields | Approval/email migration didn't run on this database | `python migrate_survey_date_approval_email.py` |
 | `500` referencing `cancelled_survey_reports` | The weekly/cancellation report migration didn't run on this database | `python migrate_weekly_survey_reports.py` |
 | Approved-survey email fails to send | Gmail OAuth identity is not `adordashcam@gmail.com` or a verified Send mail as alias | Reauthorize the Gmail token for that sender with `gmail.compose` scope, then redeploy |
-| A defect-report XLSX email goes out when it should not | `DEFECT_REPORT_EMAIL` is set to `1` in Vercel | Set it back to `0` and redeploy. See "Defect-report mail is switched off" above |
+| A defect-report XLSX email goes out when it should not | `DEFECT_REPORT_EMAIL` is set to `0` in Vercel, or the default was changed in code | Set `DEFECT_REPORT_EMAIL=0` in Vercel and redeploy. See "Defect-report mail" above |
 | Cron never fires | Env vars added but not redeployed, or the cron was removed from `vercel.json` | Redeploy; check Settings → Cron Jobs → last run |
 | Rescheduled survey never auto-cancelled | `RESCHEDULED_EXPIRY=0` is set, or it is already Sunday 23:30 IST and the sweep has not run | Check the tick's `rescheduled_expiry` result; `would_cancel: 0` with `candidates > 0` means the rows are still in date |
 | Raw-video email did not go out when the file arrived | Nothing asked the API: no dashboard was loaded and the daily cron has not run yet | Open `/admin` or `/form-approver` (the pickup runs on load), or wait for the 03:00 UTC cron. See "When the raw-video email goes out" above |

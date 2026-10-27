@@ -3104,17 +3104,11 @@ def run_weekly_reset(now=None, force=False, dry_run=False):
     }
 
 
-#: How many incomplete survey rows one expiry sweep will look at.
+#: How many ongoing or rescheduled survey rows one expiry sweep will look at.
 RESCHEDULED_EXPIRY_SCAN_LIMIT = 500
 
-#: Surveys still eligible for expiry at the end of their Mon-Sun week.
-SURVEY_EXPIRY_ELIGIBLE_STATUSES = (
-    "rescheduled",
-    "ongoing",
-    "groundwork_completed",
-    "video_pending",
-    "video_uploaded_pending_form",
-)
+#: Survey statuses eligible for expiry at the end of their Mon-Sun week.
+SURVEY_EXPIRY_ELIGIBLE_STATUSES = ("ongoing", "rescheduled")
 
 
 def _rescheduled_anchor_ist(survey):
@@ -3150,10 +3144,7 @@ def _survey_expiry_anchor_ist(survey):
     """Return the timestamp whose Mon-Sun week controls this survey's expiry."""
     from core.config import SURVEY_RESCHEDULED
 
-    if (
-        survey.status == SURVEY_RESCHEDULED
-        or survey.captain_status == SURVEY_RESCHEDULED
-    ):
+    if survey.status == SURVEY_RESCHEDULED:
         return _rescheduled_anchor_ist(survey)
     if survey.start_time is not None:
         return survey.start_time
@@ -3162,12 +3153,12 @@ def _survey_expiry_anchor_ist(survey):
 
 def expire_rescheduled_surveys(now=None, dry_run=False):
     """
-    Cancel every incomplete survey whose Sunday-23:30-IST deadline has passed.
+    Cancel every ongoing or rescheduled survey whose Sunday-23:30-IST deadline
+    has passed.
 
-    Rescheduled, ongoing, and other incomplete surveys stay visible until the
-    Sunday cutoff of their own week, then are cancelled automatically. Completed
-    surveys are never selected. This also prevents rescheduled rows from staying
-    visible forever after the Monday assignment reset.
+    Other statuses, including groundwork-completed, video-pending, and completed,
+    are not selected. The cutoff is the survey's own week: the reschedule week for
+    rescheduled surveys, or the start-time week for ongoing surveys.
 
     Idempotent - it only selects eligible, not-yet-cancelled rows, so running it
     on every dashboard load and on every cron tick is safe.
@@ -3189,7 +3180,6 @@ def expire_rescheduled_surveys(now=None, dry_run=False):
 
     from core.config import (
         SURVEY_CANCELLED,
-        SURVEY_COMPLETED,
         SURVEY_RESCHEDULED,
         ist_now,
         rescheduled_expiry_deadline,
@@ -3214,14 +3204,7 @@ def expire_rescheduled_surveys(now=None, dry_run=False):
     try:
         candidates = (
             Survey.query.filter(
-                db.or_(
-                    Survey.status.in_(SURVEY_EXPIRY_ELIGIBLE_STATUSES),
-                    Survey.captain_status == SURVEY_RESCHEDULED,
-                ),
-                db.or_(
-                    Survey.status.is_(None),
-                    Survey.status.notin_((SURVEY_COMPLETED, SURVEY_CANCELLED)),
-                ),
+                Survey.status.in_(SURVEY_EXPIRY_ELIGIBLE_STATUSES),
             )
             # Oldest first, so if the scan limit ever bites it is the least
             # overdue rows that wait for the next run, not the most overdue.

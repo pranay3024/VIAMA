@@ -334,17 +334,17 @@ An admin can also re-run the sync on demand at any time by visiting
 
 ---
 
-## Incomplete surveys auto-cancel after Sunday 23:30 IST
+## Ongoing and rescheduled surveys auto-cancel after Sunday 23:30 IST
 
-Rescheduled surveys and surveys still in an incomplete status (Ongoing,
-Groundwork Completed, Video Pending, or Video Uploaded Pending Form) become
-**Cancelled** automatically once **Sunday 23:30 IST of their own week** passes.
-Completed surveys are never auto-cancelled. Rescheduled surveys use the week
-they were rescheduled; other incomplete surveys use their start-time week.
+Only surveys with the **Ongoing** or **Rescheduled** status become **Cancelled**
+automatically once **Sunday 23:30 IST of their own week** passes. Groundwork
+Completed, Video Pending, Video Uploaded Pending Form, and Completed surveys are
+not auto-cancelled. Rescheduled surveys use the week they were rescheduled;
+ongoing surveys use their start-time week.
 
 The cutoff is derived from the row's own week, not from "now": rescheduled on
 Wednesday → that coming Sunday 23:30; rescheduled Sunday morning → 23:30 the same
-day; an incomplete survey still open from a previous week → cancelled on the next
+day; an eligible survey still open from a previous week → cancelled on the next
 run.
 
 The clock time is `RESCHEDULED_EXPIRY_HOUR` / `RESCHEDULED_EXPIRY_MINUTE` in

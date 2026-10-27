@@ -882,7 +882,7 @@ onclick="clearFilters()">
 <tr
     data-extract="{{ survey.section_no }}_Cycle{{ survey.cycle_no }}"
     data-pending-label="{{ survey.section_no | trim }}_{{ survey.cycle_no }}"
-    data-stretch-cycle="{{ (survey.stretch_code or '') | trim }}_{{ survey.cycle_no }}"
+    data-stretch-cycle="{{ survey.section_no | trim }}_{{ survey.cycle_no }}"
     data-form-received="{{ 'true' if survey.end_survey_pdf else 'false' }}"
     data-form-approved="{{ 'true' if survey.survey_form_approved else 'false' }}"
     data-status="{{ survey.status }}"

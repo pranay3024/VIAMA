@@ -334,20 +334,22 @@ An admin can also re-run the sync on demand at any time by visiting
 
 ---
 
-## Rescheduled surveys auto-cancel after Sunday 23:30 IST
+## Incomplete surveys auto-cancel after Sunday 23:30 IST
 
-A survey a captain pushed back stays **Rescheduled** so the team can see it is
-coming. Once **Sunday 23:30 IST of the week it was rescheduled in** passes without
-the survey being restarted, it becomes **Cancelled** automatically.
+Rescheduled surveys and surveys still in an incomplete status (Ongoing,
+Groundwork Completed, Video Pending, or Video Uploaded Pending Form) become
+**Cancelled** automatically once **Sunday 23:30 IST of their own week** passes.
+Completed surveys are never auto-cancelled. Rescheduled surveys use the week
+they were rescheduled; other incomplete surveys use their start-time week.
 
 The cutoff is derived from the row's own week, not from "now": rescheduled on
 Wednesday → that coming Sunday 23:30; rescheduled Sunday morning → 23:30 the same
-day; already overdue from a previous week → cancelled on the next run.
+day; an incomplete survey still open from a previous week → cancelled on the next
+run.
 
 The clock time is `RESCHEDULED_EXPIRY_HOUR` / `RESCHEDULED_EXPIRY_MINUTE` in
-`core/config.py`, and `RESCHEDULED_EXPIRED_NOTE` is built from them, so the
-"View Reason" text always matches the deadline. Changing the time is a two-line
-edit there — nothing else hardcodes it.
+`core/config.py`. Automatically cancelled surveys have no cancellation reason.
+Changing the time is a two-line edit there — nothing else hardcodes it.
 
 23:30 is deliberately the last moment of the week before the Monday-00:00 rollover
 that clears the assignment, so a captain gets the whole of Sunday rather than

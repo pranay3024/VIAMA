@@ -805,6 +805,16 @@ onclick="clearFilters()">
 
 </button>
 
+    <button
+    type="button"
+    class="search-btn"
+    onclick="copyAutoCancelledExtract()"
+    >
+
+     Auto Cancelled Extract
+
+</button>
+
 </div>
     </form>
     
@@ -872,9 +882,11 @@ onclick="clearFilters()">
 <tr
     data-extract="{{ survey.section_no }}_Cycle{{ survey.cycle_no }}"
     data-pending-label="{{ survey.section_no | trim }}_{{ survey.cycle_no }}"
+    data-stretch-cycle="{{ (survey.stretch_code or '') | trim }}_{{ survey.cycle_no }}"
     data-form-received="{{ 'true' if survey.end_survey_pdf else 'false' }}"
     data-form-approved="{{ 'true' if survey.survey_form_approved else 'false' }}"
     data-status="{{ survey.status }}"
+    data-cancelled-no-reason="{{ 'true' if survey.status == 'cancelled' and not (survey.captain_status_reason or '').strip() else 'false' }}"
     data-pdf-reupload="{{ 'true' if survey.pdf_reupload_required else 'false' }}"
     data-video-upload-time="{{ survey.display_video_upload_time.strftime('%d/%m/%Y %I:%M %p') if survey.display_video_upload_time else '' }}">
 
@@ -2207,6 +2219,47 @@ function copyPendingApprovalExtract() {
         })
         .catch(function() {
             alert("⚠️ Failed to copy pending approval extract.");
+        });
+}
+
+function copyAutoCancelledExtract() {
+
+    const rows = Array.from(
+        document.querySelectorAll("tr[data-stretch-cycle]")
+    );
+    const seen = {};
+    const labels = [];
+
+    rows.forEach(function (row) {
+        if (row.getAttribute("data-cancelled-no-reason") !== "true") {
+            return;
+        }
+
+        const label = row.getAttribute("data-stretch-cycle");
+        if (!label || seen[label]) {
+            return;
+        }
+
+        seen[label] = true;
+        labels.push(label);
+    });
+
+    if (!labels.length) {
+        alert("No auto-cancelled surveys without a reason in this filter.");
+        return;
+    }
+
+    const output = "*Cancelled - No reason available*\n\n" + labels.join("\n");
+    navigator.clipboard.writeText(output)
+        .then(function() {
+            alert(
+                "✅ Auto-cancelled extract copied!\n\n"
+                + labels.length
+                + (labels.length === 1 ? " entry" : " entries")
+            );
+        })
+        .catch(function() {
+            alert("⚠️ Failed to copy auto-cancelled extract.");
         });
 }
 

@@ -749,11 +749,11 @@ def admin_dashboard():
      return redirect("/")
 
     # =====================================================
-    # EXPIRE OVERDUE RESCHEDULED SURVEYS
+    # EXPIRE OVERDUE INCOMPLETE SURVEYS
     #
-    # A rescheduled survey is cancelled automatically once
-    # Sunday 23:30 IST of the week it was rescheduled in has
-    # passed. Run here - before any of the queries below - so
+    # Rescheduled and other incomplete surveys are cancelled once
+    # Sunday 23:30 IST of their own week has passed. Run here -
+    # before any of the queries below - so
     # the page the admin is looking at is already correct, and
     # so a quiet day still gets fixed the next time somebody
     # opens this screen. The same sweep also runs from
@@ -777,7 +777,7 @@ def admin_dashboard():
     # "rescheduled" row, so the captain can still start it
     # instead of the stretch quietly rolling into next week.
     # The Sunday 23:30 auto-cancel above then closes out
-    # whatever they never touch.
+    # whatever they have not completed.
     #
     # Same trade as the sweep above: no in-process timer
     # survives on Vercel, so this is lazy - on every
@@ -3611,4 +3611,3 @@ def test_gemini_dates(survey_id):
         return {
             "error": str(e)
         }, 500
-

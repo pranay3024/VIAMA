@@ -3104,22 +3104,16 @@ def run_weekly_reset(now=None, force=False, dry_run=False):
     }
 
 
-#: How many overdue rescheduled rows one sweep will look at.  The set is small by
-#: construction - a row only sits in it if a captain rescheduled and never came
-#: back - so this is a runaway backstop, not a working limit.  ``truncated`` in the
-#: result says when it actually bites.
+#: How many incomplete survey rows one expiry sweep will look at.
 RESCHEDULED_EXPIRY_SCAN_LIMIT = 500
 
-#: ``Survey.status`` values that mean the survey really is under way, and which
-#: therefore make a survey ineligible for auto-expiry no matter what its stale
-#: ``captain_status`` says.  ``video_uploaded_pending_form`` is here because
-#: routes/captain.py writes it and core/config.py never named it.
-RESCHEDULED_EXPIRY_PROTECTED_STATUSES = (
+#: Surveys still eligible for expiry at the end of their Mon-Sun week.
+SURVEY_EXPIRY_ELIGIBLE_STATUSES = (
+    "rescheduled",
     "ongoing",
     "groundwork_completed",
     "video_pending",
     "video_uploaded_pending_form",
-    "completed",
 )
 
 
@@ -3152,20 +3146,31 @@ def _rescheduled_anchor_ist(survey):
     return None
 
 
+def _survey_expiry_anchor_ist(survey):
+    """Return the timestamp whose Mon-Sun week controls this survey's expiry."""
+    from core.config import SURVEY_RESCHEDULED
+
+    if (
+        survey.status == SURVEY_RESCHEDULED
+        or survey.captain_status == SURVEY_RESCHEDULED
+    ):
+        return _rescheduled_anchor_ist(survey)
+    if survey.start_time is not None:
+        return survey.start_time
+    return _rescheduled_anchor_ist(survey)
+
+
 def expire_rescheduled_surveys(now=None, dry_run=False):
     """
-    Cancel every rescheduled survey whose Sunday-23:30-IST deadline has passed.
+    Cancel every incomplete survey whose Sunday-23:30-IST deadline has passed.
 
-    A captain who reschedules keeps the row in ``rescheduled`` so the team can see
-    it is coming; once the week runs out, nobody restarted it, so it is cancelled
-    automatically.  Without this the rows are immortal: the Monday reset
-    (routes/admin.py:511-522) clears ``SurveyAssignment`` back to "pending" but
-    never touches ``Survey.status``, so a rescheduled row stayed rescheduled
-    forever and kept reappearing on the dashboards.
+    Rescheduled, ongoing, and other incomplete surveys stay visible until the
+    Sunday cutoff of their own week, then are cancelled automatically. Completed
+    surveys are never selected. This also prevents rescheduled rows from staying
+    visible forever after the Monday assignment reset.
 
-    Idempotent - it only ever selects rows that are rescheduled right now, so
-    running it on every dashboard load and on every cron tick is safe, and a
-    second run finds nothing to do.
+    Idempotent - it only selects eligible, not-yet-cancelled rows, so running it
+    on every dashboard load and on every cron tick is safe.
 
     Two triggers, deliberately: the dashboards call this on load so the status is
     correct the moment anyone looks, and ``POST /api/v1/jobs/tick`` calls it so the
@@ -3179,14 +3184,12 @@ def expire_rescheduled_surveys(now=None, dry_run=False):
     worse bug than the one being fixed.
 
     Set ``RESCHEDULED_EXPIRY=0`` to switch the whole thing off without a redeploy.
-    The first run after this shipped found 116 already-overdue rows going back to
-    the week of 2026-07-05 - the leak described above - so that run is a large one
-    and the switch is worth having.
     """
     import os
 
     from core.config import (
         SURVEY_CANCELLED,
+        SURVEY_COMPLETED,
         SURVEY_RESCHEDULED,
         ist_now,
         rescheduled_expiry_deadline,
@@ -3212,22 +3215,12 @@ def expire_rescheduled_surveys(now=None, dry_run=False):
         candidates = (
             Survey.query.filter(
                 db.or_(
-                    Survey.status == SURVEY_RESCHEDULED,
+                    Survey.status.in_(SURVEY_EXPIRY_ELIGIBLE_STATUSES),
                     Survey.captain_status == SURVEY_RESCHEDULED,
                 ),
-                # The two status columns can disagree, and ``captain_status`` is the
-                # one that goes stale: the Monday reset clears the assignment's copy
-                # but never the survey's. So a row can still say captain_status
-                # "rescheduled" while its real ``status`` says the work is under
-                # way. Auto-cancelling that would throw away a live survey, so
-                # anything actually started, progressed or completed is excluded
-                # outright and only genuinely-not-started rows are ever touched.
-                # ``status`` is nullable and ``NULL NOT IN (...)`` is NULL, not
-                # true, so the NULL case is spelled out or such rows would drop out
-                # of the sweep entirely.
                 db.or_(
                     Survey.status.is_(None),
-                    Survey.status.notin_(RESCHEDULED_EXPIRY_PROTECTED_STATUSES),
+                    Survey.status.notin_((SURVEY_COMPLETED, SURVEY_CANCELLED)),
                 ),
             )
             # Oldest first, so if the scan limit ever bites it is the least
@@ -3243,7 +3236,7 @@ def expire_rescheduled_surveys(now=None, dry_run=False):
 
         for survey in candidates:
             scanned += 1
-            anchor = _rescheduled_anchor_ist(survey)
+            anchor = _survey_expiry_anchor_ist(survey)
             if anchor is None:
                 # No timestamp anywhere to work from.  Leave it alone rather than
                 # guess a week and cancel a survey that is still in date.
@@ -3307,17 +3300,16 @@ def _sync_assignment_to_cancelled(survey, stamp):
     """
     Move the survey's assignment into the same cancelled state.
 
-    Only when the assignment is *itself* still rescheduled, so a captain who has
-    already restarted the work is never overwritten by a sweep that was decided
-    before their click.  Matches on the same identity tuple the reschedule route
-    and the missed-survey engine use (routes/captain.py:2227-2247), newest
-    assignment first, and does not filter on ``status`` - the row may well be
-    "missed" by now, which is exactly the case routes/captain.py:2055-2063 clears.
+    Only pending or rescheduled assignments are synchronized, so completed or
+    otherwise changed assignments are not overwritten. Matches on the same
+    identity tuple the reschedule route and missed-survey engine use, newest
+    assignment first.
 
     Kept next to ``expire_rescheduled_surveys`` because the two must agree; it
     writes the same four fields the portal's cancel writes.
     """
     from models.db_models import SurveyAssignment
+    from extensions import db
 
     assignment = (
         SurveyAssignment.query.filter(
@@ -3325,7 +3317,13 @@ def _sync_assignment_to_cancelled(survey, stamp):
             SurveyAssignment.section_no == survey.section_no,
             SurveyAssignment.stretch_code == survey.stretch_code,
             SurveyAssignment.upc_code == survey.upc_code,
-            SurveyAssignment.captain_status == "rescheduled",
+            SurveyAssignment.captain_status.in_(("pending", "rescheduled")),
+            db.or_(
+                SurveyAssignment.status.is_(None),
+                SurveyAssignment.status.notin_(
+                    ("completed", "completed_by_backup")
+                ),
+            ),
         )
         .order_by(SurveyAssignment.id.desc())
         .first()
@@ -3360,14 +3358,13 @@ def _sync_assignment_to_cancelled(survey, stamp):
 # "rescheduled" row itself.  The captain's own flow then takes over untouched -
 # POST /checklist (routes/captain.py:217-286) already reuses a current-week row
 # whose captain_status is "rescheduled" and flips it to "ongoing", and
-# expire_rescheduled_surveys above already cancels whatever is still untouched at
+# expire_rescheduled_surveys above already cancels whatever is still incomplete at
 # Sunday 23:30.  Neither of those two needed changing; they were waiting for
 # something to hand them a row.
 #
 # The two sweeps are the whole feature: create on the day after, cancel on the
 # Sunday.  A captain now has a working afternoon, an evening and the whole of
-# Sunday to turn up, and a survey that nobody does anything about is still closed
-# out rather than left hanging.
+# Sunday to turn up, and an incomplete survey is closed out rather than left hanging.
 
 
 #: Backstop on how many assignments one sweep looks at.  Same shape and same
@@ -5559,4 +5556,3 @@ def send_test(endpoint, event="ping"):
         "latency_ms": latency,
         "error": error,
     }
-

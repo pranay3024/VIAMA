@@ -183,7 +183,7 @@ def dashboard():
 
     # Same pair of sweeps on this screen: a scheduled survey nobody started by
     # 15:00 IST the day after its day becomes a "rescheduled" row here, and is then
-    # cancelled at Sunday 23:30 if it is still untouched. Both run before the query
+    # cancelled at Sunday 23:30 if it is still incomplete. Both run before the query
     # below so neither filter option can return a row that has already moved on.
     # Idempotent, never raises.
     try:

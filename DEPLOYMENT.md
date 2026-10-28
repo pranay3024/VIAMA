@@ -196,7 +196,7 @@ callback. So the portal learns that a file has landed by **asking**.
 
 | Trigger | What it covers | Limit |
 |---|---|---|
-| Dashboard load (`/admin`, `/form-approver`) | The file that just arrived — this is the fast path | 1 raw email + 3 defect emails per load, 25 s budget each |
+| Dashboard load (`/admin`, `/form-approver`, `/admin/delayed-surveys`, `/teamleader`) | The file that just arrived — this is the fast path | 1 raw email + 3 defect emails per load, 25 s budget each |
 | `POST /api/v1/jobs/tick?only=raw_emails` | Quiet days when nobody logs in | 1 email per tick |
 | `POST /api/v1/jobs/tick?only=survey_emails` | The backlog, on demand | 25 raw + 25 defect emails |
 | `/cron/approved-survey-emails` (03:00, 09:00, 15:00, 21:00 UTC) | The backlog | 25 emails per phase, per run |

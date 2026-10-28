@@ -37,6 +37,16 @@ def teamleader_dashboard():
     if session.get("role") != "team_leader":
         return redirect("/")
 
+    # The approved-survey mails wait for their RoadVision file to land. Ask
+    # once per dashboard load so a file that has just arrived goes out now
+    # instead of waiting for the next cron run. Idempotent, never raises.
+    try:
+        from utils.approved_survey_email import send_pending_raw_emails_now
+
+        send_pending_raw_emails_now()
+    except Exception:
+        pass
+
     total_captains = User.query.filter_by(
         role="captain"
     ).count()

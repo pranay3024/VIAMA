@@ -422,6 +422,24 @@ def delayed_surveys():
             )
 
     # ============================================================
+    # PAGE-LOAD APPROVED-EMAIL PICKUP
+    #
+    # The raw-video mail and the defect-report mail both wait for
+    # the matching file to land in the RoadVision API. The daily
+    # cron would eventually send them, but this page is where the
+    # waiting rows are shown, so ask once per load and mail what
+    # is ready now - the same fast path /admin and /form-approver
+    # already use. Idempotent, never raises.
+    # ============================================================
+    if request.method == "GET":
+        try:
+            from utils.approved_survey_email import send_pending_raw_emails_now
+
+            send_pending_raw_emails_now()
+        except Exception:
+            pass
+
+    # ============================================================
     # GET -> Display delayed surveys
     # ============================================================
 

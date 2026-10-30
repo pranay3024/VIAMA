@@ -247,15 +247,32 @@ def _message_matches_section_cycle(survey, text):
 	)
 
 
-def build_defect_email_index(gmail, survey=None):
-	"""Read Sent defect-report subjects and index them by identifiers.
+#: Subject of the mail that carries the survey form + raw-video XLSX.
+RAW_EMAIL_SUBJECT = "Submission of Raw Data"
+
+#: Subject of the mail that carries the processed defect-report XLSX.
+DEFECT_EMAIL_SUBJECT = "Submission of Survey Report"
+
+
+def build_sent_email_index(
+	gmail,
+	survey=None,
+	subject_phrase=DEFECT_EMAIL_SUBJECT,
+	attempts=3,
+	quota_max_wait=_GMAIL_QUOTA_MAX_WAIT_SECONDS,
+):
+	"""Read Sent mails for one subject and index them by their headers.
 
 	When a survey is supplied, narrow Gmail's search to its identifiers so a
 	request-triggered sync does not scan the entire Sent mailbox.
+
+	``attempts``/``quota_max_wait`` let a latency-sensitive caller (the
+	pre-send duplicate check) fail fast instead of waiting out a Gmail quota
+	window.
 	"""
 	matches = []
 	page_token = None
-	query = 'in:sent has:attachment subject:"Submission of Survey Report"'
+	query = 'in:sent has:attachment subject:"{}"'.format(subject_phrase)
 	if survey:
 		for identifier in (survey.nh_number, survey.upc_code):
 			if identifier:
@@ -268,7 +285,11 @@ def build_defect_email_index(gmail, survey=None):
 		}
 		if page_token:
 			params["pageToken"] = page_token
-		response = _gmail_call(gmail.users().messages().list(**params))
+		response = _gmail_call(
+			gmail.users().messages().list(**params),
+			attempts=attempts,
+			quota_max_wait=quota_max_wait,
+		)
 
 		for item in response.get("messages", []):
 			message = _gmail_call(
@@ -277,7 +298,9 @@ def build_defect_email_index(gmail, survey=None):
 					id=item["id"],
 					format="metadata",
 					metadataHeaders=["Subject"],
-				)
+				),
+				attempts=attempts,
+				quota_max_wait=quota_max_wait,
 			)
 			headers = message.get("payload", {}).get("headers", [])
 			subject = _header(headers, "Subject")
@@ -297,15 +320,47 @@ def build_defect_email_index(gmail, survey=None):
 	return matches
 
 
-def find_defect_report_email(survey, email_index, gmail=None):
+def build_defect_email_index(gmail, survey=None, **kwargs):
+	"""Index Sent defect-report mails (the processed XLSX mail)."""
+	return build_sent_email_index(
+		gmail, survey, DEFECT_EMAIL_SUBJECT, **kwargs
+	)
+
+
+def build_raw_email_index(gmail, survey=None, **kwargs):
+	"""Index Sent raw-video mails (survey form + raw XLSX mail)."""
+	return build_sent_email_index(
+		gmail, survey, RAW_EMAIL_SUBJECT, **kwargs
+	)
+
+
+def _find_sent_email(
+	survey,
+	email_index,
+	gmail=None,
+	subject_phrase=None,
+	attempts=3,
+	quota_max_wait=_GMAIL_QUOTA_MAX_WAIT_SECONDS,
+):
 	"""Return the earliest exact section/cycle email for this survey.
 
 	NH and UPC identify the project, not a unique survey cycle. The section and
-	cycle identity must also be present before an email can be selected.
+	cycle identity must also be present before an email can be selected. When
+	``subject_phrase`` is given, only mails of that type are considered, so a
+	raw-video mail can never be mistaken for a defect-report mail.
 	"""
+	normalized_phrase = _normalize(subject_phrase) if subject_phrase else ""
+
+	def _wanted(item):
+		if not normalized_phrase:
+			return True
+		return normalized_phrase in _normalize(item.get("subject", ""))
+
 	if gmail:
 		candidates = []
 		for item in email_index:
+			if not _wanted(item):
+				continue
 			subject = item.get("subject", "")
 
 			# The index already carries each Subject header. Generated subjects
@@ -327,7 +382,9 @@ def find_defect_report_email(survey, email_index, gmail=None):
 						userId="me",
 						id=item["message_id"],
 						format="full",
-					)
+					),
+					attempts=attempts,
+					quota_max_wait=quota_max_wait,
 				)
 			except Exception as exc:
 				if _is_retryable_gmail_error(exc):
@@ -344,11 +401,34 @@ def find_defect_report_email(survey, email_index, gmail=None):
 	else:
 		matches = [
 			item for item in email_index
-			if _message_matches(survey, item["subject"])
+			if _wanted(item)
+			and _message_matches(survey, item["subject"])
 			and _message_matches_section_cycle(survey, item["subject"])
 		]
 	if not matches:
 		return None
 
-	# Use the original defect-report email, not a later reply or reply-all.
+	# Use the original email, not a later reply or reply-all.
 	return min(matches, key=lambda item: item["sent_at"])
+
+
+def find_defect_report_email(survey, email_index, gmail=None, **kwargs):
+	"""Return the earliest matching defect-report mail, if any."""
+	return _find_sent_email(
+		survey,
+		email_index,
+		gmail,
+		subject_phrase=DEFECT_EMAIL_SUBJECT,
+		**kwargs,
+	)
+
+
+def find_raw_email(survey, email_index, gmail=None, **kwargs):
+	"""Return the earliest matching raw-video mail, if any."""
+	return _find_sent_email(
+		survey,
+		email_index,
+		gmail,
+		subject_phrase=RAW_EMAIL_SUBJECT,
+		**kwargs,
+	)

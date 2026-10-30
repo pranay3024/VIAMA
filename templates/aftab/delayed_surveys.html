@@ -138,10 +138,18 @@
                     <td><span class="{{ 'approved' if survey.survey_form_approved else 'pending' }}">{{ 'YES' if survey.survey_form_approved else 'NO' }}</span></td>
                     <td>
                         {% if survey.raw_video_email_sent_at %}Sent<br>{{ survey.display_raw_video_email_sent_at.strftime('%d/%m/%Y %I:%M %p') }} IST
-                        {% elif survey.survey_dates_approved and survey.survey_form_approved %}Ready to retry
-                        {% elif survey.survey_dates_approved %}Waiting for form approval
-                        {% elif survey.survey_form_approved %}Waiting for dates approval
-                        {% else %}Waiting for approvals{% endif %}
+                        {% else %}
+                            {% if survey.survey_dates_approved and survey.survey_form_approved %}Ready to retry
+                            {% elif survey.survey_dates_approved %}Waiting for form approval
+                            {% elif survey.survey_form_approved %}Waiting for dates approval
+                            {% else %}Waiting for approvals{% endif %}
+                            {% if survey.survey_dates_approved and survey.survey_form_approved %}
+                            <form class="date-form" method="post" action="{{ url_for('admin.mark_email_sent', survey_id=survey.id, week=selected_week, team=selected_team or None, state=selected_state or None, delay=selected_delay or None) }}" onsubmit="return confirm('Mark the raw video mail as sent? This stops the automatic retry.');">
+                                <input type="hidden" name="email_type" value="raw">
+                                <button class="aftab-action" type="submit">Mark sent</button>
+                            </form>
+                            {% endif %}
+                        {% endif %}
                     </td>
                     <td>{{ survey.defect_report_sent_at.strftime('%d/%m/%Y') if survey.defect_report_sent_at else '-' }}</td>
                     <td>{{ '%.0f%%'|format((survey.defect_report_sent_confidence or 0) * 100) }}</td>
@@ -184,6 +192,10 @@
                             Sent<br>{{ survey.display_defect_report_email_sent_at.strftime('%d/%m/%Y %I:%M %p') }} IST
                         {% elif survey.raw_video_email_sent_at and survey.defect_report_api_received %}
                             Ready to send
+                            <form class="date-form" method="post" action="{{ url_for('admin.mark_email_sent', survey_id=survey.id, week=selected_week, team=selected_team or None, state=selected_state or None, delay=selected_delay or None) }}" onsubmit="return confirm('Mark the defect report mail as sent? This stops the automatic retry.');">
+                                <input type="hidden" name="email_type" value="defect">
+                                <button class="aftab-action" type="submit">Mark sent</button>
+                            </form>
                         {% elif survey.raw_video_email_sent_at %}
                             Waiting for report
                         {% else %}
@@ -198,5 +210,72 @@
         </table>
     </div>
 </main>
+
+    <script>
+        // Pick up mails that were sent by hand from Gmail, so the two email
+        // columns flip to "Sent" and the auto-sender skips them.
+        const reconcileUrl = "{{ url_for('admin.email_reconcile_sweep') }}";
+        const emailSweepUrl = "{{ url_for('admin.approved_email_sweep') }}";
+
+        async function reconcileOnce(afterId) {
+            try {
+                const response = await fetch(
+                    reconcileUrl + "?limit=5&after_id=" + encodeURIComponent(afterId),
+                    { method: "GET" }
+                );
+                return await response.json();
+            } catch (error) {
+                return { checked: 0, remaining: 0, error: error };
+            }
+        }
+
+        async function emailSweepOnce() {
+            try {
+                const response = await fetch(emailSweepUrl, { method: "GET" });
+                return await response.json();
+            } catch (error) {
+                return { sent: 0, remaining: 0, error: error };
+            }
+        }
+
+        (async function () {
+            let changed = false;
+
+            // Drain the waiting raw and defect-report mails in large batches.
+            // The page-load pickup only sends 1 raw + 3 defect; this loop
+            // clears a whole RoadVision batch in one visit.
+            for (let attempt = 0; attempt < 10; attempt += 1) {
+                const data = await emailSweepOnce();
+                if (data.error || data.skipped) {
+                    break;
+                }
+                if (!data.sent) {
+                    break;
+                }
+                changed = true;
+                if (!data.remaining) {
+                    break;
+                }
+            }
+
+            let cursor = {{ reconcile_cursor|default(0) }};
+            for (let attempt = 0; attempt < 3; attempt += 1) {
+                const data = await reconcileOnce(cursor);
+                if (data.error) {
+                    break;
+                }
+                if (data.marked_raw || data.marked_defect) {
+                    changed = true;
+                }
+                if (!data.remaining || data.next_cursor === cursor) {
+                    break;
+                }
+                cursor = data.next_cursor;
+            }
+            if (changed) {
+                window.location.reload();
+            }
+        })();
+    </script>
 </body>
 </html>

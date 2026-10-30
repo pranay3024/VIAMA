@@ -382,6 +382,17 @@ def _run_sync_defect_delay(app, survey_id):
             survey.defect_report_sent_confidence = 1.0
             survey.defect_report_email_id = match["message_id"]
 
+            # The same Gmail match proves the defect report was already
+            # delivered. Stamp the delivery flag too, otherwise the delayed
+            # report keeps offering it as "Ready to send" and the auto-sender
+            # mails it a second time. A mail the portal sent itself already
+            # carries this timestamp, so only hand-sent mails are affected.
+            if not survey.defect_report_email_sent_at:
+                survey.defect_report_email_sent_at = match["sent_at"]
+                survey.defect_report_email_message_id = (
+                    f"gmail:{match['message_id']}"
+                )
+
             # --------------------------------------------------
             # STEP 5:
             # CALCULATE DELAY

@@ -44,6 +44,17 @@ INSTANT_TRIGGER_MAX_SECONDS = 25
 DEFECT_TRIGGER_LIMIT = 3
 DEFECT_TRIGGER_MAX_SECONDS = 25
 
+#: The synchronous page-load pickup above is deliberately tiny so the page
+#: never hangs.  To clear a batch without making the page wait, the delayed
+#: reports page also calls the ``/admin/approved-email-sweep`` endpoint in the
+#: background and loops it until the queue is empty.  Each sweep call sends at
+#: most this many of each mail, within this shared wall-clock budget (kept at
+#: the same 25s the old pickup used, so a call stays under the serverless
+#: function limit; the loop is what clears the batch).
+SWEEP_RAW_LIMIT = 25
+SWEEP_DEFECT_LIMIT = 25
+SWEEP_MAX_SECONDS = 25
+
 
 def send_approved_survey_email(survey_id, inventory=None):
     """Send once both approvals and the matching raw XLSX are available."""
@@ -88,6 +99,18 @@ def send_approved_survey_email(survey_id, inventory=None):
     ):
         db.session.rollback()
         return "waiting_for_raw_xlsx"
+
+    # A mail sent by hand from Gmail never writes our delivery flag, so the
+    # row still looks "pending" here. Check the Sent folder once, right before
+    # sending: if the mail is already there, stamp the flag and stand down
+    # instead of mailing a duplicate. Best-effort - a Gmail problem returns
+    # False and the send proceeds exactly as before. Kept after the inventory
+    # check so a row that is not ready costs no Gmail call.
+    from utils.email_reconcile import stamp_if_sent_by_hand
+
+    if stamp_if_sent_by_hand(survey, "raw"):
+        db.session.rollback()
+        return "already_sent"
 
     try:
         start_date = survey.extracted_survey_start_date.isoformat()
@@ -290,6 +313,8 @@ def send_raw_emails_for_inventory_items(items):
 def send_pending_raw_emails_now(
     limit=INSTANT_TRIGGER_LIMIT,
     max_seconds=INSTANT_TRIGGER_MAX_SECONDS,
+    defect_limit=None,
+    defect_max_seconds=None,
 ):
     """Send a raw email whose file has just landed in the RoadVision API.
 
@@ -310,10 +335,19 @@ def send_pending_raw_emails_now(
     * ``max_seconds`` - a short wall-clock budget.  A slow remote API must
       not turn into a slow dashboard.
 
+    ``defect_limit`` / ``defect_max_seconds`` override the defect-report
+    phase's own limits; the delayed-reports page passes the larger sweep
+    values so a whole batch can be cleared in one visit without making the
+    initial page render wait for it.
+
     Never raises.  A failure here has to stay invisible to the page: the
     dashboards call this inside a ``try``/``except`` of their own, and the
     email will still go out on the next load or on the cron.
     """
+    if defect_limit is None:
+        defect_limit = DEFECT_TRIGGER_LIMIT
+    if defect_max_seconds is None:
+        defect_max_seconds = DEFECT_TRIGGER_MAX_SECONDS
     from core.engine import _job_lock
     from utils.received_timestamps import (
         fetch_inventories,
@@ -373,7 +407,11 @@ def send_pending_raw_emails_now(
                 candidates=candidates,
             )
 
-        results["defect_report_emails"] = _pickup_defect_emails(inventories)
+        results["defect_report_emails"] = _pickup_defect_emails(
+            inventories,
+            limit=defect_limit,
+            max_seconds=defect_max_seconds,
+        )
         return results
     except Exception:
         log.exception("raw video email pickup failed")
@@ -460,7 +498,11 @@ def run_approved_email_phases(
     }
 
 
-def _pickup_defect_emails(inventories):
+def _pickup_defect_emails(
+    inventories,
+    limit=DEFECT_TRIGGER_LIMIT,
+    max_seconds=DEFECT_TRIGGER_MAX_SECONDS,
+):
     """The defect-report phase of the pickup.
 
     A defect report is mailed once the raw survey email has gone out and the
@@ -488,7 +530,7 @@ def _pickup_defect_emails(inventories):
     )
 
     return process_pending_approved_defect_emails(
-        limit=DEFECT_TRIGGER_LIMIT,
-        max_seconds=DEFECT_TRIGGER_MAX_SECONDS,
+        limit=limit,
+        max_seconds=max_seconds,
         inventory=inventories["defect"],
     )

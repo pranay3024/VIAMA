@@ -297,6 +297,56 @@ def approve_survey_dates(survey_id):
     ))
 
 
+@admin_bp.route(
+    "/admin/delayed-surveys/<int:survey_id>/mark-email-sent",
+    methods=["POST"],
+)
+def mark_email_sent(survey_id):
+    """Record a mail that was sent by hand, so the auto-sender skips it.
+
+    The dashboard's two email columns are driven by the timestamps the portal
+    writes after its own send. A manual Gmail send writes nothing, so without
+    this the row stays "Ready to send" and the auto-sender mails it again.
+    """
+    if session.get("role") not in ("admin", "aftab"):
+        return redirect("/")
+
+    survey = Survey.query.get_or_404(survey_id)
+    email_type = (request.form.get("email_type") or "").strip()
+
+    from utils.email_reconcile import (
+        mark_defect_email_sent,
+        mark_raw_email_sent,
+    )
+
+    if email_type == "raw":
+        if mark_raw_email_sent(survey):
+            flash(
+                "Raw video mail marked as sent. The automatic retry is stopped.",
+                "success",
+            )
+        else:
+            flash("The raw video mail was already marked as sent.", "info")
+    elif email_type == "defect":
+        if mark_defect_email_sent(survey):
+            flash(
+                "Defect report mail marked as sent. The automatic retry is stopped.",
+                "success",
+            )
+        else:
+            flash("The defect report mail was already marked as sent.", "info")
+    else:
+        flash("Unknown mail type.", "warning")
+
+    return redirect(url_for(
+        "admin.delayed_surveys",
+        week=request.args.get("week") or request.form.get("week") or None,
+        team=request.args.get("team") or request.form.get("team") or None,
+        state=request.args.get("state") or request.form.get("state") or None,
+        delay=request.args.get("delay") or request.form.get("delay") or None,
+    ))
+
+
 @admin_bp.route("/admin/delayed-surveys", methods=["GET", "POST"])
 def delayed_surveys():
     user_role = session.get("role")
@@ -430,6 +480,10 @@ def delayed_surveys():
     # waiting rows are shown, so ask once per load and mail what
     # is ready now - the same fast path /admin and /form-approver
     # already use. Idempotent, never raises.
+    #
+    # Both senders now check Gmail's Sent folder immediately before
+    # sending (utils.email_reconcile.stamp_if_sent_by_hand), so a mail
+    # already sent by hand is stamped and skipped rather than duplicated.
     # ============================================================
     if request.method == "GET":
         try:
@@ -753,6 +807,7 @@ def delayed_surveys():
         bucket_matched=bucket_matched,
         bucket_missing=bucket_missing,
         message=message,
+        reconcile_cursor=0,
     )
 
 from datetime import datetime
@@ -3048,6 +3103,91 @@ def defect_delay_sweep():
         limit=limit,
     )
     return jsonify({"processed": processed, "remaining": remaining})
+
+
+@admin_bp.route("/admin/email-reconcile-sweep")
+def email_reconcile_sweep():
+    """Reconcile hand-sent raw/defect mails for one bounded batch.
+
+    The delayed-surveys page polls this after the delay sweep, so a mail sent
+    by hand from Gmail flips the row from "Ready to send" to "Sent" without a
+    manual click. ``after_id`` is a cursor: the page passes the last id it saw
+    so a burst never re-checks the same rows.
+    """
+    if not session.get("user_id") or session.get("role") not in ("admin", "aftab"):
+        return jsonify({"checked": 0, "remaining": 0}), 403
+
+    from utils.email_reconcile import reconcile_pending_manual_sends
+
+    try:
+        limit = int(request.args.get("limit", 5))
+    except (TypeError, ValueError):
+        limit = 5
+    limit = max(1, min(limit, 10))
+
+    try:
+        after_id = int(request.args.get("after_id", 0))
+    except (TypeError, ValueError):
+        after_id = 0
+
+    return jsonify(reconcile_pending_manual_sends(
+        current_app._get_current_object(),
+        limit=limit,
+        after_id=max(0, after_id),
+    ))
+
+
+@admin_bp.route("/admin/approved-email-sweep")
+def approved_email_sweep():
+    """Send one large batch of the waiting raw and defect-report mails.
+
+    The synchronous page-load pickup is deliberately tiny (1 raw, 3 defect)
+    so the page never hangs.  The delayed-reports page then calls this in the
+    background and loops it until nothing is left, so a batch of 20 defect
+    reports clears in one visit instead of three or four page loads.
+    """
+    if not session.get("user_id") or session.get("role") not in ("admin", "aftab"):
+        return jsonify({"sent": 0, "remaining": 0}), 403
+
+    from utils.approved_survey_email import (
+        SWEEP_DEFECT_LIMIT,
+        SWEEP_MAX_SECONDS,
+        SWEEP_RAW_LIMIT,
+        pending_raw_email_count,
+        send_pending_raw_emails_now,
+    )
+    from utils.approved_survey_defect_email import pending_defect_email_count
+
+    try:
+        raw_limit = int(request.args.get("raw_limit", SWEEP_RAW_LIMIT))
+    except (TypeError, ValueError):
+        raw_limit = SWEEP_RAW_LIMIT
+    raw_limit = max(1, min(raw_limit, SWEEP_RAW_LIMIT))
+
+    try:
+        defect_limit = int(request.args.get("defect_limit", SWEEP_DEFECT_LIMIT))
+    except (TypeError, ValueError):
+        defect_limit = SWEEP_DEFECT_LIMIT
+    defect_limit = max(1, min(defect_limit, SWEEP_DEFECT_LIMIT))
+
+    result = send_pending_raw_emails_now(
+        limit=raw_limit,
+        max_seconds=SWEEP_MAX_SECONDS,
+        defect_limit=defect_limit,
+        defect_max_seconds=SWEEP_MAX_SECONDS,
+    )
+    defect_result = result.get("defect_report_emails") or {}
+    raw_sent = int(result.get("sent") or 0)
+    defect_sent = int(defect_result.get("sent") or 0)
+
+    return jsonify({
+        "raw_sent": raw_sent,
+        "defect_sent": defect_sent,
+        "sent": raw_sent + defect_sent,
+        "remaining": pending_raw_email_count() + pending_defect_email_count(),
+        "skipped": result.get("skipped"),
+    })
+
 
 @admin_bp.route(
     "/admin/gmail-drafts/<email_type>",

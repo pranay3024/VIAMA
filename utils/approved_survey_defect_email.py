@@ -43,6 +43,22 @@ def defect_candidates_pending():
     )
 
 
+def pending_defect_email_count():
+    """How many surveys are still waiting for their defect-report mail."""
+    return (
+        db.session.query(Survey.id)
+        .filter(
+            Survey.raw_video_email_sent_at.is_not(None),
+            Survey.defect_report_email_sent_at.is_(None),
+            Survey.survey_dates_approved.is_(True),
+            Survey.survey_form_approved.is_(True),
+            Survey.extracted_survey_start_date.is_not(None),
+            Survey.extracted_survey_end_date.is_not(None),
+        )
+        .count()
+    )
+
+
 def send_approved_survey_defect_email(survey_id, inventory=None):
     """Send the matching defect XLSX once the raw-video email was sent."""
     survey = (
@@ -88,6 +104,18 @@ def send_approved_survey_defect_email(survey_id, inventory=None):
     if report is None:
         db.session.rollback()
         return "waiting_for_defect_report"
+
+    # A mail sent by hand from Gmail never writes our delivery flag, so the
+    # row still looks "pending" here. Check the Sent folder once, right before
+    # sending: if the mail is already there, stamp the flag and stand down
+    # instead of mailing a duplicate. Best-effort - a Gmail problem returns
+    # False and the send proceeds exactly as before. Kept after the inventory
+    # check so a row that is not ready costs no Gmail call.
+    from utils.email_reconcile import stamp_if_sent_by_hand
+
+    if stamp_if_sent_by_hand(survey, "defect"):
+        db.session.rollback()
+        return "already_sent"
 
     try:
         report_bytes, report_filename = download_defect_report(

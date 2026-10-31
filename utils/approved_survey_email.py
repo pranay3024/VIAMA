@@ -100,18 +100,6 @@ def send_approved_survey_email(survey_id, inventory=None):
         db.session.rollback()
         return "waiting_for_raw_xlsx"
 
-    # A mail sent by hand from Gmail never writes our delivery flag, so the
-    # row still looks "pending" here. Check the Sent folder once, right before
-    # sending: if the mail is already there, stamp the flag and stand down
-    # instead of mailing a duplicate. Best-effort - a Gmail problem returns
-    # False and the send proceeds exactly as before. Kept after the inventory
-    # check so a row that is not ready costs no Gmail call.
-    from utils.email_reconcile import stamp_if_sent_by_hand
-
-    if stamp_if_sent_by_hand(survey, "raw"):
-        db.session.rollback()
-        return "already_sent"
-
     try:
         start_date = survey.extracted_survey_start_date.isoformat()
         end_date = survey.extracted_survey_end_date.isoformat()

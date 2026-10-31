@@ -105,18 +105,6 @@ def send_approved_survey_defect_email(survey_id, inventory=None):
         db.session.rollback()
         return "waiting_for_defect_report"
 
-    # A mail sent by hand from Gmail never writes our delivery flag, so the
-    # row still looks "pending" here. Check the Sent folder once, right before
-    # sending: if the mail is already there, stamp the flag and stand down
-    # instead of mailing a duplicate. Best-effort - a Gmail problem returns
-    # False and the send proceeds exactly as before. Kept after the inventory
-    # check so a row that is not ready costs no Gmail call.
-    from utils.email_reconcile import stamp_if_sent_by_hand
-
-    if stamp_if_sent_by_hand(survey, "defect"):
-        db.session.rollback()
-        return "already_sent"
-
     try:
         report_bytes, report_filename = download_defect_report(
             report["label"],

@@ -235,6 +235,55 @@ def team_display(team_key):
 
 
 # ---------------------------------------------------------------------------
+# Stretch identity
+# ---------------------------------------------------------------------------
+
+
+def stretch_key(section_no):
+    """
+    Stable identity of a stretch: its section number, trimmed.
+
+    A ``Survey`` row snapshots ``stretch_code`` and ``upc_code`` from the
+    assignment as they were when it was created.  Those columns are therefore
+    *not* an identity: rename the stretch on the assignment and every older
+    survey suddenly describes a different stretch.  The per-week duplicate
+    guards then see no survey for this week (so a new row is created on every
+    dashboard load) and the cycle lookup sees no history (so it restarts at 1).
+
+    ``section_no`` survives a rename, and it is already the key
+    ``core/engine.py:create_survey`` uses for its duplicate guard and cycle
+    lookup.  Trimming matters because a few imported rows carry trailing
+    whitespace (for example ``'8 & 9\\n'``).
+    """
+    if section_no is None:
+        return None
+    return str(section_no).strip()
+
+
+def stretch_key_expr(column):
+    """
+    SQL twin of :func:`stretch_key` for a ``section_no`` column.
+
+    Strips spaces, tabs, CR and LF from both ends.  Nested ``REPLACE`` plus
+    ``TRIM`` is used instead of a regular expression so the expression also
+    works on the SQLite database the test suite uses, not just PostgreSQL.
+    """
+    from sqlalchemy import func
+
+    return func.trim(
+        func.replace(
+            func.replace(
+                func.replace(column, "\n", ""),
+                "\r",
+                "",
+            ),
+            "\t",
+            "",
+        )
+    )
+
+
+# ---------------------------------------------------------------------------
 # Days
 # ---------------------------------------------------------------------------
 

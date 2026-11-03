@@ -13,6 +13,7 @@ import pytz
 import logging
 from sqlalchemy import case, func
 from sqlalchemy.orm import defer
+from core.config import IST, stretch_key, stretch_key_expr
 from models.db_models import Survey
 from models.db_models import User
 from flask import redirect
@@ -46,10 +47,11 @@ from flask import (
 from google_drive import (
     PIU_EMAIL_MAPPING,
     download_file_from_drive,
-    create_gmail_draft,
     get_cc_email,
     get_gmail,
 )
+
+from utils.microsoft_graph_mail import create_microsoft_graph_draft
 
 from utils.request_params import (
     safe_date,
@@ -757,6 +759,20 @@ def delayed_surveys():
 
 from datetime import datetime
 
+
+def _ist_wall(value):
+    """Naive IST wall-clock for a team-leader timestamp.
+
+    Those columns are written with an aware Asia/Kolkata datetime, which can
+    come back as UTC, so convert anything aware to IST before display.
+    """
+    if value is None:
+        return None
+    if value.tzinfo is not None:
+        return value.astimezone(IST).replace(tzinfo=None)
+    return value
+
+
 @admin_bp.route("/admin")
 def admin_dashboard():
         
@@ -900,9 +916,7 @@ def admin_dashboard():
             # =================================================
 
             latest_survey = Survey.query.filter(
-                Survey.section_no == assignment.section_no,
-                Survey.upc_code == assignment.upc_code,
-                Survey.stretch_code == assignment.stretch_code
+                stretch_key_expr(Survey.section_no) == stretch_key(assignment.section_no)
             ).order_by(
                 Survey.start_time.desc(),
                 Survey.id.desc()
@@ -1607,6 +1621,9 @@ def admin_dashboard():
             survey.survey_form_approved_at + ist_offset
             if survey.survey_form_approved_at else None
         )
+        survey.display_survey_form_completed_at = _ist_wall(survey.survey_form_completed_at)
+        survey.display_task1_completed_at = _ist_wall(survey.task1_completed_at)
+        survey.display_task2_completed_at = _ist_wall(survey.task2_completed_at)
         extract_key = f"{survey.upc_code}_Cycle{survey.cycle_no}"
         if survey.pdf_reupload_required:
             extract_groups["PDF Re-upload Required"].append(extract_key)
@@ -1861,12 +1878,10 @@ def admin_dashboard():
 
         started_keys = set()
         if today_assignments:
-            started_keys = set(
-                db.session.query(
-                    Survey.captain_email,
+            started_keys = {
+                stretch_key(row.section_no)
+                for row in db.session.query(
                     Survey.section_no,
-                    Survey.stretch_code,
-                    Survey.upc_code,
                 ).filter(
                     Survey.start_time >= week_start,
                     Survey.start_time < current_week_end,
@@ -1880,7 +1895,7 @@ def admin_dashboard():
                         "completed",
                     ]),
                 ).all()
-            )
+            }
 
         for assignment in today_assignments:
 
@@ -1900,11 +1915,8 @@ def admin_dashboard():
                 continue
 
             survey_exists = (
-                assignment.captain_email,
-                assignment.section_no,
-                assignment.stretch_code,
-                assignment.upc_code,
-            ) in started_keys
+                stretch_key(assignment.section_no) in started_keys
+            )
 
             if not survey_exists:
 
@@ -2129,9 +2141,7 @@ def admin_missed():
     for assignment in missed_surveys:
 
         previous_survey = Survey.query.filter(
-            Survey.section_no == assignment.section_no,
-            Survey.stretch_code == assignment.stretch_code,
-            Survey.upc_code == assignment.upc_code
+            stretch_key_expr(Survey.section_no) == stretch_key(assignment.section_no)
         ).order_by(
             Survey.start_time.desc(),
             Survey.id.desc()
@@ -3233,14 +3243,14 @@ def email_draft(email_type):
     # Resolve all latest surveys in one query instead of one query per missed
     # assignment/history row. This route is hit repeatedly while filtering.
     missed_sections = {
-        row.section_no
+        stretch_key(row.section_no)
         for row in (*missed_assignments, *missed_history)
         if row.section_no
     }
     latest_by_section = {}
     if missed_sections:
         latest_rows = Survey.query.filter(
-            Survey.section_no.in_(missed_sections)
+            stretch_key_expr(Survey.section_no).in_(list(missed_sections))
         ).order_by(
             Survey.section_no,
             Survey.cycle_no.desc(),
@@ -3248,10 +3258,10 @@ def email_draft(email_type):
         ).all()
         latest_by_section = {}
         for row in latest_rows:
-            latest_by_section.setdefault(row.section_no, row)
+            latest_by_section.setdefault(stretch_key(row.section_no), row)
 
     for assignment in missed_assignments:
-        latest = latest_by_section.get(assignment.section_no)
+        latest = latest_by_section.get(stretch_key(assignment.section_no))
         assignment.missed_id = f"missed-{assignment.id}"
         assignment.cycle_no = latest.cycle_no + 1 if latest else 1
         assignment.is_missed = True
@@ -3332,7 +3342,7 @@ def email_draft(email_type):
                 history_id
             )
 
-            survey = latest_by_section.get(history.section_no)
+            survey = latest_by_section.get(stretch_key(history.section_no))
 
             if survey is None:
                 survey = Survey(
@@ -3437,7 +3447,7 @@ def email_draft(email_type):
             )
 
         # --------------------------------------------------
-# Create Gmail Draft
+# Create Outlook Draft
 # --------------------------------------------------
 
 # Existing RO CC — keep this for ALL email types
@@ -3460,19 +3470,38 @@ def email_draft(email_type):
              cc_email = piu_email
 
 
-        draft_id = create_gmail_draft(
-            subject=subject,
-            html_body=email_html,
-            attachment_bytes=attachment_bytes,
-            attachment_filename=attachment_name,
-            cc_email=cc_email,
-)
+        try:
+            draft_id = create_microsoft_graph_draft(
+                subject=subject,
+                html_body=email_html,
+                attachment_bytes=attachment_bytes,
+                attachment_filename=attachment_name,
+                cc_emails=cc_email,
+            )
+        except Exception as exc:
+            if is_missed:
+                survey.cycle_no = original_cycle
+            log.exception("Outlook draft creation failed")
+            flash(
+                (
+                    "Could not create the Outlook draft in "
+                    f"projects9@adorpower.com: {exc}"
+                ),
+                "error",
+            )
+            return redirect(
+                url_for(
+                    "admin.email_draft",
+                    email_type=email_type,
+                    week=selected_week,
+                )
+            )
 
         if is_missed:
             survey.cycle_no = original_cycle
 
         # --------------------------------------------------
-        # Open Gmail Draft
+        # Open Outlook Draft
         # --------------------------------------------------
 
 
@@ -3480,10 +3509,10 @@ def email_draft(email_type):
         flash(
             (
                 f"{survey.section_no}_Cycle{survey.cycle_no} "
-                f"Gmail draft created successfully.\n"
+                f"Outlook draft created successfully.\n"
                 f"The draft has been created in "
-                f"adordashcam@gmail.com. "
-                f"Please open Gmail → Drafts and send the email."
+                f"projects9@adorpower.com. "
+                f"Please open Outlook → Drafts and send the email."
             ),
             "success",
         )

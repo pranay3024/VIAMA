@@ -46,7 +46,7 @@ class="logout-btn">
 href="/admin/gmail-drafts"
 class="logout-btn">
 
-📧 Gmail Drafts
+📧 Outlook Drafts
 
 </a>
 
@@ -1419,11 +1419,11 @@ onclick="clearFilters()">
 
  YES
 
-{% if survey.survey_form_completed_at %}
+{% if survey.display_survey_form_completed_at %}
 <br>
 <small>
-{{ survey.survey_form_completed_at.strftime('%d %b %Y') }}<br>
-{{ survey.survey_form_completed_at.strftime('%I:%M %p') }}
+{{ survey.display_survey_form_completed_at.strftime('%d %b %Y') }}<br>
+{{ survey.display_survey_form_completed_at.strftime('%I:%M %p') }}
 </small>
 {% endif %}
 
@@ -1441,11 +1441,11 @@ onclick="clearFilters()">
 
  YES
 
-{% if survey.task1_completed_at %}
+{% if survey.display_task1_completed_at %}
 <br>
 <small>
-{{ survey.task1_completed_at.strftime('%d %b %Y') }}<br>
-{{ survey.task1_completed_at.strftime('%I:%M %p') }}
+{{ survey.display_task1_completed_at.strftime('%d %b %Y') }}<br>
+{{ survey.display_task1_completed_at.strftime('%I:%M %p') }}
 </small>
 {% endif %}
 
@@ -1463,11 +1463,11 @@ onclick="clearFilters()">
 
  YES
 
-{% if survey.task2_completed_at %}
+{% if survey.display_task2_completed_at %}
 <br>
 <small>
-{{ survey.task2_completed_at.strftime('%d %b %Y') }}<br>
-{{ survey.task2_completed_at.strftime('%I:%M %p') }}
+{{ survey.display_task2_completed_at.strftime('%d %b %Y') }}<br>
+{{ survey.display_task2_completed_at.strftime('%I:%M %p') }}
 </small>
 {% endif %}
 
@@ -1654,10 +1654,10 @@ function updateLiveDurations() {
 updateLiveDurations();
 
 
-// Update duration every minute
+// Update duration every 5 minutes (3 lakhs milliseconds)
 setInterval(
     updateLiveDurations,
-    60000
+    300000
 );
 
 

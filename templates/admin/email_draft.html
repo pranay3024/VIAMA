@@ -65,7 +65,7 @@ class="logo-img">
 
 <p>
 
-Generate Gmail Draft
+Generate Outlook Draft
 
 </p>
 
@@ -89,9 +89,9 @@ class="logout-btn">
     {% if messages %}
         {% for category, message in messages %}
             <div style="
-                background:#d4edda;
-                color:#155724;
-                border:1px solid #c3e6cb;
+                background:{{ '#d4edda' if category == 'success' else '#f8d7da' }};
+                color:{{ '#155724' if category == 'success' else '#721c24' }};
+                border:1px solid {{ '#c3e6cb' if category == 'success' else '#f5c6cb' }};
                 padding:15px;
                 border-radius:8px;
                 margin-bottom:20px;
@@ -310,7 +310,7 @@ onclick="copySubject()">
 
 <h2>
 
-📄 Gmail Preview
+📄 Email Preview
 
 </h2>
 
@@ -336,7 +336,7 @@ onclick="copyEmail()">
 &nbsp;
 
 <a
-id="gmailLink"
+id="outlookLink"
 target="_blank"
 class="search-btn"
 style="
@@ -344,7 +344,7 @@ text-decoration:none;
 display:inline-block;
 ">
 
-📧 Open Gmail
+📧 Open Outlook
 
 </a>
 
@@ -453,17 +453,17 @@ window.onload=function(){
 
 const subject=document.getElementById("subject");
 const preview=document.getElementById("emailPreview");
-const gmail=document.getElementById("gmailLink");
+const outlook=document.getElementById("outlookLink");
 
-if(subject && preview && gmail){
+if(subject && preview && outlook){
 
-gmail.href=
+outlook.href=
 
-"https://mail.google.com/mail/?view=cm&fs=1"
+"https://outlook.office.com/mail/deeplink/compose"
 
 +
 
-"&su="
+"?subject="
 
 +
 

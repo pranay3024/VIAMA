@@ -111,7 +111,7 @@ class ApprovedSurveyEmailTests(unittest.TestCase):
             result = approved_email.send_approved_survey_email(survey.id)
 
         self.assertEqual(result, "sent")
-        self.assertEqual(send.call_args.kwargs["to_email"], "mail.hunterrr@gmail.com")
+        self.assertEqual(send.call_args.kwargs["to_email"], graph_mail.DEFAULT_DRAFT_TO)
         self.assertEqual(send.call_args.kwargs["from_email"], "projects9@adorpower.com")
         self.assertEqual(send.call_args.kwargs["attachment_bytes"], b"%PDF")
         self.assertTrue(send.call_args.kwargs["attachment_filename"].endswith(".pdf"))
@@ -196,7 +196,7 @@ class ApprovedSurveyEmailTests(unittest.TestCase):
             result = defect_email.send_approved_survey_defect_email(survey.id)
 
         self.assertEqual(result, "sent")
-        self.assertEqual(send.call_args.kwargs["to_email"], "mail.hunterrr@gmail.com")
+        self.assertEqual(send.call_args.kwargs["to_email"], graph_mail.DEFAULT_DRAFT_TO)
         self.assertEqual(send.call_args.kwargs["from_email"], "projects9@adorpower.com")
         self.assertIn("Submission of Survey Report", send.call_args.kwargs["subject"])
         self.assertEqual(send.call_args.kwargs["attachment_bytes"], b"PK-defect")
@@ -454,6 +454,54 @@ class ApprovedSurveyEmailTests(unittest.TestCase):
             message["internetMessageHeaders"][0]["name"],
             "X-VIAMA-Message-ID",
         )
+
+    def test_graph_draft_is_created_in_the_m365_mailbox(self):
+        token_response = MagicMock(ok=True)
+        token_response.json.return_value = {"access_token": "test-access-token"}
+        draft_response = MagicMock(ok=True, status_code=201)
+        draft_response.json.return_value = {"id": "draft-42"}
+        with (
+            patch.dict(
+                os.environ,
+                {
+                    "M365_TENANT_ID": "tenant-id",
+                    "M365_CLIENT_ID": "client-id",
+                    "M365_CLIENT_SECRET": "test-secret",
+                },
+            ),
+            patch.object(
+                graph_mail.requests,
+                "post",
+                side_effect=[token_response, draft_response],
+            ) as post,
+        ):
+            draft_id = graph_mail.create_microsoft_graph_draft(
+                subject="Subject",
+                html_body="<p>Body</p>",
+                attachment_bytes=b"PK-xlsx",
+                attachment_filename="raw.xlsx",
+                cc_emails="ro@example.com, piu@example.com",
+            )
+
+        self.assertEqual(draft_id, "draft-42")
+        draft_request = post.call_args_list[1]
+        self.assertIn(
+            "projects9%40adorpower.com/messages", draft_request.args[0]
+        )
+        message = draft_request.kwargs["json"]
+        self.assertEqual(
+            [r["emailAddress"]["address"] for r in message["toRecipients"]],
+            ["dashcamzone5@nhai.org", "dashcamcell@nhai.org"],
+        )
+        self.assertEqual(
+            [r["emailAddress"]["address"] for r in message["ccRecipients"]],
+            ["ro@example.com", "piu@example.com"],
+        )
+        self.assertEqual(
+            [r["emailAddress"]["address"] for r in message["bccRecipients"]],
+            ["teamleaderador@gmail.com"],
+        )
+        self.assertEqual(message["attachments"][0]["name"], "raw.xlsx")
 
     def test_graph_403_includes_server_error_details(self):
         token_response = MagicMock(ok=True)

@@ -24,6 +24,8 @@ from core.config import (
     current_week_number,
     day_order_case,
     states_for_team,
+    stretch_key,
+    stretch_key_expr,
     team_display,
     team_for_state,
     week_window,
@@ -131,8 +133,8 @@ def current_week_start():
 
 
 def _stretch_key(row):
-    """A survey and an assignment describe the same stretch when all three match."""
-    return (row.section_no, row.stretch_code, row.upc_code)
+    """A survey and an assignment describe the same stretch when their section matches."""
+    return stretch_key(row.section_no)
 
 
 def live_cycles(schedules):
@@ -140,9 +142,12 @@ def live_cycles(schedules):
     ``{assignment.id: cycle}`` - the cycle that will actually be surveyed.
 
     Mirrors the captain's derivation (routes/captain.py:251-328): the most recent
-    survey for the same stretch decides the number, and one that never happened
+    survey for the same section decides the number, and one that never happened
     (cancelled / rescheduled / missed) keeps its number so the retry reuses it.
     A stretch with no history is cycle 1.
+
+    The section number is the identity, not the survey's snapshotted
+    ``stretch_code``/``upc_code`` - see :func:`core.config.stretch_key`.
 
     Only surveys that started *before* this week are considered.  A section
     already surveyed earlier this week has consumed its cycle, so counting it
@@ -151,7 +156,8 @@ def live_cycles(schedules):
     if not schedules:
         return {}
 
-    section_nos = {a.section_no for a in schedules if a.section_no}
+    section_nos = {stretch_key(a.section_no) for a in schedules}
+    section_nos.discard(None)
 
     if not section_nos:
         return {a.id: 1 for a in schedules}
@@ -160,7 +166,7 @@ def live_cycles(schedules):
 
     history = (
         Survey.query.filter(
-            Survey.section_no.in_(section_nos),
+            stretch_key_expr(Survey.section_no).in_(list(section_nos)),
             or_(
                 Survey.start_time < week_start,
                 Survey.start_time.is_(None),

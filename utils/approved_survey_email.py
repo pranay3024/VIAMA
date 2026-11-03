@@ -7,10 +7,14 @@ from datetime import datetime, timezone
 from core.config import current_week_number, week_of
 from core.config import defect_report_email_enabled
 from extensions import db
-from google_drive import download_file_from_drive
+from google_drive import download_file_from_drive, get_cc_email
 from models.db_models import Survey
 from utils.email_templates import build_email_body, build_subject
-from utils.microsoft_graph_mail import send_microsoft_graph_email
+from utils.microsoft_graph_mail import (
+    DEFAULT_DRAFT_BCC,
+    DEFAULT_DRAFT_TO,
+    send_microsoft_graph_email,
+)
 from utils.raw_xlsx import (
     RawXlsxUnavailable,
     download_raw_xlsx,
@@ -20,7 +24,7 @@ from utils.raw_xlsx import (
 )
 
 
-TO_EMAIL = "mail.hunterrr@gmail.com"
+TO_EMAIL = DEFAULT_DRAFT_TO
 FROM_EMAIL = "projects9@adorpower.com"
 log = logging.getLogger(__name__)
 
@@ -124,6 +128,8 @@ def send_approved_survey_email(survey_id, inventory=None):
         )
         message_id = send_microsoft_graph_email(
             to_email=TO_EMAIL,
+            cc_emails=get_cc_email(survey.ro),
+            bcc_emails=DEFAULT_DRAFT_BCC,
             from_email=FROM_EMAIL,
             subject=subject,
             html_body=html_body,

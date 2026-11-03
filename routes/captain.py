@@ -20,6 +20,7 @@ from utils.visibility import exclude_deleted
 from utils.request_params import safe_count, safe_int
 from utils import pdf_versions
 from utils import survey_upload_password
+from core.config import stretch_key, stretch_key_expr
 
 
 
@@ -195,11 +196,8 @@ def checklist():
 
     existing_survey = Survey.query.filter(
 
-        Survey.section_no == assignment.section_no,
-
-        Survey.upc_code == assignment.upc_code,
-
-        Survey.stretch_code == assignment.stretch_code,
+        stretch_key_expr(Survey.section_no) ==
+        stretch_key(assignment.section_no),
 
         Survey.start_time >= week_start,
 
@@ -321,11 +319,8 @@ def checklist():
 
     latest_survey = Survey.query.filter(
 
-        Survey.section_no == assignment.section_no,
-
-        Survey.upc_code == assignment.upc_code,
-
-        Survey.stretch_code == assignment.stretch_code
+        stretch_key_expr(Survey.section_no) ==
+        stretch_key(assignment.section_no)
 
     ).order_by(
 
@@ -1024,8 +1019,7 @@ def complete_survey():
         # -----------------------------------
 
             assignment = SurveyAssignment.query.filter(
-               SurveyAssignment.section_no == survey.section_no,
-               SurveyAssignment.stretch_code == survey.stretch_code,
+               stretch_key_expr(SurveyAssignment.section_no) == stretch_key(survey.section_no),
                SurveyAssignment.state == survey.state
                ).first()
 
@@ -2144,14 +2138,8 @@ def mark_cancelled(assignment_id):
         Survey.captain_email ==
         assignment.captain_email,
 
-        Survey.section_no ==
-        assignment.section_no,
-
-        Survey.upc_code ==
-        assignment.upc_code,
-
-        Survey.stretch_code ==
-        assignment.stretch_code,
+        stretch_key_expr(Survey.section_no) ==
+        stretch_key(assignment.section_no),
 
         Survey.start_time >= week_start,
 
@@ -2178,14 +2166,8 @@ def mark_cancelled(assignment_id):
 
         previous_survey = Survey.query.filter(
 
-            Survey.section_no ==
-            assignment.section_no,
-
-            Survey.upc_code ==
-            assignment.upc_code,
-
-            Survey.stretch_code ==
-            assignment.stretch_code,
+            stretch_key_expr(Survey.section_no) ==
+            stretch_key(assignment.section_no),
 
             Survey.start_time < week_start
 
@@ -2504,14 +2486,8 @@ def mark_rescheduled(assignment_id):
         Survey.captain_email ==
         assignment.captain_email,
 
-        Survey.section_no ==
-        assignment.section_no,
-
-        Survey.upc_code ==
-        assignment.upc_code,
-
-        Survey.stretch_code ==
-        assignment.stretch_code,
+        stretch_key_expr(Survey.section_no) ==
+        stretch_key(assignment.section_no),
 
         Survey.start_time >= week_start,
 
@@ -2545,14 +2521,8 @@ def mark_rescheduled(assignment_id):
 
         previous_survey = Survey.query.filter(
 
-            Survey.section_no ==
-            assignment.section_no,
-
-            Survey.upc_code ==
-            assignment.upc_code,
-
-            Survey.stretch_code ==
-            assignment.stretch_code,
+            stretch_key_expr(Survey.section_no) ==
+            stretch_key(assignment.section_no),
 
             Survey.start_time < week_start
 

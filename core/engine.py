@@ -3368,7 +3368,7 @@ AUTO_RESCHEDULE_REUSED_STATUSES = ("cancelled", "rescheduled")
 
 def _week_survey_keys(section_nos, week_start, week_end):
     """
-    The identity 4-tuples of every survey row already recorded this week.
+    The stretched section numbers of every survey row already recorded this week.
 
     Deliberately the same identity, and the same "status does not matter", as the
     query routes/captain.py:2338-2360 uses to decide whether a reschedule should
@@ -3377,35 +3377,39 @@ def _week_survey_keys(section_nos, week_start, week_end):
     captain's CONTINUE button is built to reuse.  Creating a second row beside it
     would give the stretch two cycles and two sets of uploads to reconcile.
 
-    Matching is on the 4-tuple rather than a foreign key because ``Survey`` has no
-    link to ``SurveyAssignment`` (see models/db_models.py).  ``start_time`` is
-    naive IST here for the same reason it is there: the portal's survey routes
-    write IST wall-clock into a naive column (routes/captain.py:2324-2326).
+    Identity is ``section_no`` (see :func:`core.config.stretch_key`), not the
+    ``(captain_email, section_no, upc_code, stretch_code)`` 4-tuple this used to
+    use.  ``stretch_code``/``upc_code`` are snapshotted when a survey is created,
+    so renaming the stretch on the assignment made every older survey look like a
+    different stretch: no row matched this week and a fresh cycle-1 row was
+    created on every dashboard load.  Section numbers survive a rename.
+
+    Matching is on the section number rather than a foreign key because
+    ``Survey`` has no link to ``SurveyAssignment`` (see models/db_models.py).
+    ``start_time`` is naive IST here for the same reason it is there: the
+    portal's survey routes write IST wall-clock into a naive column
+    (routes/captain.py:2324-2326).
 
     One query for the whole batch rather than one per assignment: this sweep runs
     on every dashboard load, and the per-row version turned a page render into
-    hundreds of round trips.  Returns a set of tuples to test with ``in``.
+    hundreds of round trips.  Returns a set of section keys to test with ``in``.
     """
+    from core.config import stretch_key, stretch_key_expr
     from models.db_models import Survey
 
-    if not section_nos:
+    keys = {stretch_key(section_no) for section_no in section_nos}
+    keys.discard(None)
+
+    if not keys:
         return set()
 
     rows = Survey.query.filter(
-        Survey.section_no.in_(list(section_nos)),
+        stretch_key_expr(Survey.section_no).in_(list(keys)),
         Survey.start_time >= week_start,
         Survey.start_time < week_end,
     ).all()
 
-    return {
-        (
-            row.captain_email,
-            row.section_no,
-            row.upc_code,
-            row.stretch_code,
-        )
-        for row in rows
-    }
+    return {stretch_key(row.section_no) for row in rows}
 
 
 def _auto_reschedule_cycle_no(assignment, week_start):
@@ -3419,21 +3423,28 @@ def _auto_reschedule_cycle_no(assignment, week_start):
     not count, so this attempt reuses its number.  Anything else means the cycle
     was spent and this is the next one.  No history at all is cycle 1.
 
+    The stretch is identified by its trimmed ``section_no`` - see
+    :func:`core.config.stretch_key` - because the assignment's ``stretch_code``
+    may have been renamed since the history was written.
+
     Matches :func:`utils.schedules.live_cycles`, which is what the schedules
     tables display as "Cycle (This Week)" - the number a captain reads on the
     screen has to be the number the new row carries.
     """
+    from core.config import stretch_key, stretch_key_expr
     from models.db_models import Survey
+    from sqlalchemy import or_
 
     previous = (
         Survey.query.filter(
-            Survey.section_no == assignment.section_no,
-            Survey.upc_code == assignment.upc_code,
-            Survey.stretch_code == assignment.stretch_code,
-            Survey.start_time < week_start,
+            stretch_key_expr(Survey.section_no) == stretch_key(assignment.section_no),
+            or_(
+                Survey.start_time < week_start,
+                Survey.start_time.is_(None),
+            ),
         )
         .order_by(
-            Survey.start_time.desc(),
+            Survey.start_time.desc().nullslast(),
             Survey.id.desc(),
         )
         .first()
@@ -3537,6 +3548,7 @@ def auto_reschedule_unstarted_surveys(now=None, dry_run=False):
         auto_reschedule_deadline,
         ist_now,
         rescheduled_expiry_deadline,
+        stretch_key,
         utc_now,
         week_start_monday,
     )
@@ -3617,12 +3629,7 @@ def auto_reschedule_unstarted_surveys(now=None, dry_run=False):
         due = []
 
         for assignment in assignments:
-            if (
-                assignment.captain_email,
-                assignment.section_no,
-                assignment.upc_code,
-                assignment.stretch_code,
-            ) in already_surveyed:
+            if stretch_key(assignment.section_no) in already_surveyed:
                 continue
 
             deadline = auto_reschedule_deadline(

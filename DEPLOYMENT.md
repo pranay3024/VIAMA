@@ -45,9 +45,10 @@ for all of them.
 
 The approved survey email uses Microsoft Graph to send as
 `projects9@adorpower.com`. The Entra app needs Microsoft Graph **Application**
-permission `Mail.Send` with admin consent, and Exchange must allow the app to
-send as that mailbox. The raw XLSX API key and all three `M365_*` variables are
-required locally and in Vercel. Never commit or share the client secret.
+permissions `Mail.Send` and `Mail.ReadWrite` with admin consent (the latter is
+needed to create drafts in that mailbox), and Exchange must allow the app to
+work with that mailbox. The raw XLSX API key and all three `M365_*` variables
+are required locally and in Vercel. Never commit or share the client secret.
 
 Before deploying defect-report email tracking, run
 `python migrate_defect_report_email_delivery.py` once against the target database.
@@ -503,7 +504,7 @@ than once a day, and checks that each cron path still has a route in `routes/`.
 | `500` referencing `video_count_matched` | Migration didn't run on this database | `python migrate_video_count_check.py` |
 | `500` referencing survey date-approval or raw-email fields | Approval/email migration didn't run on this database | `python migrate_survey_date_approval_email.py` |
 | `500` referencing `cancelled_survey_reports` | The weekly/cancellation report migration didn't run on this database | `python migrate_weekly_survey_reports.py` |
-| Approved-survey email fails to send | Gmail OAuth identity is not `adordashcam@gmail.com` or a verified Send mail as alias | Reauthorize the Gmail token for that sender with `gmail.compose` scope, then redeploy |
+| Approved-survey email fails to send | Microsoft Graph credentials are wrong, or the Entra app lacks `Mail.Send` / `Mail.ReadWrite` with admin consent | Check the three `M365_*` variables, then grant and consent the application permissions for `projects9@adorpower.com` |
 | A defect-report XLSX email goes out when it should not | `DEFECT_REPORT_EMAIL` is set to `0` in Vercel, or the default was changed in code | Set `DEFECT_REPORT_EMAIL=0` in Vercel and redeploy. See "Defect-report mail" above |
 | Cron never fires | Env vars added but not redeployed, or the cron was removed from `vercel.json` | Redeploy; check Settings → Cron Jobs → last run |
 | Rescheduled survey never auto-cancelled | `RESCHEDULED_EXPIRY=0` is set, or it is already Sunday 23:30 IST and the sweep has not run | Check the tick's `rescheduled_expiry` result; `would_cancel: 0` with `candidates > 0` means the rows are still in date |

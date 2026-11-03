@@ -1,5 +1,5 @@
 """
-Google Drive uploads/downloads and Gmail draft creation.
+Google Drive uploads/downloads and Gmail sending.
 
 Credentials are resolved lazily, on first use, rather than at import time.
 
@@ -571,83 +571,8 @@ def download_file_from_drive(view_url):
 
 
 # --------------------------------------------------
-# CREATE GMAIL DRAFT
+# SEND GMAIL EMAIL
 # --------------------------------------------------
-
-def create_gmail_draft(
-
-    subject,
-    html_body,
-    attachment_bytes,
-    attachment_filename,
-    cc_email=""
-
-):
-
-    gmail = get_gmail()
-
-    message = MIMEMultipart()
-
-    # SUBJECT
-    message["Subject"] = subject
-
-    # TO
-    message["To"] = (
-        "dashcamzone5@nhai.org,"
-        "dashcamcell@nhai.org"
-    )
-
-    # CC
-    if cc_email:
-        message["Cc"] = cc_email
-
-    message["Bcc"] = "teamleaderador@gmail.com"
-
-    # HTML BODY
-    message.attach(
-        MIMEText(
-            html_body,
-            "html"
-        )
-    )
-
-    # ATTACHMENT (Optional)
-    if attachment_bytes:
-
-     attachment = MIMEApplication(
-        attachment_bytes
-    )
-
-     attachment.add_header(
-        "Content-Disposition",
-        "attachment",
-        filename=attachment_filename
-    )
-
-     message.attach(
-        attachment
-    )
-
-    raw = base64.urlsafe_b64encode(
-        message.as_bytes()
-    ).decode()
-
-    draft = gmail.users().drafts().create(
-
-        userId="me",
-
-        body={
-            "message": {
-                "raw": raw
-            }
-        }
-
-    ).execute(num_retries=5)
-
-    log.info("gmail draft created: %s", draft.get("id"))
-
-    return draft["id"]
-
 
 def send_gmail_email(
     to_email,

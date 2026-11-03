@@ -626,16 +626,25 @@ def delayed_surveys():
         from utils.raw_xlsx import list_raw_xlsx_files
 
         raw_xlsx_files = list_raw_xlsx_files()
+        raw_inventory_failed = False
     except Exception as exc:
         log.warning("RoadVision raw XLSX inventory unavailable: %s", exc)
         raw_xlsx_files = []
+        raw_inventory_failed = True
 
     for survey in delayed:
         survey.raw_video_api_label = _raw_xlsx_label_for_survey(
             survey,
             raw_xlsx_files,
         )
-        survey.raw_video_api_received = bool(survey.raw_video_api_label)
+        # A file that was already stamped as received stays YES even when the
+        # live list cannot be read this time.
+        survey.raw_video_api_received = bool(
+            survey.raw_video_api_label or survey.raw_video_received_at
+        )
+        survey.raw_video_api_unknown = (
+            raw_inventory_failed and not survey.raw_video_api_received
+        )
 
     defect_report_files = []
     if any(survey.raw_video_email_sent_at for survey in delayed):

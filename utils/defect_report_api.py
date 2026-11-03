@@ -83,8 +83,12 @@ def find_defect_report_file(section_no, upc_code, cycle_no, survey_type, files):
     return None
 
 
-def download_defect_report(stretch, cycle_no, survey_type):
-    """Return ``(xlsx_bytes, filename)`` for the matched defect report."""
+def download_defect_report(stretch, cycle_no, survey_type, file_name=None):
+    """Return ``(xlsx_bytes, filename)`` for the matched defect report.
+
+    ``file_name`` is the name RoadVision lists for the report; when given it
+    is used as the attachment name so the mail matches the RoadVision name.
+    """
     api_key = _api_key()
     if not api_key:
         raise DefectReportUnavailable("RoadVision defect-report API key is not configured")
@@ -119,6 +123,9 @@ def download_defect_report(stretch, cycle_no, survey_type):
         raise DefectReportUnavailable(
             f"RoadVision returned an invalid defect report for stretch {stretch}, cycle {cycle_no}"
         )
+
+    if file_name:
+        return content, str(file_name)
 
     safe_stretch = re.sub(r"[^A-Za-z0-9_-]+", "_", stretch).strip("_")
     filename = f"Defect_Report_{safe_stretch}_Cycle{cycle_no}_{day_night.title()}.xlsx"

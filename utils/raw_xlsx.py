@@ -93,8 +93,12 @@ def list_raw_xlsx_files():
     return files
 
 
-def download_raw_xlsx(section_no, cycle_no, survey_type):
-    """Return ``(xlsx_bytes, filename)`` for the survey's stretch and cycle."""
+def download_raw_xlsx(section_no, cycle_no, survey_type, inventory=None):
+    """Return ``(xlsx_bytes, filename)`` for the survey's stretch and cycle.
+
+    The filename is the one RoadVision lists for the file, so the attachment
+    matches the RoadVision name.  Without a listing it is built by the portal.
+    """
     api_key = (os.getenv("RV_RAW_XLSX_API_KEY") or "").strip()
     if not api_key:
         raise RuntimeError("RV_RAW_XLSX_API_KEY is not configured")
@@ -131,6 +135,18 @@ def download_raw_xlsx(section_no, cycle_no, survey_type):
             f"RoadVision returned an invalid raw XLSX for stretch {stretch}, "
             f"cycle {cycle_no}"
         )
+
+    listed = next(
+        (
+            item
+            for item in inventory or []
+            if raw_xlsx_item_matches(item, section_no, None, cycle_no, survey_type)
+            and item.get("file")
+        ),
+        None,
+    )
+    if listed is not None:
+        return content, str(listed["file"])
 
     safe_stretch = re.sub(r"[^A-Za-z0-9_-]+", "_", stretch).strip("_")
     night_suffix = "_Night" if is_night else ""

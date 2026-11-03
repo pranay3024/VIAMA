@@ -125,6 +125,7 @@ def send_approved_survey_email(survey_id, inventory=None):
             survey.section_no,
             survey.cycle_no,
             survey.survey_type,
+            inventory=inventory,
         )
         message_id = send_microsoft_graph_email(
             to_email=TO_EMAIL,

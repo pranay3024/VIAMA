@@ -49,7 +49,11 @@ def list_defect_report_files():
 
 
 def find_defect_report_file(section_no, upc_code, cycle_no, survey_type, files):
-    """Find an inventory entry matching section/UPC, cycle and day/night."""
+    """Find the inventory entry for this section/UPC and cycle.
+
+    The shift is ignored: RoadVision lists every defect report as day, so a
+    file for the stretch and cycle counts for the survey whatever its shift.
+    """
     if cycle_no is None:
         return None
 
@@ -61,7 +65,6 @@ def find_defect_report_file(section_no, upc_code, cycle_no, survey_type, files):
     if not identifiers:
         return None
 
-    is_night = str(survey_type or "").strip().casefold() == "night"
     for item in files or []:
         if not isinstance(item, dict):
             continue
@@ -70,10 +73,6 @@ def find_defect_report_file(section_no, upc_code, cycle_no, survey_type, files):
         except (TypeError, ValueError):
             continue
         if item_cycle != int(cycle_no):
-            continue
-
-        item_dn = str(item.get("dn") or "").strip().casefold()
-        if (item_dn == "night") != is_night:
             continue
 
         label = str(item.get("label") or "")
@@ -94,7 +93,9 @@ def download_defect_report(stretch, cycle_no, survey_type):
     if not stretch or cycle_no is None:
         raise ValueError("A stretch label and cycle are required for the defect report")
 
-    day_night = "night" if str(survey_type or "").strip().casefold() == "night" else "day"
+    # RoadVision lists every defect report as day, so the download asks for that
+    # whatever the survey's shift; a night survey gets the file for its cycle.
+    day_night = "day"
     params = {"stretch": stretch, "cycle": str(cycle_no), "dn": day_night}
     request = Request(
         f"{API_URL}?{urlencode(params)}",

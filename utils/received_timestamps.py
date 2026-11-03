@@ -152,7 +152,7 @@ def record_received_timestamps(inventories=None, limit=2000):
     summary["defect_inventory"] = defect_files is not None
 
     raw_index = build_inventory_index(raw_files, by_shift=False)
-    defect_index = build_inventory_index(defect_files)
+    defect_index = build_inventory_index(defect_files, by_shift=False)
 
     if not raw_index and not defect_index:
         return summary
@@ -192,6 +192,7 @@ def record_received_timestamps(inventories=None, limit=2000):
                 survey.upc_code,
                 survey.cycle_no,
                 survey.survey_type,
+                by_shift=False,
             )
             match = next(
                 (defect_index[key] for key in keys if key in defect_index),

@@ -378,10 +378,10 @@ class ApprovedSurveyEmailTests(unittest.TestCase):
             )
         )
 
-    def test_defect_inventory_matches_section_upc_cycle_and_day_night(self):
+    def test_defect_inventory_matches_section_upc_and_cycle_for_any_shift(self):
         files = [
             {"label": "N0908601002UP", "cycle": 7, "dn": "day"},
-            {"label": "124", "cycle": 2, "dn": "night"},
+            {"label": "124", "cycle": 2, "dn": "day"},
         ]
 
         self.assertEqual(
@@ -395,7 +395,7 @@ class ApprovedSurveyEmailTests(unittest.TestCase):
             files[1],
         )
         self.assertIsNone(
-            defect_api.find_defect_report_file("124", "124", 2, "Day", files)
+            defect_api.find_defect_report_file("124", "124", 3, "Day", files)
         )
 
     def test_graph_sender_uses_app_token_and_both_attachments(self):

@@ -34,13 +34,13 @@ def _normalised_label(value):
     return re.sub(r"[^A-Za-z0-9]", "", str(value or "")).upper()
 
 
-def build_inventory_index(files):
-    """``(label, cycle, dn)`` -> the inventory entry, ready to look up.
+def build_inventory_index(files, by_shift=True):
+    """``(label, cycle[, dn])`` -> the inventory entry, ready to look up.
 
-    ``dn`` is normalised the same way for both inventories: ``"night"`` for a
-    night survey, ``""`` for a day one - the raw-XLSX inventory leaves the
-    field empty for day and the defect-report inventory spells out ``"day"``,
-    and both mean the same shift.
+    With ``by_shift`` the key includes ``dn``, normalised the same way for both
+    inventories: ``"night"`` for a night survey, ``""`` for a day one.  Without
+    it the key is only the stretch and cycle, which is what the raw-XLSX
+    inventory needs because it does not mark night files.
     """
     index = {}
     for item in files or []:
@@ -53,16 +53,20 @@ def build_inventory_index(files):
             continue
         if not label:
             continue
-        index[(label, cycle, normalise_dn(item.get("dn")))] = item
+        if by_shift:
+            index[(label, cycle, normalise_dn(item.get("dn")))] = item
+        else:
+            index[(label, cycle)] = item
     return index
 
 
-def survey_inventory_keys(section_no, upc_code, cycle_no, survey_type):
+def survey_inventory_keys(section_no, upc_code, cycle_no, survey_type, by_shift=True):
     """The index keys a survey could be stored under.
 
     A stretch is written in several ways on the two sides ("N/09086/01002/UP"
     here, "N0908601002UP" there), and a section can name more than one
-    stretch, so every plausible key is returned.
+    stretch, so every plausible key is returned.  ``by_shift`` matches
+    :func:`build_inventory_index`.
     """
     if cycle_no is None:
         return []
@@ -73,6 +77,9 @@ def survey_inventory_keys(section_no, upc_code, cycle_no, survey_type):
             label = _normalised_label(part)
             if label:
                 labels.add(label)
+
+    if not by_shift:
+        return [(label, int(cycle_no)) for label in labels]
 
     dn = "night" if str(survey_type or "").strip().casefold() == "night" else ""
     return [(label, int(cycle_no), dn) for label in labels]
@@ -144,7 +151,7 @@ def record_received_timestamps(inventories=None, limit=2000):
     summary["raw_inventory"] = raw_files is not None
     summary["defect_inventory"] = defect_files is not None
 
-    raw_index = build_inventory_index(raw_files)
+    raw_index = build_inventory_index(raw_files, by_shift=False)
     defect_index = build_inventory_index(defect_files)
 
     if not raw_index and not defect_index:
@@ -165,21 +172,27 @@ def record_received_timestamps(inventories=None, limit=2000):
     changed = False
 
     for survey in surveys:
-        keys = survey_inventory_keys(
-            survey.section_no,
-            survey.upc_code,
-            survey.cycle_no,
-            survey.survey_type,
-        )
-
         if raw_index and survey.raw_video_received_at is None:
-            match = next((raw_index[key] for key in keys if key in raw_index), None)
+            raw_keys = survey_inventory_keys(
+                survey.section_no,
+                survey.upc_code,
+                survey.cycle_no,
+                survey.survey_type,
+                by_shift=False,
+            )
+            match = next((raw_index[key] for key in raw_keys if key in raw_index), None)
             if match is not None:
                 survey.raw_video_received_at = item_received_at(match) or now
                 summary["raw_video_stamped"] += 1
                 changed = True
 
         if defect_index and survey.defect_report_received_at is None:
+            keys = survey_inventory_keys(
+                survey.section_no,
+                survey.upc_code,
+                survey.cycle_no,
+                survey.survey_type,
+            )
             match = next(
                 (defect_index[key] for key in keys if key in defect_index),
                 None,

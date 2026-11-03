@@ -52,14 +52,15 @@ def raw_xlsx_item_matches(item, section_no, upc_code, cycle_no, survey_type):
     except (TypeError, ValueError):
         return False
 
-    expected_dn = "night" if str(survey_type or "").strip().casefold() == "night" else ""
-    item_dn = normalise_dn(item.get("dn"))
-
-    return label in labels and item_cycle == int(cycle_no) and item_dn == expected_dn
+    return label in labels and item_cycle == int(cycle_no)
 
 
 def raw_xlsx_is_listed(section_no, upc_code, cycle_no, survey_type, files):
-    """Whether the inventory contains this survey's stretch, cycle and day/night."""
+    """Whether the inventory contains this survey's stretch and cycle.
+
+    The shift is ignored: RoadVision does not mark night files, so a file that
+    is listed for the stretch and cycle counts for the survey.
+    """
     if cycle_no is None:
         return False
 
@@ -104,8 +105,6 @@ def download_raw_xlsx(section_no, cycle_no, survey_type):
 
     is_night = str(survey_type or "").strip().casefold() == "night"
     params = {"stretch": stretch, "cycle": str(cycle_no)}
-    if is_night:
-        params["dn"] = "night"
 
     request = Request(
         f"{API_URL}?{urlencode(params)}",

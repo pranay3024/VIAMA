@@ -129,17 +129,12 @@ def _raw_xlsx_label_for_survey(survey, raw_files):
     if not identifiers or survey.cycle_no is None:
         return None
 
-    is_night = str(survey.survey_type or "").strip().casefold() == "night"
     for raw_file in raw_files:
         try:
             cycle_no = int(raw_file.get("cycle"))
         except (TypeError, ValueError):
             continue
         if cycle_no != survey.cycle_no:
-            continue
-
-        dn = str(raw_file.get("dn") or "").strip().casefold()
-        if (dn == "night") != is_night:
             continue
 
         label = str(raw_file.get("label") or "")

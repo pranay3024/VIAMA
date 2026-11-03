@@ -352,7 +352,7 @@ class ApprovedSurveyEmailTests(unittest.TestCase):
         self.assertEqual(filename, "Raw_Video_140_Cycle14_Night.xlsx")
         self.assertEqual(
             parse_qs(urlparse(request.full_url).query),
-            {"stretch": ["140"], "cycle": ["14"], "dn": ["night"]},
+            {"stretch": ["140"], "cycle": ["14"]},
         )
         self.assertEqual(request.get_header("X-api-key"), "test-key")
 
@@ -372,7 +372,7 @@ class ApprovedSurveyEmailTests(unittest.TestCase):
                 "N/09086/01002/UP", "N/09086/01002/UP", 6, "Day", files
             )
         )
-        self.assertFalse(
+        self.assertTrue(
             raw_xlsx.raw_xlsx_is_listed(
                 "N/09086/01002/UP", "N/09086/01002/UP", 7, "Night", files
             )
@@ -966,7 +966,7 @@ class UploadCallbackTests(unittest.TestCase):
                 "124", "124", 2, "Day", [{"label": "124", "cycle": 2, "dn": ""}]
             )
         )
-        self.assertFalse(
+        self.assertTrue(
             raw_xlsx.raw_xlsx_is_listed(
                 "124", "124", 2, "Night", [{"label": "124", "cycle": 2, "dn": "day"}]
             )
@@ -1303,14 +1303,14 @@ class ReceivedTimestampTests(unittest.TestCase):
         db.session.refresh(survey)
         self.assertIsNone(survey.raw_video_received_at)
 
-    def test_a_night_survey_does_not_match_a_day_file(self):
+    def test_a_night_survey_matches_the_file_for_its_stretch_and_cycle(self):
         survey = self.make_survey(survey_type="Night")
 
         summary = received_timestamps.record_received_timestamps(self.raw_inventory())
 
-        self.assertEqual(summary["raw_video_stamped"], 0)
+        self.assertEqual(summary["raw_video_stamped"], 1)
         db.session.refresh(survey)
-        self.assertIsNone(survey.raw_video_received_at)
+        self.assertIsNotNone(survey.raw_video_received_at)
 
     def test_nothing_is_stamped_when_the_inventory_cannot_be_read(self):
         survey = self.make_survey()

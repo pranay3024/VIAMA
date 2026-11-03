@@ -46,12 +46,13 @@ from flask import (
 
 from google_drive import (
     PIU_EMAIL_MAPPING,
+    create_gmail_draft,
     download_file_from_drive,
     get_cc_email,
     get_gmail,
 )
 
-from utils.microsoft_graph_mail import create_microsoft_graph_draft
+from utils.microsoft_graph_mail import DEFAULT_DRAFT_BCC, DEFAULT_DRAFT_TO
 
 from utils.request_params import (
     safe_date,
@@ -3471,21 +3472,23 @@ def email_draft(email_type):
 
 
         try:
-            draft_id = create_microsoft_graph_draft(
+            draft_id = create_gmail_draft(
+                to_emails=DEFAULT_DRAFT_TO,
                 subject=subject,
                 html_body=email_html,
                 attachment_bytes=attachment_bytes,
                 attachment_filename=attachment_name,
                 cc_emails=cc_email,
+                bcc_emails=DEFAULT_DRAFT_BCC,
             )
         except Exception as exc:
             if is_missed:
                 survey.cycle_no = original_cycle
-            log.exception("Outlook draft creation failed")
+            log.exception("Gmail draft creation failed")
             flash(
                 (
-                    "Could not create the Outlook draft in "
-                    f"projects9@adorpower.com: {exc}"
+                    "Could not create the Gmail draft in "
+                    f"adordashcam@gmail.com: {exc}"
                 ),
                 "error",
             )
@@ -3501,7 +3504,7 @@ def email_draft(email_type):
             survey.cycle_no = original_cycle
 
         # --------------------------------------------------
-        # Open Outlook Draft
+        # Open Gmail Draft
         # --------------------------------------------------
 
 
@@ -3509,10 +3512,10 @@ def email_draft(email_type):
         flash(
             (
                 f"{survey.section_no}_Cycle{survey.cycle_no} "
-                f"Outlook draft created successfully.\n"
+                f"Gmail draft created successfully.\n"
                 f"The draft has been created in "
-                f"projects9@adorpower.com. "
-                f"Please open Outlook → Drafts and send the email."
+                f"adordashcam@gmail.com. "
+                f"Please open Gmail → Drafts and send the email."
             ),
             "success",
         )

@@ -571,6 +571,55 @@ def download_file_from_drive(view_url):
 
 
 # --------------------------------------------------
+# CREATE GMAIL DRAFT
+# --------------------------------------------------
+
+def create_gmail_draft(
+    to_emails,
+    subject,
+    html_body,
+    attachment_bytes,
+    attachment_filename,
+    cc_emails="",
+    bcc_emails="",
+):
+    """Save one HTML draft in the Gmail account behind the Gmail token.
+
+    The draft is not sent: a person opens Gmail → Drafts, checks it, and sends.
+    """
+    gmail = get_gmail()
+
+    message = MIMEMultipart()
+    message["Subject"] = subject
+    message["To"] = ", ".join(to_emails) if not isinstance(to_emails, str) else to_emails
+    if cc_emails:
+        message["Cc"] = cc_emails
+    if bcc_emails:
+        message["Bcc"] = (
+            ", ".join(bcc_emails) if not isinstance(bcc_emails, str) else bcc_emails
+        )
+    message.attach(MIMEText(html_body, "html"))
+
+    if attachment_bytes:
+        mimetype = mimetypes.guess_type(attachment_filename)[0] or "application/octet-stream"
+        subtype = mimetype.split("/", 1)[1]
+        attachment = MIMEApplication(attachment_bytes, _subtype=subtype)
+        attachment.add_header(
+            "Content-Disposition",
+            "attachment",
+            filename=attachment_filename,
+        )
+        message.attach(attachment)
+
+    raw = base64.urlsafe_b64encode(message.as_bytes()).decode()
+    draft = gmail.users().drafts().create(
+        userId="me",
+        body={"message": {"raw": raw}},
+    ).execute()
+    return draft.get("id")
+
+
+# --------------------------------------------------
 # SEND GMAIL EMAIL
 # --------------------------------------------------
 

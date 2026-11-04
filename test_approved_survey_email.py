@@ -356,6 +356,16 @@ class ApprovedSurveyEmailTests(unittest.TestCase):
         )
         self.assertEqual(request.get_header("X-api-key"), "test-key")
 
+    def test_raw_xlsx_matches_a_section_written_with_ampersand(self):
+        files = [{"label": "7&33", "cycle": 14, "dn": ""}]
+
+        self.assertTrue(
+            raw_xlsx.raw_xlsx_is_listed("7 & 33", "N/07033/01001/UP", 14, "Day", files)
+        )
+        self.assertTrue(
+            raw_xlsx.raw_xlsx_is_listed("7 & 33", "7 & 33", 14, "Day", files)
+        )
+
     def test_raw_xlsx_inventory_matches_normalized_upc_and_cycle(self):
         files = [
             {"label": "N0908601002UP", "cycle": 7, "dn": ""},

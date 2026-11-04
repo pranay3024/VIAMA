@@ -24,6 +24,7 @@ from utils.raw_xlsx import (
     RawXlsxUnavailable,
     list_raw_xlsx_files,
     normalise_dn,
+    stretch_labels,
 )
 
 
@@ -71,12 +72,7 @@ def survey_inventory_keys(section_no, upc_code, cycle_no, survey_type, by_shift=
     if cycle_no is None:
         return []
 
-    labels = set()
-    for value in (section_no, upc_code):
-        for part in re.split(r"\s*&\s*", str(value or "")):
-            label = _normalised_label(part)
-            if label:
-                labels.add(label)
+    labels = stretch_labels(section_no, upc_code)
 
     if not by_shift:
         return [(label, int(cycle_no)) for label in labels]

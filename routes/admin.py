@@ -121,10 +121,12 @@ def _cancelled_survey_criterion():
 
 
 def _raw_xlsx_label_for_survey(survey, raw_files):
-    identifiers = {
-        "".join(character for character in str(value or "") if character.isalnum()).casefold()
-        for value in (survey.section_no, survey.upc_code, survey.stretch_code)
-    }
+    from utils.raw_xlsx import stretch_labels
+
+    identifiers = {label.casefold() for label in stretch_labels(survey.section_no, survey.upc_code)}
+    identifiers.add(
+        "".join(character for character in str(survey.stretch_code or "") if character.isalnum()).casefold()
+    )
     identifiers.discard("")
     if not identifiers or survey.cycle_no is None:
         return None

@@ -31,18 +31,29 @@ def normalise_dn(value):
     return ""
 
 
-def raw_xlsx_item_matches(item, section_no, upc_code, cycle_no, survey_type):
-    """Whether one inventory entry is this survey's stretch, cycle and shift."""
-    if not isinstance(item, dict) or cycle_no is None:
-        return False
+def stretch_labels(*values):
+    """The upper-case labels a section or UPC can be known by in RoadVision.
 
+    A section such as ``7 & 33`` is listed as ``7&33`` (so ``733`` once the
+    separators are removed), and it can also be a plain ``7`` or ``33``.  Each
+    value therefore gives its whole label plus every part around ``&``.
+    """
     labels = set()
-    for value in (section_no, upc_code):
-        for part in re.split(r"\s*&\s*", str(value or "")):
+    for value in values:
+        text = str(value or "")
+        for part in [text, *re.split(r"\s*&\s*", text)]:
             label = re.sub(r"[^A-Za-z0-9]", "", part).upper()
             if label:
                 labels.add(label)
+    return labels
 
+
+def raw_xlsx_item_matches(item, section_no, upc_code, cycle_no, survey_type):
+    """Whether one inventory entry is this survey's stretch and cycle."""
+    if not isinstance(item, dict) or cycle_no is None:
+        return False
+
+    labels = stretch_labels(section_no, upc_code)
     if not labels:
         return False
 
@@ -103,7 +114,8 @@ def download_raw_xlsx(section_no, cycle_no, survey_type, inventory=None):
     if not api_key:
         raise RuntimeError("RV_RAW_XLSX_API_KEY is not configured")
 
-    stretch = str(section_no or "").strip()
+    # RoadVision takes "7&33", not "7 & 33".
+    stretch = re.sub(r"\s*&\s*", "&", str(section_no or "").strip())
     if not stretch or cycle_no is None:
         raise ValueError("A stretch number and cycle are required for the raw XLSX")
 

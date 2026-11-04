@@ -732,6 +732,33 @@ def delayed_surveys():
     )
 
     # ============================================================
+    # Extract lists: section_no_CycleN for the rows an extract button picked
+    # ============================================================
+    extract_kind = request.args.get("extract")
+    extract_titles = {
+        "dates_pending": "Dates approval pending",
+        "raw_no_form_email": "Raw excel received, survey form email not sent",
+        "delay_over_1": "Working days delay more than 1",
+    }
+    if extract_kind == "dates_pending":
+        extract_rows = [s for s in delayed if not s.survey_dates_approved]
+    elif extract_kind == "raw_no_form_email":
+        extract_rows = [
+            s for s in delayed
+            if s.raw_video_api_received and not s.raw_video_email_sent_at
+        ]
+    elif extract_kind == "delay_over_1":
+        extract_rows = [
+            s for s in delayed if (s.defect_report_delay_days or 0) > 1
+        ]
+    else:
+        extract_kind = None
+        extract_rows = []
+    extract_text = "\n".join(
+        f"{s.section_no}_Cycle{s.cycle_no}" for s in extract_rows
+    )
+
+    # ============================================================
     # Render page
     # ============================================================
 
@@ -751,6 +778,10 @@ def delayed_surveys():
         # spilling onto the Monday that starts next week.
         week_end_display=week_end - timedelta(days=1),
         total_delay_days=total_delay_days,
+        extract_kind=extract_kind,
+        extract_title=extract_titles.get(extract_kind),
+        extract_count=len(extract_rows),
+        extract_text=extract_text,
         selected_team=selected_team,
         selected_state=selected_state,
         selected_delay=delay_filter,

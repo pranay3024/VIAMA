@@ -83,11 +83,12 @@ def find_defect_report_file(section_no, upc_code, cycle_no, survey_type, files):
     return None
 
 
-def download_defect_report(stretch, cycle_no, survey_type, file_name=None):
+def download_defect_report(stretch, cycle_no, survey_type, file_name=None, dn=None):
     """Return ``(xlsx_bytes, filename)`` for the matched defect report.
 
     ``file_name`` is the name RoadVision lists for the report; when given it
     is used as the attachment name so the mail matches the RoadVision name.
+    ``dn`` is the shift RoadVision lists the report under.
     """
     api_key = _api_key()
     if not api_key:
@@ -97,9 +98,9 @@ def download_defect_report(stretch, cycle_no, survey_type, file_name=None):
     if not stretch or cycle_no is None:
         raise ValueError("A stretch label and cycle are required for the defect report")
 
-    # RoadVision lists every defect report as day, so the download asks for that
-    # whatever the survey's shift; a night survey gets the file for its cycle.
-    day_night = "day"
+    # Ask for the shift RoadVision lists the file under; the list is the
+    # source of truth, not the survey's own shift.
+    day_night = "night" if str(dn or "").strip().casefold() == "night" else "day"
     params = {"stretch": stretch, "cycle": str(cycle_no), "dn": day_night}
     request = Request(
         f"{API_URL}?{urlencode(params)}",

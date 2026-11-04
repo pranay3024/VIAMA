@@ -116,6 +116,7 @@ def send_approved_survey_defect_email(survey_id, inventory=None):
             survey.cycle_no,
             survey.survey_type,
             file_name=report.get("file"),
+            dn=report.get("dn"),
         )
         start_date = survey.extracted_survey_start_date.isoformat()
         end_date = survey.extracted_survey_end_date.isoformat()

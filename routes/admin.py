@@ -734,29 +734,44 @@ def delayed_surveys():
     # ============================================================
     # Extract lists: section_no_CycleN for the rows an extract button picked
     # ============================================================
+    # The extract buttons fetch this as plain text and copy it, so the page
+    # itself does not change.
     extract_kind = request.args.get("extract")
-    extract_titles = {
-        "dates_pending": "Dates approval pending",
-        "raw_no_form_email": "Raw excel received, survey form email not sent",
-        "delay_over_1": "Working days delay more than 1",
-    }
-    if extract_kind == "dates_pending":
-        extract_rows = [s for s in delayed if not s.survey_dates_approved]
-    elif extract_kind == "raw_no_form_email":
-        extract_rows = [
-            s for s in delayed
-            if s.raw_video_api_received and not s.raw_video_email_sent_at
-        ]
-    elif extract_kind == "delay_over_1":
-        extract_rows = [
-            s for s in delayed if (s.defect_report_delay_days or 0) > 1
-        ]
-    else:
-        extract_kind = None
-        extract_rows = []
-    extract_text = "\n".join(
-        f"{s.section_no}_Cycle{s.cycle_no}" for s in extract_rows
-    )
+    if request.args.get("format") == "text" and extract_kind:
+        if extract_kind == "dates_pending":
+            rows = [s for s in delayed if not s.survey_dates_approved]
+            lines = [f"{s.section_no}_Cycle{s.cycle_no}" for s in rows]
+        elif extract_kind == "raw_no_form_email":
+            rows = [
+                s for s in delayed
+                if s.raw_video_api_received and not s.raw_video_email_sent_at
+            ]
+            lines = [f"{s.section_no}_Cycle{s.cycle_no}" for s in rows]
+        elif extract_kind == "delay_over_1":
+            rows = [
+                s for s in delayed if (s.defect_report_delay_days or 0) > 1
+            ]
+            lines = ["\t".join([
+                "Stretch_Cycle",
+                "Delay (days)",
+                "Survey End Date",
+                "Bucket Video Upload Time",
+                "Defect Report Sent Date",
+            ])]
+            for s in rows:
+                lines.append("\t".join([
+                    f"{s.section_no}_Cycle{s.cycle_no}",
+                    str(s.defect_report_delay_days),
+                    s.extracted_survey_end_date.strftime("%d/%m/%Y")
+                    if s.extracted_survey_end_date else "-",
+                    s.display_video_upload_time.strftime("%d/%m/%Y %I:%M %p")
+                    if s.display_video_upload_time else "-",
+                    s.defect_report_sent_at.strftime("%d/%m/%Y")
+                    if s.defect_report_sent_at else "-",
+                ]))
+        else:
+            return current_app.response_class("", mimetype="text/plain")
+        return current_app.response_class("\n".join(lines), mimetype="text/plain")
 
     # ============================================================
     # Render page
@@ -778,10 +793,6 @@ def delayed_surveys():
         # spilling onto the Monday that starts next week.
         week_end_display=week_end - timedelta(days=1),
         total_delay_days=total_delay_days,
-        extract_kind=extract_kind,
-        extract_title=extract_titles.get(extract_kind),
-        extract_count=len(extract_rows),
-        extract_text=extract_text,
         selected_team=selected_team,
         selected_state=selected_state,
         selected_delay=delay_filter,

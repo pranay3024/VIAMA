@@ -63,19 +63,58 @@
             <a href="{{ url_for('admin.delayed_surveys') }}" class="search-btn">Clear Filters</a>
         </form>
 
-        <div style="display:flex;flex-wrap:wrap;gap:10px;margin:12px 0;">
-            <a class="search-btn" href="{{ url_for('admin.delayed_surveys', **dict(request.args, extract='dates_pending')) }}">Extract: Dates approval pending</a>
-            <a class="search-btn" href="{{ url_for('admin.delayed_surveys', **dict(request.args, extract='raw_no_form_email')) }}">Extract: Raw received, form email not sent</a>
-            <a class="search-btn" href="{{ url_for('admin.delayed_surveys', **dict(request.args, extract='delay_over_1')) }}">Extract: Delay more than 1 day</a>
+        <div style="display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin:12px 0;">
+            <button type="button" class="search-btn extract-btn" data-url="{{ url_for('admin.delayed_surveys', **dict(request.args, extract='dates_pending', format='text')) }}">Extract: Dates approval pending</button>
+            <button type="button" class="search-btn extract-btn" data-url="{{ url_for('admin.delayed_surveys', **dict(request.args, extract='raw_no_form_email', format='text')) }}">Extract: Raw received, form email not sent</button>
+            <button type="button" class="search-btn extract-btn" data-header="1" data-url="{{ url_for('admin.delayed_surveys', **dict(request.args, extract='delay_over_1', format='text')) }}">Extract: Delay more than 1 day</button>
+            <span id="extractStatus" style="font-weight:bold;"></span>
         </div>
 
-        {% if extract_kind %}
-        <div style="border:1px solid #f1d0b1;border-radius:8px;padding:12px;margin-bottom:15px;background:#fff;">
-            <p style="margin:0 0 8px;font-weight:bold;">{{ extract_title }} &mdash; {{ extract_count }} stretch(es)</p>
-            <pre id="extractDelayedList" style="white-space:pre-wrap;margin:0 0 8px;">{{ extract_text or 'None' }}</pre>
-            <button type="button" class="search-btn" onclick="navigator.clipboard.writeText(document.getElementById('extractDelayedList').innerText)">Copy list</button>
-        </div>
-        {% endif %}
+        <script>
+        (function () {
+            const status = document.getElementById('extractStatus');
+
+            function copyText(text) {
+                if (navigator.clipboard && window.isSecureContext) {
+                    return navigator.clipboard.writeText(text);
+                }
+                const area = document.createElement('textarea');
+                area.value = text;
+                area.style.position = 'fixed';
+                area.style.opacity = '0';
+                document.body.appendChild(area);
+                area.select();
+                const ok = document.execCommand('copy');
+                document.body.removeChild(area);
+                return ok ? Promise.resolve() : Promise.reject(new Error('copy blocked'));
+            }
+
+            document.querySelectorAll('.extract-btn').forEach(function (btn) {
+                btn.addEventListener('click', function () {
+                    status.textContent = 'Preparing...';
+                    fetch(btn.dataset.url, { credentials: 'same-origin' })
+                        .then(function (r) {
+                            if (!r.ok) throw new Error('HTTP ' + r.status);
+                            return r.text();
+                        })
+                        .then(function (text) {
+                            const rows = text.split('\n').filter(function (l) { return l.trim(); });
+                            const count = btn.dataset.header === '1' ? rows.length - 1 : rows.length;
+                            if (!rows.length) {
+                                status.textContent = 'Nothing to copy for this filter.';
+                                return;
+                            }
+                            return copyText(text).then(function () {
+                                status.textContent = 'Copied ' + count + ' row(s) to clipboard.';
+                            });
+                        })
+                        .catch(function (err) {
+                            status.textContent = 'Could not copy: ' + err.message;
+                        });
+                });
+            });
+        })();
+        </script>
 
         <div style="background:#fff3cd;border:1px solid #ffc107;border-radius:10px;padding:12px;margin-bottom:15px;">
             <p style="margin:0;font-weight:bold;">

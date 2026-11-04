@@ -374,13 +374,22 @@ def regional_dashboard():
 
     for survey in all_surveys:
 
-        if survey.start_time:
+        # Same rules as the admin dashboard (routes/admin.py, the display
+        # times block), so the two pages show the same start and end.
+        if (
+            survey.captain_status in ["rescheduled", "cancelled"]
+            and survey.captain_status_updated_at
+        ):
+            survey.display_start_time = survey.captain_status_updated_at + ist_offset
+        elif survey.start_time:
             survey.display_start_time = survey.start_time
         else:
             survey.display_start_time = None
 
-        if survey.end_time:
-            survey.display_end_time = survey.end_time
+        if survey.captain_status in ["rescheduled", "cancelled"]:
+            survey.display_end_time = None
+        elif survey.end_time:
+            survey.display_end_time = survey.end_time + ist_offset
         else:
             survey.display_end_time = None
 

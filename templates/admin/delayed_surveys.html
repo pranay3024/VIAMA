@@ -72,7 +72,7 @@
 
         <form method="GET" style="display:flex;flex-wrap:wrap;align-items:flex-end;gap:12px;margin:12px 0;">
             {% for key, value in request.args.items() %}
-                {% if key not in ('raw_sent_date', 'defect_sent_date', 'extract', 'format') %}
+                {% if key not in ('raw_sent_date', 'defect_sent_date', 'raw_received_date', 'defect_received_date', 'extract', 'format') %}
                 <input type="hidden" name="{{ key }}" value="{{ value }}">
                 {% endif %}
             {% endfor %}
@@ -82,7 +82,13 @@
             <label>Defect report email sent on
                 <input type="date" name="defect_sent_date" value="{{ defect_sent_date }}" onchange="this.form.submit()">
             </label>
-            <button type="button" class="search-btn" onclick="this.form.raw_sent_date.value='';this.form.defect_sent_date.value='';this.form.submit();">Clear Dates</button>
+            <label>Raw excel received on
+                <input type="date" name="raw_received_date" value="{{ raw_received_date }}" onchange="this.form.submit()">
+            </label>
+            <label>Defect report received on
+                <input type="date" name="defect_received_date" value="{{ defect_received_date }}" onchange="this.form.submit()">
+            </label>
+            <button type="button" class="search-btn" onclick="this.form.raw_sent_date.value='';this.form.defect_sent_date.value='';this.form.raw_received_date.value='';this.form.defect_received_date.value='';this.form.submit();">Clear Dates</button>
             <button type="button" class="search-btn extract-btn" data-url="{{ url_for('admin.delayed_surveys', **dict(request.args, extract='raw_sent', format='text')) }}">Extract: Survey form email sent</button>
             <button type="button" class="search-btn extract-btn" data-url="{{ url_for('admin.delayed_surveys', **dict(request.args, extract='defect_sent', format='text')) }}">Extract: Defect report email sent</button>
         </form>

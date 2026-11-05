@@ -762,6 +762,22 @@ def delayed_surveys():
             and s.display_defect_report_email_sent_at.date() == defect_sent_on
         ]
 
+    # Same for the day RoadVision received the raw excel and the defect report.
+    raw_received_on = _day_arg("raw_received_date")
+    defect_received_on = _day_arg("defect_received_date")
+    if raw_received_on:
+        delayed = [
+            s for s in delayed
+            if s.display_raw_video_received_at
+            and s.display_raw_video_received_at.date() == raw_received_on
+        ]
+    if defect_received_on:
+        delayed = [
+            s for s in delayed
+            if s.display_defect_report_received_at
+            and s.display_defect_report_received_at.date() == defect_received_on
+        ]
+
     # The extract buttons fetch this as plain text and copy it, so the page
     # itself does not change.
     extract_kind = request.args.get("extract")
@@ -821,6 +837,8 @@ def delayed_surveys():
         delayed_surveys=delayed,
         raw_sent_date=request.args.get("raw_sent_date", ""),
         defect_sent_date=request.args.get("defect_sent_date", ""),
+        raw_received_date=request.args.get("raw_received_date", ""),
+        defect_received_date=request.args.get("defect_received_date", ""),
         current_week_no=current_week_no,
         selected_week=selected_week,
         week_options=week_options,

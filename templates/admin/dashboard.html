@@ -862,6 +862,7 @@ onclick="clearFilters()">
 <th>Upload<br>Duration</th> -->
 
 <th>Raw<br>Excel<br>Received</th>
+<th>Defect<br>Report<br>Received</th>
 <th>Survey<br>Form</th>
 
 <th>Raw<br>Video</th>
@@ -1427,6 +1428,14 @@ onclick="clearFilters()">
 
     <td>
 {% if survey.raw_excel_received %}
+<strong style="color:green;">YES</strong>
+{% else %}
+<strong style="color:#a33;">NO</strong>
+{% endif %}
+    </td>
+
+    <td>
+{% if survey.defect_excel_received %}
 <strong style="color:green;">YES</strong>
 {% else %}
 <strong style="color:#a33;">NO</strong>

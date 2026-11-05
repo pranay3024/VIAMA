@@ -1709,10 +1709,38 @@ def admin_dashboard():
         log.warning("RoadVision raw XLSX inventory unavailable: %s", exc)
         dashboard_raw_files = []
 
+    # Defect Report Received: the defect file is in the RoadVision defect list
+    # for this stretch and cycle, or it was already stamped as received.
+    try:
+        from utils.defect_report_api import (
+            find_defect_report_file,
+            list_defect_report_files,
+        )
+
+        dashboard_defect_files = list_defect_report_files()
+    except Exception as exc:
+        log.warning("RoadVision defect-report inventory unavailable: %s", exc)
+        dashboard_defect_files = []
+        find_defect_report_file = None
+
     for survey in all_surveys:
         survey.raw_excel_received = bool(
             _raw_xlsx_label_for_survey(survey, dashboard_raw_files)
             or survey.raw_video_received_at
+        )
+        survey.defect_excel_received = bool(
+            (
+                find_defect_report_file(
+                    survey.section_no,
+                    survey.upc_code,
+                    survey.cycle_no,
+                    survey.survey_type,
+                    dashboard_defect_files,
+                )
+                if find_defect_report_file
+                else None
+            )
+            or survey.defect_report_received_at
         )
 
     for survey in all_surveys:

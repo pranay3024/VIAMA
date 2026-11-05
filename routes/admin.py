@@ -1665,6 +1665,22 @@ def admin_dashboard():
 
     current_state_km = {}
 
+    # Raw Excel Received: the file is in the RoadVision raw-XLSX list for this
+    # stretch and cycle, or it was already stamped as received.
+    try:
+        from utils.raw_xlsx import list_raw_xlsx_files
+
+        dashboard_raw_files = list_raw_xlsx_files()
+    except Exception as exc:
+        log.warning("RoadVision raw XLSX inventory unavailable: %s", exc)
+        dashboard_raw_files = []
+
+    for survey in all_surveys:
+        survey.raw_excel_received = bool(
+            _raw_xlsx_label_for_survey(survey, dashboard_raw_files)
+            or survey.raw_video_received_at
+        )
+
     for survey in all_surveys:
         survey.display_survey_form_approved_at = (
             survey.survey_form_approved_at + ist_offset

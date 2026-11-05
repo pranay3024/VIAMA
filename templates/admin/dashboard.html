@@ -808,6 +808,16 @@ onclick="clearFilters()">
     <button
     type="button"
     class="search-btn"
+    onclick="copyRawExcelExtract()"
+    >
+
+     Raw Excel Received Extract
+
+</button>
+
+    <button
+    type="button"
+    class="search-btn"
     onclick="copyAutoCancelledExtract()"
     >
 
@@ -851,6 +861,7 @@ onclick="clearFilters()">
 
 <th>Upload<br>Duration</th> -->
 
+<th>Raw<br>Excel<br>Received</th>
 <th>Survey<br>Form</th>
 
 <th>Raw<br>Video</th>
@@ -884,6 +895,7 @@ onclick="clearFilters()">
     data-pending-label="{{ survey.section_no | trim }}_{{ survey.cycle_no }}"
     data-stretch-cycle="{{ survey.section_no | trim }}_{{ survey.cycle_no }}"
     data-form-received="{{ 'true' if survey.end_survey_pdf else 'false' }}"
+    data-raw-excel="{{ 'true' if survey.raw_excel_received else 'false' }}"
     data-form-approved="{{ 'true' if survey.survey_form_approved else 'false' }}"
     data-status="{{ survey.status }}"
     data-cancelled-no-reason="{{ 'true' if survey.status == 'cancelled' and not (survey.captain_status_reason or '').strip() else 'false' }}"
@@ -1412,6 +1424,14 @@ onclick="clearFilters()">
     {% endif %}
 
     </td> -->
+
+    <td>
+{% if survey.raw_excel_received %}
+<strong style="color:green;">YES</strong>
+{% else %}
+<strong style="color:#a33;">NO</strong>
+{% endif %}
+    </td>
 
     <td>
 
@@ -2140,6 +2160,34 @@ function copyVideoUploadExtract() {
  * re-upload. Note the schema cannot tell "not yet reviewed" from "rejected" -
  * both read false - so forms sent back for correction are still included.
  */
+// Raw excel received for the rows on screen, as section_Cycle, one per line.
+function copyRawExcelExtract() {
+
+    const seen = new Set();
+    const lines = Array.from(
+        document.querySelectorAll('tr[data-raw-excel="true"][data-extract]')
+    ).map(function(row) {
+        return row.getAttribute("data-extract");
+    }).filter(function(label) {
+        if (!label || seen.has(label)) return false;
+        seen.add(label);
+        return true;
+    });
+
+    if (!lines.length) {
+        alert("No raw excel received surveys in this filter.");
+        return;
+    }
+
+    navigator.clipboard.writeText(lines.join("\n"))
+        .then(function() {
+            alert(lines.length + " raw excel stretch(es) copied!");
+        })
+        .catch(function() {
+            alert("⚠️ Failed to copy raw excel extract.");
+        });
+}
+
 function copyPendingApprovalExtract() {
 
     const rows = Array.from(

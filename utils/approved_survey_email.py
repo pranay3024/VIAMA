@@ -4,9 +4,7 @@ import logging
 import time
 from datetime import datetime, timezone
 
-import pytz
-
-from core.config import current_week_number, week_of
+from core.config import current_week_number, ist_now, week_of
 from core.config import defect_report_email_enabled
 from extensions import db
 from google_drive import download_file_from_drive, get_cc_email
@@ -147,13 +145,11 @@ def send_approved_survey_email(survey_id, inventory=None):
         survey.raw_video_email_message_id = message_id
         # The survey-form mail is the team's Survey Form and Raw Video step, so
         # both columns (and the KM totals that need all three) follow the mail.
-        sent_ist = datetime.now(pytz.timezone("Asia/Kolkata"))
-        if not survey.survey_form_completed:
-            survey.survey_form_completed = True
-            survey.survey_form_completed_at = sent_ist
-        if not survey.task1_completed:
-            survey.task1_completed = True
-            survey.task1_completed_at = sent_ist
+        sent_ist = ist_now()
+        survey.survey_form_completed = True
+        survey.survey_form_completed_at = sent_ist
+        survey.task1_completed = True
+        survey.task1_completed_at = sent_ist
         db.session.commit()
         if defect_report_email_enabled():
             try:

@@ -94,6 +94,13 @@
 
     <form method="GET" class="advanced-filter">
 
+        <label style="font-weight:bold;color:#b45309;">
+            <input type="checkbox" name="form_pending" value="1"
+            {% if request.args.get("form_pending") == "1" %}checked{% endif %}
+            onchange="this.form.submit()">
+            Pending approval only
+        </label>
+
         <select name="state">
 
             <option value="">

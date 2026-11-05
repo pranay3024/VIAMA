@@ -211,6 +211,7 @@ def dashboard():
     day = request.args.get("day", "").strip()
     status = request.args.get("status", "").strip()
     section_no = request.args.get("section_no", "").strip()
+    form_pending = request.args.get("form_pending", "").strip() == "1"
 
     # Preserved when the approve / reject buttons submit (hidden inputs).
     filter_args = {
@@ -234,7 +235,7 @@ def dashboard():
     # Week defaults to the current project week, exactly like the admin
     # dashboard: an explicit week wins, any other active filter with no week
     # means "all weeks", and the untouched default view shows the current week.
-    other_filters_applied = any([state, team, cycle, day, status, section_no])
+    other_filters_applied = any([state, team, cycle, day, status, section_no, form_pending])
     if week:
         try:
             week_no = int(week)
@@ -312,8 +313,6 @@ def dashboard():
 
     for survey in all_surveys:
 
-        survey.scheduled_day = survey.survey_day
-
         survey.raw_excel_received = bool(
             (
                 raw_xlsx_is_listed(
@@ -332,6 +331,18 @@ def dashboard():
             survey.raw_video_email_sent_at + _IST_OFFSET
             if survey.raw_video_email_sent_at else None
         )
+
+    # "Pending approval" filter: raw excel is in, the survey-form mail is not
+    # sent yet, so these are the forms waiting on this approver.
+    if form_pending:
+        all_surveys = [
+            survey for survey in all_surveys
+            if survey.raw_excel_received and not survey.raw_video_email_sent_at
+        ]
+
+    for survey in all_surveys:
+
+        survey.scheduled_day = survey.survey_day
 
         if (
             survey.captain_status in ["rescheduled", "cancelled"]

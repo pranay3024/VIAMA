@@ -4,9 +4,7 @@ import logging
 import time
 from datetime import datetime, timezone
 
-import pytz
-
-from core.config import current_week_number, ist_date, week_of
+from core.config import current_week_number, ist_date, ist_now, week_of
 from extensions import db
 from models.db_models import Survey
 from google_drive import get_cc_email
@@ -159,11 +157,8 @@ def send_approved_survey_defect_email(survey_id, inventory=None):
         survey.defect_report_match_status = "matched"
         # The Defect Report column (task2) follows the mail, as the survey-form
         # mail does for Survey Form and Raw Video.
-        if not survey.task2_completed:
-            survey.task2_completed = True
-            survey.task2_completed_at = datetime.now(
-                pytz.timezone("Asia/Kolkata")
-            )
+        survey.task2_completed = True
+        survey.task2_completed_at = ist_now()
         db.session.commit()
         return "sent"
     except DefectReportUnavailable:

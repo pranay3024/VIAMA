@@ -220,7 +220,12 @@
                                 <br><small class="text-muted">{{ survey.display_survey_dates_approved_at.strftime('%A') }}<br>{{ survey.display_survey_dates_approved_at.strftime('%d %b %Y, %I:%M %p') }} IST</small>
                             {% endif %}
                         </td>
-                        <td><strong style="color:{{ 'green' if survey.survey_form_approved else '#a33' }};">{{ 'YES' if survey.survey_form_approved else 'NO' }}</strong></td>
+                        <td>
+                            <strong style="color:{{ 'green' if survey.survey_form_approved else '#a33' }};">{{ 'YES' if survey.survey_form_approved else 'NO' }}</strong>
+                            {% if survey.survey_form_approved and survey.display_survey_form_approved_at %}
+                                <br><small class="text-muted">{{ survey.display_survey_form_approved_at.strftime('%A') }}<br>{{ survey.display_survey_form_approved_at.strftime('%d %b %Y, %I:%M %p') }} IST</small>
+                            {% endif %}
+                        </td>
                         <td>
                             {% if survey.raw_video_email_sent_at %}
                                 Sent<br>{{ survey.display_raw_video_email_sent_at.strftime('%d/%m/%Y %I:%M %p') }} IST

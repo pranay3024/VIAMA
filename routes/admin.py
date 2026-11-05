@@ -687,6 +687,10 @@ def delayed_surveys():
         log.warning("could not record the RoadVision received timestamps: %s", exc)
 
     for survey in delayed:
+        survey.display_survey_form_approved_at = (
+            survey.survey_form_approved_at + ist_offset
+            if survey.survey_form_approved_at else None
+        )
         survey.display_survey_dates_approved_at = (
             survey.survey_dates_approved_at + ist_offset
             if survey.survey_dates_approved_at else None

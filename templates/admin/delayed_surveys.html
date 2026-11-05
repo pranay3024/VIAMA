@@ -210,6 +210,9 @@
                         <td>{{ survey.extracted_survey_end_date.strftime('%d/%m/%Y') if survey.extracted_survey_end_date else '-' }}</td>
                         <td>
                             <strong style="color:{{ 'green' if survey.survey_dates_approved else '#a33' }};">{{ 'YES' if survey.survey_dates_approved else 'NO' }}</strong>
+                            {% if survey.survey_dates_approved and survey.display_survey_dates_approved_at %}
+                                <br><small class="text-muted">{{ survey.display_survey_dates_approved_at.strftime('%A') }}<br>{{ survey.display_survey_dates_approved_at.strftime('%d %b %Y, %I:%M %p') }} IST</small>
+                            {% endif %}
                         </td>
                         <td><strong style="color:{{ 'green' if survey.survey_form_approved else '#a33' }};">{{ 'YES' if survey.survey_form_approved else 'NO' }}</strong></td>
                         <td>

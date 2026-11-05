@@ -736,11 +736,40 @@ def delayed_surveys():
     # ============================================================
     # Extract lists: section_no_CycleN for the rows an extract button picked
     # ============================================================
+    # Date filters on the emails sent. They narrow the table and the extract
+    # buttons to the surveys whose email went out on that IST day.
+    def _day_arg(name):
+        try:
+            return datetime.strptime(request.args.get(name, ""), "%Y-%m-%d").date()
+        except ValueError:
+            return None
+
+    raw_sent_on = _day_arg("raw_sent_date")
+    defect_sent_on = _day_arg("defect_sent_date")
+    if raw_sent_on:
+        delayed = [
+            s for s in delayed
+            if s.display_raw_video_email_sent_at
+            and s.display_raw_video_email_sent_at.date() == raw_sent_on
+        ]
+    if defect_sent_on:
+        delayed = [
+            s for s in delayed
+            if s.display_defect_report_email_sent_at
+            and s.display_defect_report_email_sent_at.date() == defect_sent_on
+        ]
+
     # The extract buttons fetch this as plain text and copy it, so the page
     # itself does not change.
     extract_kind = request.args.get("extract")
     if request.args.get("format") == "text" and extract_kind:
-        if extract_kind == "dates_pending":
+        if extract_kind == "raw_sent":
+            rows = [s for s in delayed if s.raw_video_email_sent_at]
+            lines = [f"{s.section_no}_Cycle{s.cycle_no}" for s in rows]
+        elif extract_kind == "defect_sent":
+            rows = [s for s in delayed if s.defect_report_email_sent_at]
+            lines = [f"{s.section_no}_Cycle{s.cycle_no}" for s in rows]
+        elif extract_kind == "dates_pending":
             rows = [s for s in delayed if not s.survey_dates_approved]
             lines = [f"{s.section_no}_Cycle{s.cycle_no}" for s in rows]
         elif extract_kind == "raw_no_form_email":
@@ -787,6 +816,8 @@ def delayed_surveys():
     return render_template(
         template,
         delayed_surveys=delayed,
+        raw_sent_date=request.args.get("raw_sent_date", ""),
+        defect_sent_date=request.args.get("defect_sent_date", ""),
         current_week_no=current_week_no,
         selected_week=selected_week,
         week_options=week_options,

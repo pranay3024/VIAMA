@@ -218,8 +218,7 @@ style="margin:0 0 10px 0;color:#555;font-size:14px;">
 ⏰ Uploaded at:
 
 <b>
-{{ pdf.uploaded_at.strftime('%d %b %Y, %I:%M %p')
-if pdf.uploaded_at else 'Not recorded' }}
+{{ pdf.uploaded_at|ist('%d %b %Y, %I:%M %p') if pdf.uploaded_at else 'Not recorded' }}
 </b>
 
 </p>

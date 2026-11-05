@@ -547,6 +547,17 @@ def ist_now_aware():
     return datetime.now(IST)
 
 
+def utc_to_ist(value):
+    """A stored naive UTC datetime as naive IST wall-clock, or ``None``."""
+    return value + IST_OFFSET if value else None
+
+
+def ist_date(utc_value):
+    """The IST calendar day of a stored naive UTC datetime, or ``None``."""
+    ist_value = utc_to_ist(utc_value)
+    return ist_value.date() if ist_value else None
+
+
 # ---------------------------------------------------------------------------
 # Week boundaries - two different conventions, deliberately kept apart
 # ---------------------------------------------------------------------------

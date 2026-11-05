@@ -145,7 +145,7 @@
                             {% else %}Waiting for approvals{% endif %}
                         {% endif %}
                     </td>
-                    <td>{{ survey.defect_report_sent_at.strftime('%d/%m/%Y') if survey.defect_report_sent_at else '-' }}</td>
+                    <td>{{ survey.defect_report_sent_at|ist('%d/%m/%Y') }}</td>
                     <td>{{ '%.0f%%'|format((survey.defect_report_sent_confidence or 0) * 100) }}</td>
                     <td style="color:red;font-weight:bold;">{{ survey.defect_report_delay_days if survey.defect_report_delay_days is not none else '-' }}</td>
                     <td>{{ survey.defect_report_match_status if survey.defect_report_match_status else '-' }}</td>
@@ -153,7 +153,7 @@
                         <form class="manual-form" method="post" action="{{ url_for('admin.manual_delayed_survey_update', survey_id=survey.id, week=selected_week, team=selected_team or None, state=selected_state or None, delay=selected_delay or None) }}">
                             <input type="date" name="manual_start_date" value="{{ survey.extracted_survey_start_date.isoformat() if survey.extracted_survey_start_date else '' }}" title="Manual survey start date">
                             <input type="date" name="manual_end_date" value="{{ survey.extracted_survey_end_date.isoformat() if survey.extracted_survey_end_date else '' }}" title="Manual survey end date">
-                            <input type="date" name="manual_sent_at" value="{{ survey.defect_report_sent_at.strftime('%Y-%m-%d') if survey.defect_report_sent_at else '' }}" title="Manual defect report sent date">
+                            <input type="date" name="manual_sent_at" value="{{ survey.defect_report_sent_at|ist('%Y-%m-%d') if survey.defect_report_sent_at else '' }}" title="Manual defect report sent date">
                             <button type="submit" class="aftab-action">Save</button>
                         </form>
                     </td>

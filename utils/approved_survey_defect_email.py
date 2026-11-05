@@ -4,10 +4,13 @@ import logging
 import time
 from datetime import datetime, timezone
 
-from core.config import current_week_number, week_of
+import pytz
+
+from core.config import current_week_number, ist_date, week_of
 from extensions import db
 from models.db_models import Survey
 from google_drive import get_cc_email
+from utils.defect_report_delay import defect_report_delay_days
 from utils.defect_report_api import (
     DefectReportUnavailable,
     download_defect_report,
@@ -140,10 +143,27 @@ def send_approved_survey_defect_email(survey_id, inventory=None):
             attachment_filename=report_filename,
             message_id=f"<viama-defect-report-{survey.id}@viama.local>",
         )
-        survey.defect_report_email_sent_at = datetime.now(
-            timezone.utc
-        ).replace(tzinfo=None)
+        sent_utc = datetime.now(timezone.utc).replace(tzinfo=None)
+        survey.defect_report_email_sent_at = sent_utc
         survey.defect_report_email_message_id = message_id
+        # The mail we sent is the defect-report record: its send time is the
+        # defect sent date (stored as UTC, like the Gmail value it replaces).
+        survey.defect_report_sent_at = sent_utc
+        survey.defect_report_sent_confidence = 1.0
+        survey.defect_report_email_id = message_id
+        if survey.extracted_survey_end_date:
+            survey.defect_report_delay_days = defect_report_delay_days(
+                survey.extracted_survey_end_date,
+                ist_date(sent_utc),
+            )
+        survey.defect_report_match_status = "matched"
+        # The Defect Report column (task2) follows the mail, as the survey-form
+        # mail does for Survey Form and Raw Video.
+        if not survey.task2_completed:
+            survey.task2_completed = True
+            survey.task2_completed_at = datetime.now(
+                pytz.timezone("Asia/Kolkata")
+            )
         db.session.commit()
         return "sent"
     except DefectReportUnavailable:

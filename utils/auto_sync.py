@@ -1,6 +1,7 @@
 import logging
 import threading
 
+from core.config import ist_date
 from extensions import db
 from models.db_models import Survey
 from google_drive import get_gmail
@@ -389,7 +390,7 @@ def _run_sync_defect_delay(app, survey_id):
             if survey.extracted_survey_end_date:
                 survey.defect_report_delay_days = defect_report_delay_days(
                     survey.extracted_survey_end_date,
-                    match["sent_at"].date(),
+                    ist_date(match["sent_at"]),
                 )
             else:
                 # No end date yet (extraction failed / not retried enough):

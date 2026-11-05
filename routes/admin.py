@@ -13,7 +13,7 @@ import pytz
 import logging
 from sqlalchemy import case, func
 from sqlalchemy.orm import defer
-from core.config import IST, stretch_key, stretch_key_expr
+from core.config import IST, ist_date, stretch_key, stretch_key_expr
 from models.db_models import Survey
 from models.db_models import User
 from flask import redirect
@@ -315,11 +315,14 @@ def delayed_surveys():
         try:
             gmail = get_gmail()
 
+            # Surveys whose defect mail the system sent already carry their
+            # own sent date, so the Gmail scan leaves them alone.
             eligible_surveys = Survey.query.filter(
                 Survey.survey_form_completed.is_(True),
                 Survey.task1_completed.is_(True),
                 Survey.task2_completed.is_(True),
                 Survey.end_survey_pdf.isnot(None),
+                Survey.defect_report_email_sent_at.is_(None),
             ).all()
 
             email_index = build_defect_email_index(gmail)
@@ -380,7 +383,7 @@ def delayed_surveys():
 
                     survey.defect_report_delay_days = defect_report_delay_days(
                         survey.extracted_survey_end_date,
-                        match["sent_at"].date(),
+                        ist_date(match["sent_at"]),
                     )
 
                     survey.defect_report_match_status = "matched"
@@ -797,7 +800,7 @@ def delayed_surveys():
                     if s.extracted_survey_end_date else "-",
                     s.display_video_upload_time.strftime("%d/%m/%Y %I:%M %p")
                     if s.display_video_upload_time else "-",
-                    s.defect_report_sent_at.strftime("%d/%m/%Y")
+                    ist_date(s.defect_report_sent_at).strftime("%d/%m/%Y")
                     if s.defect_report_sent_at else "-",
                 ]))
         else:

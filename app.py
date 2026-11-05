@@ -20,6 +20,14 @@ def create_app():
 
     app.config.from_object("config.Config")
 
+    from core.config import utc_to_ist
+
+    @app.template_filter("ist")
+    def _ist_filter(value, fmt="%d %b %Y, %I:%M %p"):
+        """Show a stored naive UTC datetime as IST, so every page reads the same."""
+        ist_value = utc_to_ist(value)
+        return ist_value.strftime(fmt) if ist_value else "-"
+
     # `app.secret_key` used to be reassigned here to the literal "viama_secret",
     # which silently overrode whatever config.Config computed. The key now comes
     # from SECRET_KEY via config.Config and this line is deliberately gone.

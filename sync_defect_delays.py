@@ -21,6 +21,7 @@ from googleapiclient.errors import HttpError
 load_dotenv()
 
 from app import create_app
+from core.config import ist_date
 from extensions import db
 from google_drive import get_gmail
 from gemini_utils import extract_survey_form_fields_from_drive, apply_survey_form_fields
@@ -127,6 +128,7 @@ def sync_batch(args):
             Survey.task2_completed.is_(True),
             Survey.end_survey_pdf.isnot(None),
             Survey.start_time >= from_date,
+            Survey.defect_report_email_sent_at.is_(None),
         ).order_by(Survey.id.asc())
 
         if week_end is not None:
@@ -195,7 +197,7 @@ def sync_batch(args):
                     survey.defect_report_email_id = match["message_id"]
                     survey.defect_report_delay_days = defect_report_delay_days(
                         survey.extracted_survey_end_date,
-                        match["sent_at"].date(),
+                        ist_date(match["sent_at"]),
                     )
                     survey.defect_report_match_status = "matched"
                     counts["matched"] += 1

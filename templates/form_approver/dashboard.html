@@ -318,6 +318,8 @@
 
 <th style="min-width:160px;">Status</th>
 
+<th>Raw<br>Excel<br>Received</th>
+<th>Survey Form<br>Sent</th>
 <th>Survey<br>Form</th>
 
 <th>Raw<br>Video</th>
@@ -631,6 +633,29 @@
     {% endif %}
 
 </td>
+
+    <td>
+{% if survey.raw_excel_received %}
+<strong style="color:green;">YES</strong>
+{% else %}
+<strong style="color:#a33;">NO</strong>
+{% endif %}
+    </td>
+
+    <td>
+{% if survey.raw_video_email_sent_at %}
+<strong style="color:green;">Sent</strong>
+<br>
+<small>
+{{ survey.display_survey_form_sent_at.strftime('%d %b %Y') }}<br>
+{{ survey.display_survey_form_sent_at.strftime('%I:%M %p') }} IST
+</small>
+{% elif survey.raw_excel_received %}
+<strong style="color:#b45309;">Pending approval</strong>
+{% else %}
+<span>-</span>
+{% endif %}
+    </td>
 
     <td>
 

@@ -300,9 +300,38 @@ def dashboard():
         Survey.id.desc(),
     ).all()
 
+    # Raw Excel Received: the file is in the RoadVision raw-XLSX list for this
+    # stretch and cycle, or it was already stamped as received.
+    try:
+        from utils.raw_xlsx import list_raw_xlsx_files, raw_xlsx_is_listed
+
+        raw_files = list_raw_xlsx_files()
+    except Exception:
+        raw_files = []
+        raw_xlsx_is_listed = None
+
     for survey in all_surveys:
 
         survey.scheduled_day = survey.survey_day
+
+        survey.raw_excel_received = bool(
+            (
+                raw_xlsx_is_listed(
+                    survey.section_no,
+                    survey.upc_code,
+                    survey.cycle_no,
+                    survey.survey_type,
+                    raw_files,
+                )
+                if raw_xlsx_is_listed
+                else False
+            )
+            or survey.raw_video_received_at
+        )
+        survey.display_survey_form_sent_at = (
+            survey.raw_video_email_sent_at + _IST_OFFSET
+            if survey.raw_video_email_sent_at else None
+        )
 
         if (
             survey.captain_status in ["rescheduled", "cancelled"]

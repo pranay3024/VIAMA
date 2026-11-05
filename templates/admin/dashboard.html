@@ -862,12 +862,9 @@ onclick="clearFilters()">
 <th>Upload<br>Duration</th> -->
 
 <th>Raw<br>Excel<br>Received</th>
+<th>Mail 1<br>Survey Form Sent</th>
 <th>Defect<br>Report<br>Received</th>
-<th>Survey<br>Form</th>
-
-<th>Raw<br>Video</th>
-
-<th>Defect<br>Report</th>
+<th>Mail 2<br>Defect Report Sent</th>
 
 <th>
     Road Vision
@@ -1435,6 +1432,18 @@ onclick="clearFilters()">
     </td>
 
     <td>
+{% if survey.raw_video_email_sent_at %}
+<strong style="color:green;">Sent</strong>
+<br><small>
+{{ survey.display_survey_form_sent_at.strftime('%d %b %Y') }}<br>
+{{ survey.display_survey_form_sent_at.strftime('%I:%M %p') }} IST
+</small>
+{% else %}
+<strong style="color:#a33;">NO</strong>
+{% endif %}
+    </td>
+
+    <td>
 {% if survey.defect_excel_received %}
 <strong style="color:green;">YES</strong>
 {% else %}
@@ -1443,69 +1452,15 @@ onclick="clearFilters()">
     </td>
 
     <td>
-
-{% if survey.survey_form_completed %}
-
- YES
-
-{% if survey.display_survey_form_completed_at %}
-<br>
-<small>
-{{ survey.display_survey_form_completed_at.strftime('%d %b %Y') }}<br>
-{{ survey.display_survey_form_completed_at.strftime('%I:%M %p') }}
+{% if survey.defect_report_email_sent_at %}
+<strong style="color:green;">Sent</strong>
+<br><small>
+{{ survey.display_defect_mail_sent_at.strftime('%d %b %Y') }}<br>
+{{ survey.display_defect_mail_sent_at.strftime('%I:%M %p') }} IST
 </small>
-{% endif %}
-
 {% else %}
-
- NO
-
+<strong style="color:#a33;">NO</strong>
 {% endif %}
-
-    </td>
-
-    <td>
-
-{% if survey.task1_completed %}
-
- YES
-
-{% if survey.display_task1_completed_at %}
-<br>
-<small>
-{{ survey.display_task1_completed_at.strftime('%d %b %Y') }}<br>
-{{ survey.display_task1_completed_at.strftime('%I:%M %p') }}
-</small>
-{% endif %}
-
-{% else %}
-
- NO
-
-{% endif %}
-
-    </td>
-
-    <td>
-
-{% if survey.task2_completed %}
-
- YES
-
-{% if survey.display_task2_completed_at %}
-<br>
-<small>
-{{ survey.display_task2_completed_at.strftime('%d %b %Y') }}<br>
-{{ survey.display_task2_completed_at.strftime('%I:%M %p') }}
-</small>
-{% endif %}
-
-{% else %}
-
- NO
-
-{% endif %}
-
     </td>
 
     <!-- ROADVISION -->
@@ -2362,9 +2317,10 @@ function exportDashboardToExcel() {
     // 7  Video Upload Time
     // 8  Bucket Video Upload Time
     // 9  Status
-    // 10 Survey Form
-    // 11 Raw Video
-    // 12 Defect Report
+    // 10 Raw Excel Received
+    // 11 Mail 1 Survey Form Sent
+    // 12 Defect Report Received
+    // 13 Mail 2 Defect Report Sent
     //
     // Road Vision, RV Remark and Details
     // are intentionally NOT exported.
@@ -2381,9 +2337,10 @@ function exportDashboardToExcel() {
         "Video Upload Time",
         "Bucket Video Upload Time",
         "Status",
-        "Survey Form",
-        "Raw Video",
-        "Defect Report"
+        "Raw Excel Received",
+        "Mail 1 Survey Form Sent",
+        "Defect Report Received",
+        "Mail 2 Defect Report Sent"
     ];
 
     const workbook = new ExcelJS.Workbook();
@@ -2415,13 +2372,13 @@ function exportDashboardToExcel() {
             row.querySelectorAll("td")
         );
 
-        if (cells.length < 13) {
+        if (cells.length < 14) {
             return;
         }
 
         const values = [];
 
-        for (let i = 0; i < 13; i++) {
+        for (let i = 0; i < 14; i++) {
 
             values.push(cells[i]
                 .innerText

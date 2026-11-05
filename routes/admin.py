@@ -1728,6 +1728,14 @@ def admin_dashboard():
             _raw_xlsx_label_for_survey(survey, dashboard_raw_files)
             or survey.raw_video_received_at
         )
+        survey.display_survey_form_sent_at = (
+            survey.raw_video_email_sent_at + ist_offset
+            if survey.raw_video_email_sent_at else None
+        )
+        survey.display_defect_mail_sent_at = (
+            survey.defect_report_email_sent_at + ist_offset
+            if survey.defect_report_email_sent_at else None
+        )
         survey.defect_excel_received = bool(
             (
                 find_defect_report_file(

@@ -786,7 +786,10 @@ def delayed_surveys():
     # itself does not change.
     extract_kind = request.args.get("extract")
     if request.args.get("format") == "text" and extract_kind:
-        if extract_kind == "raw_sent":
+        if extract_kind == "filtered":
+            rows = list(delayed)
+            lines = [f"{s.section_no}_Cycle{s.cycle_no}" for s in rows]
+        elif extract_kind == "raw_sent":
             rows = [s for s in delayed if s.raw_video_email_sent_at]
             lines = [f"{s.section_no}_Cycle{s.cycle_no}" for s in rows]
         elif extract_kind == "defect_sent":

@@ -419,6 +419,14 @@ class ApprovedSurveyEmailTests(unittest.TestCase):
             defect_api.find_defect_report_file("124", "124", 3, "Day", files)
         )
 
+    def test_defect_inventory_matches_a_section_written_with_ampersand(self):
+        files = [{"label": "8", "cycle": 4, "dn": "night"}]
+
+        self.assertEqual(
+            defect_api.find_defect_report_file("8 & 9", "N/08089/01001/UP", 4, "Day", files),
+            files[0],
+        )
+
     def test_graph_sender_uses_app_token_and_both_attachments(self):
         token_response = MagicMock()
         token_response.json.return_value = {"access_token": "test-access-token"}

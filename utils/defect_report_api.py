@@ -7,6 +7,8 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
+from utils.raw_xlsx import stretch_labels
+
 
 API_URL = "https://gis.roadvision.ai/api/defect-report"
 LIST_API_URL = f"{API_URL}/list"
@@ -57,11 +59,9 @@ def find_defect_report_file(section_no, upc_code, cycle_no, survey_type, files):
     if cycle_no is None:
         return None
 
-    identifiers = {
-        re.sub(r"[^A-Za-z0-9]", "", str(value or "")).casefold()
-        for value in (section_no, upc_code)
-    }
-    identifiers.discard("")
+    # A section such as "8 & 9" is also listed by each of its parts ("8", "9"),
+    # so every label the stretch can go by is a valid identifier.
+    identifiers = {label.casefold() for label in stretch_labels(section_no, upc_code)}
     if not identifiers:
         return None
 

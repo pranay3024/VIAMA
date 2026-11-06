@@ -36,7 +36,16 @@ class Config:
     "pool_pre_ping": os.getenv(
         "SQLALCHEMY_POOL_PRE_PING", "true"
     ).strip().lower() not in ("0", "false", "no"),
+    # Supabase's pooler closes idle connections, and a connection that dies
+    # mid-request raises "SSL SYSCALL error: EOF detected". Recycling pooled
+    # connections before that happens, and keeping TCP alive while idle,
+    # avoids most of those errors.
+    "pool_recycle": 240,
     "connect_args": {
-        "options": "-csearch_path=public"
+        "options": "-csearch_path=public",
+        "keepalives": 1,
+        "keepalives_idle": 30,
+        "keepalives_interval": 10,
+        "keepalives_count": 5,
     }
 }

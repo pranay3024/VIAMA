@@ -1814,10 +1814,9 @@ def admin_dashboard():
             if assignment else None
         )
 
-        # KM counts once Mail 1 (survey form) and Mail 2 (defect report) are sent.
+        # KM counts surveys whose status is completed.
         if (
-            survey.raw_video_email_sent_at
-            and survey.defect_report_email_sent_at
+            survey.status == "completed"
             and survey.state
         ):
             current_state_km[survey.state] = (
@@ -1978,8 +1977,7 @@ def admin_dashboard():
         )
         .filter(
             Survey.show_on_dashboard.is_(True),
-            Survey.raw_video_email_sent_at.isnot(None),
-            Survey.defect_report_email_sent_at.isnot(None),
+            Survey.status == "completed",
             Survey.state.isnot(None),
         )
         .group_by(Survey.state)

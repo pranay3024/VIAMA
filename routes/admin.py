@@ -11,7 +11,7 @@ from models.db_models import User
 from flask import session
 import pytz
 import logging
-from sqlalchemy import case, func
+from sqlalchemy import and_, case, func, or_
 from sqlalchemy.orm import defer
 from core.config import IST, ist_date, stretch_key, stretch_key_expr
 from models.db_models import Survey
@@ -866,6 +866,25 @@ def delayed_surveys():
     )
 
 from datetime import datetime
+
+
+# Week 20 starts on 02/11/2026. Surveys starting before it count for KM when
+# the team-leader flags are all set; from it on, when Mail 1 and Mail 2 are sent.
+KM_MAIL_CUTOFF = datetime(2026, 11, 2)
+
+
+def _km_counted(survey):
+    """Whether a survey's section length counts toward KM."""
+    if survey.start_time and survey.start_time < KM_MAIL_CUTOFF:
+        return bool(
+            survey.survey_form_completed
+            and survey.task1_completed
+            and survey.task2_completed
+        )
+    return bool(
+        survey.raw_video_email_sent_at
+        and survey.defect_report_email_sent_at
+    )
 
 
 def _ist_wall(value):
@@ -1814,11 +1833,7 @@ def admin_dashboard():
             if assignment else None
         )
 
-        # KM counts surveys whose status is completed.
-        if (
-            survey.status == "completed"
-            and survey.state
-        ):
+        if survey.state and _km_counted(survey):
             current_state_km[survey.state] = (
                 current_state_km.get(survey.state, 0)
                 + (survey.section_length or 0)
@@ -1977,8 +1992,23 @@ def admin_dashboard():
         )
         .filter(
             Survey.show_on_dashboard.is_(True),
-            Survey.status == "completed",
             Survey.state.isnot(None),
+            or_(
+                and_(
+                    Survey.start_time < KM_MAIL_CUTOFF,
+                    Survey.survey_form_completed.is_(True),
+                    Survey.task1_completed.is_(True),
+                    Survey.task2_completed.is_(True),
+                ),
+                and_(
+                    or_(
+                        Survey.start_time >= KM_MAIL_CUTOFF,
+                        Survey.start_time.is_(None),
+                    ),
+                    Survey.raw_video_email_sent_at.isnot(None),
+                    Survey.defect_report_email_sent_at.isnot(None),
+                ),
+            ),
         )
         .group_by(Survey.state)
         .all()

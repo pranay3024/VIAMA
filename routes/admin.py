@@ -200,9 +200,8 @@ def manual_delayed_survey_update(survey_id):
             ).date()
             survey.survey_end_date_confidence = 1.0
 
-        if start_date_value or end_date_value:
-            survey.survey_dates_approved = False
-            survey.survey_dates_approved_at = None
+        # A manual date correction keeps the dates approval as it was. Clearing
+        # it here used to turn an approved "Dates Approval" back to NO.
 
         if sent_at_value:
             survey.defect_report_sent_at = datetime.fromisoformat(

@@ -111,6 +111,8 @@ def send_approved_survey_defect_email(survey_id, inventory=None):
         db.session.rollback()
         return "waiting_for_defect_report"
 
+    claimed = False
+    sent = False
     try:
         report_bytes, report_filename = download_defect_report(
             report["label"],
@@ -130,6 +132,11 @@ def send_approved_survey_defect_email(survey_id, inventory=None):
             end_date,
             selected_week,
         )
+        # Record the send before calling Graph, so a failed save afterwards can
+        # never make the next pickup send the same mail again.
+        survey.defect_report_email_sent_at = datetime.now(timezone.utc).replace(tzinfo=None)
+        db.session.commit()
+        claimed = True
         message_id = send_microsoft_graph_email(
             to_email=TO_EMAIL,
             cc_emails=get_cc_email(survey.ro),
@@ -141,6 +148,7 @@ def send_approved_survey_defect_email(survey_id, inventory=None):
             attachment_filename=report_filename,
             message_id=f"<viama-defect-report-{survey.id}@viama.local>",
         )
+        sent = True
         sent_utc = datetime.now(timezone.utc).replace(tzinfo=None)
         survey.defect_report_email_sent_at = sent_utc
         survey.defect_report_email_message_id = message_id
@@ -166,6 +174,10 @@ def send_approved_survey_defect_email(survey_id, inventory=None):
         return "waiting_for_defect_report"
     except Exception:
         db.session.rollback()
+        if claimed and not sent:
+            # The mail never left: release the claim so a retry can send it.
+            survey.defect_report_email_sent_at = None
+            db.session.commit()
         raise
 
 

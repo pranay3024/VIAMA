@@ -104,6 +104,8 @@ def send_approved_survey_email(survey_id, inventory=None):
         db.session.rollback()
         return "waiting_for_raw_xlsx"
 
+    claimed = False
+    sent = False
     try:
         start_date = survey.extracted_survey_start_date.isoformat()
         end_date = survey.extracted_survey_end_date.isoformat()
@@ -127,6 +129,11 @@ def send_approved_survey_email(survey_id, inventory=None):
             survey.survey_type,
             inventory=inventory,
         )
+        # Record the send before calling Graph, so a failed save afterwards can
+        # never make the next pickup send the same mail again.
+        survey.raw_video_email_sent_at = datetime.now(timezone.utc).replace(tzinfo=None)
+        db.session.commit()
+        claimed = True
         message_id = send_microsoft_graph_email(
             to_email=TO_EMAIL,
             cc_emails=get_cc_email(survey.ro),
@@ -139,6 +146,7 @@ def send_approved_survey_email(survey_id, inventory=None):
             additional_attachments=[(raw_xlsx_bytes, raw_xlsx_filename)],
             message_id=f"<viama-survey-{survey.id}@viama.local>",
         )
+        sent = True
         survey.raw_video_email_sent_at = datetime.now(
             timezone.utc
         ).replace(tzinfo=None)
@@ -175,6 +183,10 @@ def send_approved_survey_email(survey_id, inventory=None):
         return "waiting_for_raw_xlsx"
     except Exception:
         db.session.rollback()
+        if claimed and not sent:
+            # The mail never left: release the claim so a retry can send it.
+            survey.raw_video_email_sent_at = None
+            db.session.commit()
         raise
 
 

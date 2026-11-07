@@ -849,6 +849,10 @@ def delayed_surveys():
             return current_app.response_class("", mimetype="text/plain")
         return current_app.response_class("\n".join(lines), mimetype="text/plain")
 
+    # Rows whose defect report is due today (or overdue) go to the top; the
+    # sort is stable, so the rest keep their existing order.
+    delayed = sorted(delayed, key=lambda s: not getattr(s, "defect_due_now", False))
+
     # ============================================================
     # Render page
     # ============================================================

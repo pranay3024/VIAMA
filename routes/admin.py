@@ -807,6 +807,13 @@ def delayed_surveys():
         elif extract_kind == "defect_sent":
             rows = [s for s in delayed if s.defect_report_email_sent_at]
             lines = [f"{s.section_no}_Cycle{s.cycle_no}" for s in rows]
+        elif extract_kind == "defect_recv_not_sent":
+            rows = [
+                s for s in delayed
+                if (s.defect_report_api_received or s.defect_report_received_at)
+                and not s.defect_report_email_sent_at
+            ]
+            lines = [f"{s.section_no}_Cycle{s.cycle_no}" for s in rows]
         elif extract_kind == "dates_pending":
             rows = [s for s in delayed if not s.survey_dates_approved]
             lines = [f"{s.section_no}_Cycle{s.cycle_no}" for s in rows]

@@ -127,6 +127,10 @@
                     <button type="button" class="tb-btn extract-btn" data-url="{{ url_for('admin.delayed_surveys', **dict(request.args, extract='raw_sent', format='text')) }}">Survey form email sent</button>
                     <button type="button" class="tb-btn extract-btn" data-url="{{ url_for('admin.delayed_surveys', **dict(request.args, extract='defect_sent', format='text')) }}">Defect report email sent</button>
                 </div>
+                <div class="tb-group-label" style="font-weight:800;color:#20333b;font-size:13px;text-transform:none;letter-spacing:0;">Defect report received but not sent</div>
+                <div class="tb-actions">
+                    <button type="button" class="tb-btn extract-btn" style="font-weight:700;" data-url="{{ url_for('admin.delayed_surveys', **dict(request.args, extract='defect_recv_not_sent', format='text')) }}">Defect report received but not sent</button>
+                </div>
             </section>
 
         </div>

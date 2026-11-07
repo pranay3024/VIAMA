@@ -44,6 +44,19 @@ def working_days_between(start_date, end_date):
 	return working_days
 
 
+def defect_report_deadline(end_date, allowed_days=3):
+	"""The last day the defect report can go out: the Nth Monday-Saturday after the end date."""
+	if not end_date:
+		return None
+	current = end_date
+	counted = 0
+	while counted < allowed_days:
+		current += timedelta(days=1)
+		if current.weekday() != 6:
+			counted += 1
+	return current
+
+
 def defect_report_delay_days(start_date, sent_date, allowed_days=3):
 	"""Return delay days after the allowed Monday-Saturday working days."""
 	return max(

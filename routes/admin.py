@@ -65,6 +65,7 @@ from utils.defect_report_delay import (
     find_defect_report_email,
     working_days_between,
     defect_report_delay_days,
+    defect_report_deadline,
 )
 from utils.video_upload_times import survey_match_report
 
@@ -686,7 +687,18 @@ def delayed_surveys():
     except Exception as exc:
         log.warning("could not record the RoadVision received timestamps: %s", exc)
 
+    today_ist = (datetime.utcnow() + ist_offset).date()
     for survey in delayed:
+        survey.defect_deadline = defect_report_deadline(
+            survey.extracted_survey_end_date
+        )
+        # Highlight when the defect report is due today or already overdue and
+        # has not been sent.
+        survey.defect_due_now = bool(
+            survey.defect_deadline
+            and not survey.defect_report_email_sent_at
+            and today_ist >= survey.defect_deadline
+        )
         survey.display_survey_form_approved_at = (
             survey.survey_form_approved_at + ist_offset
             if survey.survey_form_approved_at else None
@@ -806,7 +818,7 @@ def delayed_surveys():
             lines = [f"{s.section_no}_Cycle{s.cycle_no}" for s in rows]
         elif extract_kind == "delay_over_1":
             rows = [
-                s for s in delayed if (s.defect_report_delay_days or 0) > 1
+                s for s in delayed if (s.defect_report_delay_days or 0) >= 1
             ]
             lines = ["\t".join([
                 "Stretch_Cycle",

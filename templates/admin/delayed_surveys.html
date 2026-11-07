@@ -3,6 +3,25 @@
 <head>
     <title>Delayed Defect Reports</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}">
+    <style>
+        .tb-wrap { display: grid; gap: 14px; margin-bottom: 18px; }
+        .tb-panel { background: #fff; border: 1px solid #f1d0b1; border-radius: 10px; padding: 14px 16px; }
+        .tb-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 12px; font-weight: 700; color: #20333b; font-size: 15px; }
+        .tb-head small { font-weight: 500; color: #62747a; }
+        .tb-status { font-weight: 600; color: #c2410c; }
+        .tb-group-label { font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: #62747a; margin: 10px 0 6px; font-weight: 700; }
+        .tb-filters { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 0; }
+        .tb-dates { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; align-items: end; margin: 0; }
+        .tb-field { display: grid; gap: 6px; font-size: 13px; font-weight: 600; color: #42585f; }
+        .tb-field input { padding: 7px 8px; border: 1px solid #d8b995; border-radius: 4px; font: inherit; }
+        .tb-field-action { display: flex; align-items: end; }
+        .tb-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+        .tb-btn { border: 1px solid #ff7a00; background: #fff; color: #c2410c; border-radius: 4px; padding: 7px 12px; font: inherit; font-size: 13px; font-weight: 650; cursor: pointer; }
+        .tb-btn:hover { background: #fff4e8; }
+        .tb-btn:focus-visible { outline: 2px solid #ff7a00; outline-offset: 2px; }
+        tr.tb-due td { background: #fee2e2 !important; color: #991b1b; }
+        .tb-due-text { color: #b91c1c; font-weight: 700; }
+    </style>
 </head>
 <body>
     <div class="top-navbar">
@@ -19,7 +38,11 @@
     </div>
 
     <div class="dashboard-content">
-        <form method="get" style="display:flex;align-items:center;gap:10px;margin-bottom:15px;flex-wrap:wrap;" id="filter-form">
+        <div class="tb-wrap">
+
+            <section class="tb-panel">
+                <div class="tb-head"><span>Filters</span></div>
+        <form method="get" class="tb-filters" id="filter-form">
             <label for="delay-week">Week</label>
             <select id="delay-week" name="week" onchange="this.form.submit()">
                 {% for week in week_options %}
@@ -62,37 +85,51 @@
             {% endif %}
             <a href="{{ url_for('admin.delayed_surveys') }}" class="search-btn">Clear Filters</a>
         </form>
+            </section>
 
-        <div style="display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin:12px 0;">
-            <button type="button" class="search-btn extract-btn" data-url="{{ url_for('admin.delayed_surveys', **dict(request.args, extract='filtered', format='text')) }}">Extract: All filtered rows</button>
-            <button type="button" class="search-btn extract-btn" data-url="{{ url_for('admin.delayed_surveys', **dict(request.args, extract='dates_pending', format='text')) }}">Extract: Dates approval pending</button>
-            <button type="button" class="search-btn extract-btn" data-url="{{ url_for('admin.delayed_surveys', **dict(request.args, extract='raw_no_form_email', format='text')) }}">Extract: Raw received, form email not sent</button>
-            <button type="button" class="search-btn extract-btn" data-header="1" data-url="{{ url_for('admin.delayed_surveys', **dict(request.args, extract='delay_over_1', format='text')) }}">Extract: Delay more than 1 day</button>
-            <span id="extractStatus" style="font-weight:bold;"></span>
+            <section class="tb-panel">
+                <div class="tb-head"><span>Date filters</span><small>Day in IST</small></div>
+                <form method="GET" class="tb-dates">
+                    {% for key, value in request.args.items() %}
+                        {% if key not in ('raw_sent_date', 'defect_sent_date', 'raw_received_date', 'defect_received_date', 'extract', 'format') %}
+                        <input type="hidden" name="{{ key }}" value="{{ value }}">
+                        {% endif %}
+                    {% endfor %}
+                    <label class="tb-field">Raw excel received on
+                        <input type="date" name="raw_received_date" value="{{ raw_received_date }}" onchange="this.form.submit()">
+                    </label>
+                    <label class="tb-field">Survey form email sent on
+                        <input type="date" name="raw_sent_date" value="{{ raw_sent_date }}" onchange="this.form.submit()">
+                    </label>
+                    <label class="tb-field">Defect report received on
+                        <input type="date" name="defect_received_date" value="{{ defect_received_date }}" onchange="this.form.submit()">
+                    </label>
+                    <label class="tb-field">Defect report email sent on
+                        <input type="date" name="defect_sent_date" value="{{ defect_sent_date }}" onchange="this.form.submit()">
+                    </label>
+                    <div class="tb-field tb-field-action">
+                        <button type="button" class="tb-btn" onclick="this.form.raw_sent_date.value='';this.form.defect_sent_date.value='';this.form.raw_received_date.value='';this.form.defect_received_date.value='';this.form.submit();">Clear dates</button>
+                    </div>
+                </form>
+            </section>
+
+            <section class="tb-panel">
+                <div class="tb-head"><span>Copy to clipboard</span><span id="extractStatus" class="tb-status"></span></div>
+                <div class="tb-group-label">Current filters</div>
+                <div class="tb-actions">
+                    <button type="button" class="tb-btn extract-btn" data-url="{{ url_for('admin.delayed_surveys', **dict(request.args, extract='filtered', format='text')) }}">All filtered rows</button>
+                    <button type="button" class="tb-btn extract-btn" data-header="1" data-url="{{ url_for('admin.delayed_surveys', **dict(request.args, extract='delay_over_1', format='text')) }}">Delay 1 day or more</button>
+                    <button type="button" class="tb-btn extract-btn" data-url="{{ url_for('admin.delayed_surveys', **dict(request.args, extract='dates_pending', format='text')) }}">Dates approval pending</button>
+                    <button type="button" class="tb-btn extract-btn" data-url="{{ url_for('admin.delayed_surveys', **dict(request.args, extract='raw_no_form_email', format='text')) }}">Raw received, form email not sent</button>
+                </div>
+                <div class="tb-group-label">Email dates</div>
+                <div class="tb-actions">
+                    <button type="button" class="tb-btn extract-btn" data-url="{{ url_for('admin.delayed_surveys', **dict(request.args, extract='raw_sent', format='text')) }}">Survey form email sent</button>
+                    <button type="button" class="tb-btn extract-btn" data-url="{{ url_for('admin.delayed_surveys', **dict(request.args, extract='defect_sent', format='text')) }}">Defect report email sent</button>
+                </div>
+            </section>
+
         </div>
-
-        <form method="GET" style="display:flex;flex-wrap:wrap;align-items:flex-end;gap:12px;margin:12px 0;">
-            {% for key, value in request.args.items() %}
-                {% if key not in ('raw_sent_date', 'defect_sent_date', 'raw_received_date', 'defect_received_date', 'extract', 'format') %}
-                <input type="hidden" name="{{ key }}" value="{{ value }}">
-                {% endif %}
-            {% endfor %}
-            <label>Raw excel received on
-                <input type="date" name="raw_received_date" value="{{ raw_received_date }}" onchange="this.form.submit()">
-            </label>
-            <label>Survey form email sent on
-                <input type="date" name="raw_sent_date" value="{{ raw_sent_date }}" onchange="this.form.submit()">
-            </label>
-            <label>Defect report received on
-                <input type="date" name="defect_received_date" value="{{ defect_received_date }}" onchange="this.form.submit()">
-            </label>
-            <label>Defect report email sent on
-                <input type="date" name="defect_sent_date" value="{{ defect_sent_date }}" onchange="this.form.submit()">
-            </label>
-            <button type="button" class="search-btn" onclick="this.form.raw_sent_date.value='';this.form.defect_sent_date.value='';this.form.raw_received_date.value='';this.form.defect_received_date.value='';this.form.submit();">Clear Dates</button>
-            <button type="button" class="search-btn extract-btn" data-url="{{ url_for('admin.delayed_surveys', **dict(request.args, extract='raw_sent', format='text')) }}">Extract: Survey form email sent</button>
-            <button type="button" class="search-btn extract-btn" data-url="{{ url_for('admin.delayed_surveys', **dict(request.args, extract='defect_sent', format='text')) }}">Extract: Defect report email sent</button>
-        </form>
 
         <script>
         (function () {
@@ -200,7 +237,7 @@
                 </thead>
                 <tbody>
                 {% for survey in delayed_surveys %}
-                    <tr>
+                    <tr class="{{ 'tb-due' if survey.defect_due_now else '' }}">
                         <td>{{ loop.index }}</td>
                         <td>{{ survey.upc_code or '-' }}</td>
                         <td>{{ survey.section_no }}_Cycle{{ survey.cycle_no }}</td>
@@ -276,6 +313,9 @@
                                 Ready to send
                             {% elif survey.raw_video_email_sent_at %}
                                 Waiting for report
+                                {% if survey.defect_deadline %}
+                                    <br><small class="{{ 'tb-due-text' if survey.defect_due_now else 'text-muted' }}">Last day {{ survey.defect_deadline.strftime('%d/%m/%Y') }}</small>
+                                {% endif %}
                             {% else %}
                                 Waiting for raw email
                             {% endif %}

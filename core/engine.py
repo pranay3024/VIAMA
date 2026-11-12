@@ -3536,7 +3536,7 @@ def auto_reschedule_unstarted_surveys(now=None, dry_run=False):
     loads, which are the common case, so every pass has to be a no-op when there
     is nothing new to do.  A second run finds the rows it just created and stops.
 
-    Set ``AUTO_RESCHEDULE=0`` to switch the whole thing off without a redeploy.
+    Off unless ``AUTO_RESCHEDULE=1`` is set; no redeploy is needed to change it.
     ``dry_run=True`` reports what it would create and writes nothing.
     """
     import os
@@ -3555,7 +3555,10 @@ def auto_reschedule_unstarted_surveys(now=None, dry_run=False):
     from extensions import db
     from models.db_models import Survey, SurveyAssignment
 
-    if os.getenv("AUTO_RESCHEDULE", "1").strip() in ("0", "false", "no", "off"):
+    # Off by default: captains now reschedule surveys themselves, and the
+    # reschedule notice is only sent for that. Set AUTO_RESCHEDULE=1 to turn
+    # the automatic rows back on.
+    if os.getenv("AUTO_RESCHEDULE", "0").strip() not in ("1", "true", "yes", "on"):
         return {
             "ran": False,
             "skipped": "disabled via AUTO_RESCHEDULE=0",

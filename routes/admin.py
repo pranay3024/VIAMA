@@ -852,6 +852,12 @@ def delayed_surveys():
     # sort is stable, so the rest keep their existing order.
     delayed = sorted(delayed, key=lambda s: not getattr(s, "defect_due_now", False))
 
+    # Aftab works through the dates first, so surveys whose dates are not yet
+    # approved go above the approved ones. Stable, so the order inside each
+    # group is unchanged.
+    if user_role == "aftab":
+        delayed = sorted(delayed, key=lambda s: bool(s.survey_dates_approved))
+
     # ============================================================
     # Render page
     # ============================================================

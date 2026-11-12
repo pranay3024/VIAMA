@@ -1,7 +1,7 @@
 """Email the reschedule notice to the NHAI teams when a captain reschedules a survey.
 
-The body follows the reason the captain typed in the portal. Each reason keyword
-has its own sentence; anything without a keyword gets the generic sentence.
+The body is a short notice followed by the project details, which include the
+reason the captain saved in the portal.
 
 Recipients: To is the fixed dashcam pair plus the survey's PIU; CC is the RO of
 the stretch. For local testing set ``RESCHEDULE_TEST_TO`` and every notice goes
@@ -25,27 +25,8 @@ from utils.microsoft_graph_mail import (
 
 log = logging.getLogger(__name__)
 
-#: (keyword in the portal reason, sentence describing it). First match wins.
-REASON_SENTENCES = (
-    (
-        "accident",
-        "could not be conducted due to an unfortunate accident involving the Captain.",
-    ),
-)
-
-GENERIC_REASON_SENTENCE = "could not be conducted due to the following reason: {reason}."
-
-
 def build_subject(survey):
     return f"Rescheduling of Survey – UPC: {survey.upc_code}"
-
-
-def _reason_sentence(reason):
-    lowered = (reason or "").casefold()
-    for keyword, sentence in REASON_SENTENCES:
-        if keyword in lowered:
-            return sentence
-    return GENERIC_REASON_SENTENCE.format(reason=html.escape(reason or "-"))
 
 
 def _saved_reason(survey):
@@ -55,14 +36,11 @@ def _saved_reason(survey):
 
 def build_body(survey):
     reason = _saved_reason(survey)
-    survey_kind = "night survey" if (survey.survey_type or "").strip().casefold() == "night" else "survey"
     length = f"{survey.section_length:.2f} km" if survey.section_length else "-"
     day = survey.survey_day or "-"
     return f"""
 <p>Dear Sir,</p>
-<p>This is with reference to the previously scheduled {survey_kind} for the below-mentioned project.</p>
-<p>We would like to inform you that the {survey_kind} scheduled for last week {_reason_sentence(reason)}</p>
-<p>The same survey cycle will be conducted during the current week as per the planned schedule.</p>
+<p>Please note that the below mentioned survey is rescheduled. Details are provided below.</p>
 <p><b>Project Details:</b><br>
 Project Name: {html.escape(survey.stretch_code or '-')}<br>
 UPC: {html.escape(survey.upc_code or '-')}<br>

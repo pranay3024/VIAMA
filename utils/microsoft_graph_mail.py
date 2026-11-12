@@ -23,6 +23,23 @@ DEFAULT_MAILBOX = "projects9@adorpower.com"
 DEFAULT_DRAFT_TO = ("dashcamzone5@nhai.org", "dashcamcell@nhai.org")
 DEFAULT_DRAFT_BCC = ("teamleaderador@gmail.com",)
 
+#: State team inbox, copied on every automated mail for a stretch in that state.
+STATE_BCC = {
+    "UTTAR PRADESH": "dashcamup@gmail.com",
+    "JHARKHAND": "dashcamup@gmail.com",
+    "ODISHA": "dashcamodisha@gmail.com",
+    "WEST BENGAL": "dashcamwb@gmail.com",
+    "ASSAM": "dashcamassammeghalay@gmail.com",
+    "MEGHALAYA": "dashcamassammeghalay@gmail.com",
+    "BIHAR": "dashcambihar@gmail.com",
+}
+
+
+def state_bcc(state):
+    """The state team inbox for a survey's state, as a tuple (empty if none)."""
+    address = STATE_BCC.get((state or "").strip().upper())
+    return (address,) if address else ()
+
 
 def _raise_for_service_error(response, service_name):
     if response.ok:
@@ -160,7 +177,7 @@ def send_microsoft_graph_email(
     """Send an HTML email and its attachments from the configured M365 mailbox."""
     access_token = _graph_access_token()
 
-    attachments = [(attachment_bytes, attachment_filename)]
+    attachments = [(attachment_bytes, attachment_filename)] if attachment_bytes else []
     attachments.extend(additional_attachments or [])
     graph_attachments = []
     for content, filename in attachments:

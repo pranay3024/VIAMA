@@ -14,6 +14,7 @@ from utils.microsoft_graph_mail import (
     DEFAULT_DRAFT_BCC,
     DEFAULT_DRAFT_TO,
     send_microsoft_graph_email,
+    state_bcc,
 )
 from utils.raw_xlsx import (
     RawXlsxUnavailable,
@@ -137,7 +138,7 @@ def send_approved_survey_email(survey_id, inventory=None):
         message_id = send_microsoft_graph_email(
             to_email=TO_EMAIL,
             cc_emails=get_cc_email(survey.ro),
-            bcc_emails=DEFAULT_DRAFT_BCC,
+            bcc_emails=(*DEFAULT_DRAFT_BCC, *state_bcc(survey.state)),
             from_email=FROM_EMAIL,
             subject=subject,
             html_body=html_body,

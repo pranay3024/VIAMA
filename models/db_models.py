@@ -278,6 +278,7 @@ class Survey(db.Model):
     # Null means it has not arrived yet.
     raw_video_received_at = db.Column(db.DateTime, nullable=True)
     defect_report_email_sent_at = db.Column(db.DateTime, nullable=True)
+    reschedule_email_sent_at = db.Column(db.DateTime, nullable=True)
     defect_report_email_message_id = db.Column(db.String(255), nullable=True)
     # When the defect-report XLSX was first seen in the RoadVision inventory.
     defect_report_received_at = db.Column(db.DateTime, nullable=True)

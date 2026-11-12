@@ -2723,7 +2723,14 @@ def mark_rescheduled(assignment_id):
     # SAVE
     # =========================================================
 
+    # A new reschedule gets its own notice, so clear the sent-once claim first.
+    existing_survey.reschedule_email_sent_at = None
+
     db.session.commit()
+
+    from utils.reschedule_email import send_reschedule_email_safely
+
+    send_reschedule_email_safely(existing_survey)
 
 
     # =========================================================

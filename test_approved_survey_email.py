@@ -64,6 +64,7 @@ class ApprovedSurveyEmailTests(unittest.TestCase):
             cycle_no=1,
             stretch_code="Test Stretch",
             survey_type="Day",
+            state="UTTAR PRADESH",
             nh_number="NH-1",
             piu="PIU",
             ro="RO",

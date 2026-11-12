@@ -49,7 +49,7 @@ PIU: {html.escape(survey.piu or '-')}<br>
 Length: {length}<br>
 Original Schedule Day: {html.escape(day)}<br>
 Survey Schedule: This Week (As per Planned Schedule)<br>
-Reason for Cancellation: {html.escape(reason or '-')}</p>
+<b>Reason for Rescheduling: {html.escape(reason or '-')}</b></p>
 <p>This is for your information and necessary action.</p>
 <p>Regards,<br>Team Dashcam-Ador</p>
 """

@@ -317,11 +317,11 @@
                                 Ready to send
                             {% elif survey.raw_video_email_sent_at %}
                                 Waiting for report
-                                {% if survey.defect_deadline %}
-                                    <br><small class="{{ 'tb-due-text' if survey.defect_due_now else 'text-muted' }}">Last day {{ survey.defect_deadline.strftime('%d/%m/%Y') }}</small>
-                                {% endif %}
                             {% else %}
                                 Waiting for raw email
+                            {% endif %}
+                            {% if survey.defect_deadline and not survey.defect_report_email_sent_at %}
+                                <br><small class="{{ 'tb-due-text' if survey.defect_due_now else 'text-muted' }}">Last day {{ survey.defect_deadline.strftime('%d/%m/%Y') }}</small>
                             {% endif %}
                         </td>
                     </tr>

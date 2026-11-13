@@ -17,6 +17,7 @@ from extensions import db
 from google_drive import PIU_EMAIL_MAPPING, get_cc_email
 from models.db_models import Survey
 from utils.microsoft_graph_mail import (
+    DEFAULT_DRAFT_BCC,
     DEFAULT_DRAFT_TO,
     DEFAULT_MAILBOX,
     send_microsoft_graph_email,
@@ -64,7 +65,7 @@ def send_reschedule_email(survey):
         piu_email = PIU_EMAIL_MAPPING.get((survey.piu or "").strip(), "")
         to_email = ", ".join([*DEFAULT_DRAFT_TO, piu_email] if piu_email else DEFAULT_DRAFT_TO)
         cc_email = get_cc_email(survey.ro) or None
-        bcc_email = state_bcc(survey.state) or None
+        bcc_email = [*DEFAULT_DRAFT_BCC, *state_bcc(survey.state)] or None
 
     return send_microsoft_graph_email(
         to_email=to_email,

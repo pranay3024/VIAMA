@@ -95,6 +95,11 @@ def send_reschedule_email_safely(survey):
         if locked is None or locked.reschedule_email_sent_at:
             db.session.rollback()
             return "already_sent"
+        # Automatic reschedule rows have no reason yet. The notice waits until
+        # the captain has given one.
+        if not (locked.captain_status_reason or "").strip():
+            db.session.rollback()
+            return "no_reason"
         locked.reschedule_email_sent_at = datetime.now(timezone.utc).replace(tzinfo=None)
         db.session.commit()
     except Exception:

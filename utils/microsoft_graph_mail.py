@@ -226,3 +226,70 @@ def send_microsoft_graph_email(
         )
 
     return message_id or response.headers.get("request-id") or "accepted"
+
+
+def reply_all_microsoft_graph(from_email, message_id, html_body):
+    """Reply to all on an existing mail with an HTML body, staying in its thread.
+
+    Creates the reply-all draft (which carries the quoted thread), puts our HTML
+    above the quote, then sends it.
+    """
+    access_token = _graph_access_token()
+    headers = {"Authorization": f"Bearer {access_token}"}
+    base = f"{GRAPH_ROOT}/users/{quote(from_email, safe='')}/messages"
+
+    created = requests.post(
+        f"{base}/{quote(message_id, safe='')}/createReplyAll",
+        headers=headers,
+        timeout=DRAFT_TIMEOUT_SECONDS,
+    )
+    _raise_for_service_error(created, "Microsoft Graph createReplyAll")
+    draft = created.json()
+    draft_id = draft.get("id")
+    if not draft_id:
+        raise RuntimeError("Microsoft Graph createReplyAll returned no draft id")
+    quoted = (draft.get("body") or {}).get("content") or ""
+
+    updated = requests.patch(
+        f"{base}/{quote(draft_id, safe='')}",
+        headers=headers,
+        json={"body": {"contentType": "HTML", "content": html_body + quoted}},
+        timeout=DRAFT_TIMEOUT_SECONDS,
+    )
+    _raise_for_service_error(updated, "Microsoft Graph update reply draft")
+
+    sent = requests.post(
+        f"{base}/{quote(draft_id, safe='')}/send",
+        headers=headers,
+        timeout=SEND_TIMEOUT_SECONDS,
+    )
+    _raise_for_service_error(sent, "Microsoft Graph send reply")
+    if sent.status_code != 202:
+        raise RuntimeError(
+            f"Microsoft Graph returned unexpected reply send status {sent.status_code}"
+        )
+
+
+def find_sent_message_id(from_email, subject):
+    """Id of the newest sent mail with this subject, or None if it can't be read."""
+    try:
+        access_token = _graph_access_token()
+        response = requests.get(
+            f"{GRAPH_ROOT}/users/{quote(from_email, safe='')}/mailFolders/sentitems/messages",
+            headers={"Authorization": f"Bearer {access_token}"},
+            # Graph refuses a subject filter combined with a sort, so the newest
+            # match is picked here instead.
+            params={
+                "$filter": f"subject eq '{subject.replace(chr(39), chr(39) * 2)}'",
+                "$top": "25",
+                "$select": "id,sentDateTime",
+            },
+            timeout=DRAFT_TIMEOUT_SECONDS,
+        )
+        _raise_for_service_error(response, "Microsoft Graph sent items")
+        items = response.json().get("value") or []
+        newest = max(items, key=lambda item: item.get("sentDateTime") or "", default=None)
+        return newest["id"] if newest else None
+    except Exception:
+        return None
+

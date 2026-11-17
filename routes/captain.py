@@ -769,10 +769,15 @@ def select_stretch():
 
         return redirect("/survey-details")
 
+    ist_today = datetime.now(pytz.timezone("Asia/Kolkata")).date()
+    week_monday = ist_today - timedelta(days=ist_today.weekday())
+
     return render_template(
         "captain/select_stretch.html",
         user=user,
-        assignments=assignments
+        assignments=assignments,
+        reschedule_min=week_monday.isoformat(),
+        reschedule_max=(week_monday + timedelta(days=6)).isoformat(),
     )
 
    
@@ -2425,6 +2430,20 @@ def mark_rescheduled(assignment_id):
 
         return redirect("/select-stretch")
 
+    try:
+        reschedule_to = datetime.strptime(
+            request.form.get("reschedule_date", "").strip(),
+            "%Y-%m-%d"
+        ).date()
+    except ValueError:
+
+        flash(
+            "Reschedule date is mandatory (YYYY-MM-DD).",
+            "error"
+        )
+
+        return redirect("/select-stretch")
+
 
     # =========================================================
     # CURRENT WEEK
@@ -2480,6 +2499,20 @@ def mark_rescheduled(assignment_id):
     # If a survey row already exists this week,
     # update that SAME row.
     # =========================================================
+
+    # The rescheduled date must fall inside this week, so the notice only ever
+    # carries a date of that week.
+    if not (
+        week_start.date() <= reschedule_to < week_end.date()
+    ):
+
+        flash(
+            "The reschedule date must be within this week.",
+            "error"
+        )
+
+        return redirect("/select-stretch")
+
 
     existing_survey = Survey.query.filter(
 
@@ -2725,6 +2758,16 @@ def mark_rescheduled(assignment_id):
 
     # A new reschedule gets its own notice, so clear the sent-once claim first.
     existing_survey.reschedule_email_sent_at = None
+    existing_survey.reschedule_to_date = reschedule_to
+
+    # Keep every reschedule reason, so a later cancellation can list them all.
+    from models.db_models import RescheduleReason
+
+    db.session.add(RescheduleReason(
+        survey=existing_survey,
+        reason=reason,
+        rescheduled_to=reschedule_to,
+    ))
 
     db.session.commit()
 

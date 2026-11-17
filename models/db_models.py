@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from extensions import db
 
 class User(db.Model):
@@ -279,6 +281,11 @@ class Survey(db.Model):
     raw_video_received_at = db.Column(db.DateTime, nullable=True)
     defect_report_email_sent_at = db.Column(db.DateTime, nullable=True)
     reschedule_email_sent_at = db.Column(db.DateTime, nullable=True)
+    # The day the captain says the survey is rescheduled to.
+    reschedule_to_date = db.Column(db.Date, nullable=True)
+    # Graph id of the reschedule mail this survey's thread started with; later
+    # reschedules reply to it instead of starting a new mail.
+    reschedule_thread_message_id = db.Column(db.String(255), nullable=True)
     defect_report_email_message_id = db.Column(db.String(255), nullable=True)
     # When the defect-report XLSX was first seen in the RoadVision inventory.
     defect_report_received_at = db.Column(db.DateTime, nullable=True)
@@ -567,3 +574,21 @@ class MissedSurveyHistory(db.Model):
         db.DateTime,
         default=datetime.utcnow
     )
+
+
+class RescheduleReason(db.Model):
+    """Every reschedule a captain submits for a survey, with its reason and date."""
+
+    __tablename__ = "reschedule_reasons"
+
+    id = db.Column(db.Integer, primary_key=True)
+    survey_id = db.Column(
+        db.Integer,
+        db.ForeignKey("surveys.id"),
+        nullable=False,
+        index=True,
+    )
+    reason = db.Column(db.Text, nullable=False)
+    rescheduled_to = db.Column(db.Date, nullable=True)
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    survey = db.relationship("Survey")

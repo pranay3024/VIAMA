@@ -46,13 +46,16 @@ from flask import (
 
 from google_drive import (
     PIU_EMAIL_MAPPING,
-    create_gmail_draft,
     download_file_from_drive,
     get_cc_email,
     get_gmail,
 )
 
-from utils.microsoft_graph_mail import DEFAULT_DRAFT_BCC, DEFAULT_DRAFT_TO
+from utils.microsoft_graph_mail import (
+    DEFAULT_DRAFT_BCC,
+    DEFAULT_DRAFT_TO,
+    create_microsoft_graph_draft,
+)
 
 from utils.request_params import (
     safe_date,
@@ -3589,6 +3592,8 @@ def email_draft(email_type):
          return redirect(request.url)
 
         if selected_section.startswith("missed-"):
+         # Remember the survey's own cycle, so the cleanup after the draft can restore it.
+         original_cycle = survey.cycle_no
          survey.cycle_no = assignment.cycle_no
 
         elif selected_section.startswith("history-"):
@@ -3686,23 +3691,24 @@ def email_draft(email_type):
 
 
         try:
-            draft_id = create_gmail_draft(
+            draft_id = create_microsoft_graph_draft(
                 to_emails=DEFAULT_DRAFT_TO,
                 subject=subject,
                 html_body=email_html,
                 attachment_bytes=attachment_bytes,
                 attachment_filename=attachment_name,
+                from_email="projects9@adorpower.com",
                 cc_emails=cc_email,
                 bcc_emails=DEFAULT_DRAFT_BCC,
             )
         except Exception as exc:
             if is_missed:
                 survey.cycle_no = original_cycle
-            log.exception("Gmail draft creation failed")
+            log.exception("Outlook draft creation failed")
             flash(
                 (
-                    "Could not create the Gmail draft in "
-                    f"adordashcam@gmail.com: {exc}"
+                    "Could not create the Outlook draft in "
+                    f"projects9@adorpower.com: {exc}"
                 ),
                 "error",
             )
@@ -3718,7 +3724,7 @@ def email_draft(email_type):
             survey.cycle_no = original_cycle
 
         # --------------------------------------------------
-        # Open Gmail Draft
+        # Open Outlook Draft
         # --------------------------------------------------
 
 
@@ -3726,10 +3732,10 @@ def email_draft(email_type):
         flash(
             (
                 f"{survey.section_no}_Cycle{survey.cycle_no} "
-                f"Gmail draft created successfully.\n"
+                f"Outlook draft created successfully.\n"
                 f"The draft has been created in "
-                f"adordashcam@gmail.com. "
-                f"Please open Gmail → Drafts and send the email."
+                f"projects9@adorpower.com. "
+                f"Please open Outlook → Drafts and send the email."
             ),
             "success",
         )

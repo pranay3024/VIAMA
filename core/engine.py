@@ -3264,6 +3264,15 @@ def expire_rescheduled_surveys(now=None, dry_run=False):
             _sync_assignment_to_cancelled(survey, stamp)
 
         db.session.commit()
+
+        # Cancelled surveys that were rescheduled get the cancellation reply in
+        # their reschedule thread. Sent after the commit, so a failed mail cannot
+        # undo the cancellation.
+        from utils.reschedule_email import send_cancellation_thread_email_safely
+
+        for survey, _deadline in overdue:
+            send_cancellation_thread_email_safely(survey)
+
         result["ran"] = True
         result["cancelled_count"] = len(overdue)
         result["survey_ids"] = [s.id for s, _ in overdue]

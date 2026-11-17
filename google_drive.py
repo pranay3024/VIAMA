@@ -369,7 +369,7 @@ PIU_EMAIL_MAPPING = {
 
     "Madhubani": "piumadhubani@nhai.org",
 
-    "Malda": "malda@nhai.org",
+    "Malda": "pdpiumalda@yahoo.co.in",
 
     "Moradabad": "mor@nhai.org",
 

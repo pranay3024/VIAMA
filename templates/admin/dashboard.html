@@ -825,6 +825,16 @@ onclick="clearFilters()">
 
 </button>
 
+    <button
+    type="button"
+    class="search-btn"
+    onclick="copyAutoRescheduledExtract()"
+    >
+
+     Auto Rescheduled Extract
+
+</button>
+
 </div>
     </form>
     
@@ -897,6 +907,7 @@ onclick="clearFilters()">
     data-form-approved="{{ 'true' if survey.survey_form_approved else 'false' }}"
     data-status="{{ survey.status }}"
     data-cancelled-no-reason="{{ 'true' if survey.status == 'cancelled' and not (survey.captain_status_reason or '').strip() else 'false' }}"
+    data-rescheduled-no-reason="{{ 'true' if survey.status == 'rescheduled' and not (survey.captain_status_reason or '').strip() else 'false' }}"
     data-pdf-reupload="{{ 'true' if survey.pdf_reupload_required else 'false' }}"
     data-video-upload-time="{{ survey.display_video_upload_time.strftime('%d/%m/%Y %I:%M %p') if survey.display_video_upload_time else '' }}">
 
@@ -2231,6 +2242,45 @@ function copyPendingApprovalExtract() {
         })
         .catch(function() {
             alert("⚠️ Failed to copy pending approval extract.");
+        });
+}
+
+// Stretches the system auto-rescheduled that the captain has not given a reason
+// for yet, so they can be asked to reschedule them in the portal.
+function copyAutoRescheduledExtract() {
+
+    const rows = Array.from(
+        document.querySelectorAll("tr[data-stretch-cycle]")
+    );
+    const seen = {};
+    const labels = [];
+
+    rows.forEach(function (row) {
+        if (row.getAttribute("data-rescheduled-no-reason") !== "true") {
+            return;
+        }
+
+        const label = row.getAttribute("data-stretch-cycle");
+        if (!label || seen[label]) {
+            return;
+        }
+
+        seen[label] = true;
+        labels.push(label);
+    });
+
+    if (!labels.length) {
+        alert("No auto-rescheduled surveys waiting for a reason in this filter.");
+        return;
+    }
+
+    const output = "*Reschedule reason pending*" + String.fromCharCode(10, 10) + labels.join(String.fromCharCode(10));
+    navigator.clipboard.writeText(output)
+        .then(function() {
+            alert(labels.length + " auto-rescheduled stretch(es) copied!");
+        })
+        .catch(function() {
+            alert("⚠️ Failed to copy auto-rescheduled extract.");
         });
 }
 

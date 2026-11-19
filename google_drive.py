@@ -311,7 +311,7 @@ PIU_EMAIL_MAPPING = {
 
     "Bahraich": "piubahraich@gmail.com",
 
-    "Bareilly": "bareilly@nhai.org",
+    "Bareilly": "pdpiuraebareilly@nhai.org, pdpiuraebareilly@gmail.com",
 
     "Begusarai": "piubegusarai@nhai.org",
 

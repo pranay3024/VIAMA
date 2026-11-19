@@ -101,6 +101,57 @@ filename='css/regional.css') }}">
 
     word-break: break-word;
 }
+
+/* Reschedule form on auto-rescheduled rows */
+.reschedule-form { display:flex; flex-wrap:wrap; gap:6px; align-items:center; justify-content:center; }
+.reschedule-form input[type="text"],
+.reschedule-form input[type="date"] { padding:6px 8px; border:1px solid #d8b995; border-radius:6px; font:inherit; }
+.reschedule-btn { padding:7px 14px; border:none; border-radius:6px; background:#f59e0b; color:#fff; font-weight:700; cursor:pointer; }
+.reschedule-btn:hover { background:#d97706; }
+
+/* ================================
+   TABLE LAYOUT
+   One consistent grid: every cell is centred vertically, the header
+   stays on one line, and long text wraps instead of pushing columns.
+================================ */
+
+.table-wrapper {
+    width: 100%;
+    overflow-x: auto;
+}
+
+.survey-table {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: auto;
+}
+
+.survey-table thead th {
+    white-space: nowrap;
+    text-align: center;
+    vertical-align: middle;
+    padding: 12px 10px;
+    font-size: 13px;
+}
+
+.survey-table tbody td {
+    vertical-align: middle;
+    text-align: center;
+    padding: 12px 10px;
+    font-size: 13px;
+    line-height: 1.4;
+    border-bottom: 1px solid #f1e6da;
+}
+
+.survey-table tbody td:nth-child(2),
+.survey-table tbody td.captain-cell {
+    text-align: left;
+    word-break: break-word;
+}
+
+.survey-table tbody tr:hover td {
+    background: #fffaf5;
+}
     </style>
 
 <a href="/regional/schedules" class="view-btn">
@@ -139,6 +190,14 @@ filename='css/regional.css') }}">
 
 
 <div class="dashboard-content">
+{% with messages = get_flashed_messages(with_categories=true) %}
+{% for category, message in messages %}
+<div style="padding:10px 14px;border-radius:8px;margin-bottom:12px;font-weight:600;
+background:{{ '#dcfce7' if category == 'success' else '#fee2e2' }};color:{{ '#166534' if category == 'success' else '#991b1b' }};">
+{{ message }}
+</div>
+{% endfor %}
+{% endwith %}
 
     
 
@@ -749,6 +808,23 @@ Extract to Excel
                 </button>
 
             {% endif %}
+
+
+            {# Every rescheduled row can be rescheduled again; a repeat in the same
+               week replies in the reschedule thread. #}
+                <form method="POST"
+                action="{{ url_for('regional_bp.regional_reschedule_auto_row', survey_id=survey.id) }}"
+                class="reschedule-form"
+                style="flex-direction:column;align-items:stretch;">
+
+                    <input type="text" name="reason" placeholder="Reason" required>
+
+                    <input type="date" name="reschedule_date"
+                    min="{{ reschedule_min }}" max="{{ reschedule_max }}" required>
+
+                    <button type="submit" class="reschedule-btn">Reschedule</button>
+
+                </form>
 
         </div>
 

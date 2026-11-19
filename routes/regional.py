@@ -1,4 +1,4 @@
-﻿from flask import Blueprint, render_template, session, redirect, request, jsonify
+﻿from flask import Blueprint, render_template, session, redirect, request, jsonify, flash
 from datetime import datetime, timedelta
 from werkzeug.security import (
     check_password_hash,
@@ -526,6 +526,10 @@ def regional_dashboard():
         except Exception:
             pass
 
+    from utils.reschedule_service import current_week_bounds
+
+    reschedule_week_start, reschedule_week_end, _now = current_week_bounds()
+
     return render_template(
 
         "regional/dashboard.html",
@@ -538,6 +542,8 @@ def regional_dashboard():
 
         all_surveys=all_surveys,
         timedelta=timedelta,
+        reschedule_min=(reschedule_week_start.date().isoformat()),
+        reschedule_max=((reschedule_week_end.date() - timedelta(days=1)).isoformat()),
 
         states=states,
         captains=captains,
@@ -555,6 +561,83 @@ def regional_dashboard():
         survey_upload_password_updated_by=survey_upload_password_updated_by
 
     )
+
+
+def _regional_state_list():
+    user = User.query.get(session["user_id"])
+    manager_states = RegionalManagerState.query.filter_by(
+        manager_email=user.email
+    ).all()
+    return [row.state for row in manager_states]
+
+
+def _reschedule_from_regional(assignment, state_list):
+    """Shared by both regional reschedule buttons. Returns True when saved."""
+    from core.config import stretch_key
+    from utils.reschedule_service import (
+        RescheduleError,
+        apply_reschedule,
+        parse_reschedule_form,
+    )
+
+    if assignment is None or assignment.state not in state_list:
+        flash("That survey is not in your states.", "error")
+        return False
+
+    try:
+        reason, reschedule_to = parse_reschedule_form(request.form)
+        apply_reschedule(assignment, reason, reschedule_to)
+    except RescheduleError as exc:
+        flash(str(exc), "error")
+        return False
+
+    flash("Survey rescheduled. The reschedule notice has been sent.", "success")
+    return True
+
+
+@regional_bp.route("/regional/missed/<int:assignment_id>/reschedule", methods=["POST"])
+def regional_reschedule_missed(assignment_id):
+
+    if session.get("role") != "regional_manager":
+        return redirect("/")
+
+    assignment = SurveyAssignment.query.get_or_404(assignment_id)
+    if assignment.status != "missed":
+        flash("Only missed surveys can be rescheduled from here.", "error")
+        return redirect("/regional/missed")
+
+    _reschedule_from_regional(assignment, _regional_state_list())
+    return redirect(request.referrer or "/regional/missed")
+
+
+@regional_bp.route("/regional/survey/<int:survey_id>/reschedule", methods=["POST"])
+def regional_reschedule_auto_row(survey_id):
+    """Reschedule a row the system auto-rescheduled, which has no reason yet.
+
+    The row's assignment is the one with the same captain, state and stretch.
+    """
+
+    if session.get("role") != "regional_manager":
+        return redirect("/")
+
+    from core.config import stretch_key
+
+    survey = Survey.query.get_or_404(survey_id)
+    state_list = _regional_state_list()
+
+    assignment = SurveyAssignment.query.filter(
+        SurveyAssignment.captain_email == survey.captain_email,
+        SurveyAssignment.state == survey.state,
+    ).order_by(SurveyAssignment.id.desc()).all()
+    assignment = next(
+        (row for row in assignment
+         if stretch_key(row.section_no) == stretch_key(survey.section_no)),
+        None,
+    )
+
+    _reschedule_from_regional(assignment, state_list)
+    # Back to the same week and filters the admin was looking at.
+    return redirect(request.referrer or "/regional")
 
 
 @regional_bp.route("/regional/missed")
@@ -579,9 +662,15 @@ def regional_missed():
         SurveyAssignment.section_no
     ).all()
 
+    from utils.reschedule_service import current_week_bounds
+
+    week_start, week_end, _now = current_week_bounds()
+
     return render_template(
         "regional/missed.html",
-        missed_surveys=missed_surveys
+        missed_surveys=missed_surveys,
+        reschedule_min=week_start.date().isoformat(),
+        reschedule_max=(week_end.date() - timedelta(days=1)).isoformat(),
     )
 
 @regional_bp.route("/regional/schedules")

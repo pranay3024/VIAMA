@@ -35,6 +35,16 @@ class="logout-btn">
 
 <div class="dashboard-content">
 
+{% with messages = get_flashed_messages(with_categories=true) %}
+{% for category, message in messages %}
+<div class="flash-{{ category }}" style="padding:10px 14px;border-radius:8px;margin-bottom:12px;font-weight:600;
+background:{{ '#dcfce7' if category == 'success' else '#fee2e2' }};color:{{ '#166534' if category == 'success' else '#991b1b' }};">
+{{ message }}
+</div>
+{% endfor %}
+{% endwith %}
+
+
 <div class="table-wrapper">
 
 <table class="survey-table">
@@ -49,6 +59,7 @@ class="logout-btn">
 <th>Captain</th>
 <th>State</th>
 <th>Status</th>
+<th>Reschedule</th>
 
 </tr>
 
@@ -82,6 +93,23 @@ class="logout-btn">
 
 </td>
 
+<td>
+
+<form method="POST"
+action="{{ url_for('regional_bp.regional_reschedule_missed', assignment_id=assignment.id) }}"
+class="reschedule-form">
+
+<input type="text" name="reason" placeholder="Reason" required>
+
+<input type="date" name="reschedule_date"
+min="{{ reschedule_min }}" max="{{ reschedule_max }}" required>
+
+<button type="submit" class="reschedule-btn">Reschedule</button>
+
+</form>
+
+</td>
+
 </tr>
 
 {% endfor %}
@@ -93,3 +121,38 @@ class="logout-btn">
 </div>
 
 </div>
+
+<style>
+.reschedule-form {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: center;
+    justify-content: center;
+}
+.reschedule-form input[type="text"] {
+    min-width: 160px;
+    padding: 6px 8px;
+    border: 1px solid #d8b995;
+    border-radius: 6px;
+    font: inherit;
+}
+.reschedule-form input[type="date"] {
+    padding: 6px 8px;
+    border: 1px solid #d8b995;
+    border-radius: 6px;
+    font: inherit;
+}
+.reschedule-btn {
+    padding: 7px 14px;
+    border: none;
+    border-radius: 6px;
+    background: #f59e0b;
+    color: #fff;
+    font-weight: 700;
+    cursor: pointer;
+}
+.reschedule-btn:hover {
+    background: #d97706;
+}
+</style>

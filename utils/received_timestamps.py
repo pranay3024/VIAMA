@@ -99,6 +99,21 @@ def item_received_at(item):
     return parsed.astimezone(timezone.utc).replace(tzinfo=None)
 
 
+def _received_value(current, item, now):
+    """The received time to keep for a file.
+
+    A file that has never been stamped gets its upstream time (or ``now`` when
+    there is none). A stamped file moves forward when RoadVision has written
+    it again, so the date follows the file's latest update.
+    """
+    stamp = item_received_at(item)
+    if current is None:
+        return stamp or now
+    if stamp and stamp > current:
+        return stamp
+    return current
+
+
 def _now():
     return datetime.now(timezone.utc).replace(tzinfo=None)
 
@@ -157,8 +172,6 @@ def record_received_timestamps(inventories=None, limit=2000):
         Survey.query.filter(
             Survey.end_survey_pdf.isnot(None),
             (Survey.status.is_(None)) | (Survey.status != "cancelled"),
-            (Survey.raw_video_received_at.is_(None))
-            | (Survey.defect_report_received_at.is_(None)),
         )
         .limit(limit)
         .all()
@@ -168,7 +181,7 @@ def record_received_timestamps(inventories=None, limit=2000):
     changed = False
 
     for survey in surveys:
-        if raw_index and survey.raw_video_received_at is None:
+        if raw_index:
             raw_keys = survey_inventory_keys(
                 survey.section_no,
                 survey.upc_code,
@@ -178,11 +191,14 @@ def record_received_timestamps(inventories=None, limit=2000):
             )
             match = next((raw_index[key] for key in raw_keys if key in raw_index), None)
             if match is not None:
-                survey.raw_video_received_at = item_received_at(match) or now
-                summary["raw_video_stamped"] += 1
-                changed = True
+                new_value = _received_value(survey.raw_video_received_at, match, now)
+                if new_value != survey.raw_video_received_at:
+                    key = "raw_video_stamped" if survey.raw_video_received_at is None else "raw_video_restamped"
+                    summary[key] = summary.get(key, 0) + 1
+                    survey.raw_video_received_at = new_value
+                    changed = True
 
-        if defect_index and survey.defect_report_received_at is None:
+        if defect_index:
             keys = survey_inventory_keys(
                 survey.section_no,
                 survey.upc_code,
@@ -195,9 +211,12 @@ def record_received_timestamps(inventories=None, limit=2000):
                 None,
             )
             if match is not None:
-                survey.defect_report_received_at = item_received_at(match) or now
-                summary["defect_report_stamped"] += 1
-                changed = True
+                new_value = _received_value(survey.defect_report_received_at, match, now)
+                if new_value != survey.defect_report_received_at:
+                    key = "defect_report_stamped" if survey.defect_report_received_at is None else "defect_report_restamped"
+                    summary[key] = summary.get(key, 0) + 1
+                    survey.defect_report_received_at = new_value
+                    changed = True
 
     if changed:
         db.session.commit()

@@ -742,6 +742,10 @@ def delayed_surveys():
                 if survey.video_upload_time else None
             )
         )
+        survey.display_captain_video_upload_time = (
+            survey.video_upload_time + ist_offset
+            if survey.video_upload_time else None
+        )
 
     for survey in delayed:
         survey.display_defect_report_email_sent_at = (

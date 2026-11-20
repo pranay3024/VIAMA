@@ -29,6 +29,7 @@
         .manual-form input[type="date"] { box-sizing: border-box; width: 100%; min-width: 0; }
         .manual-form button { width: 100%; }
         .flash-line { margin-bottom: 10px; }
+        .aftab-table tr.row-missing-end td { background: #fee2e2; color: #991b1b; font-weight: 600; }
         @media (max-width: 700px) { .aftab-content { padding: 14px 10px 24px; } }
     </style>
 </head>
@@ -93,7 +94,7 @@
         <table class="aftab-table">
             <thead><tr>
                 <th>S.No.</th><th>UPC Code</th><th>Stretch / Cycle</th><th>Section Length (km)</th>
-                <th>Survey PDF</th><th>PDF Upload Time</th><th>End Time</th><th>Bucket Video Upload Time</th>
+                <th>Survey PDF</th><th>PDF Upload Time</th><th>End Time</th><th>Bucket Video Upload Time</th><th>Video Upload Time</th>
                 <th>Survey Start Date</th><th>Survey End Date</th><th>End Date Confidence</th><th>Dates Approval</th><th>Survey Form Approved</th>
                 <th>Survey Form Email</th><th>Original Defect Email Date (Gmail)</th><th>Gmail Sent Confidence</th>
                 <th>Working Days Delay</th><th>Match Status</th><th>Manual Correction</th><th>Raw Excel Received</th>
@@ -101,7 +102,7 @@
             </tr></thead>
             <tbody>
             {% for survey in delayed_surveys %}
-                <tr>
+                <tr class="{{ 'row-missing-end' if not survey.extracted_survey_end_date else '' }}">
                     <td>{{ loop.index }}</td>
                     <td>{{ survey.upc_code or '-' }}</td>
                     <td>{{ survey.section_no }}_Cycle{{ survey.cycle_no }}</td>
@@ -116,6 +117,7 @@
                             {{ survey.display_video_upload_time.strftime('%d/%m/%Y %I:%M %p') }}
                         {% else %}-{% endif %}
                     </td>
+                    <td>{{ survey.display_captain_video_upload_time.strftime('%d/%m/%Y %I:%M %p') if survey.display_captain_video_upload_time else '-' }}</td>
                     <td>{{ survey.extracted_survey_start_date.strftime('%d/%m/%Y') if survey.extracted_survey_start_date else '-' }}</td>
                     <td>{{ survey.extracted_survey_end_date.strftime('%d/%m/%Y') if survey.extracted_survey_end_date else '-' }}</td>
                     <td>{{ '%.0f%%'|format((survey.survey_end_date_confidence or 0) * 100) }}</td>
@@ -196,7 +198,7 @@
                     </td>
                 </tr>
             {% else %}
-                <tr><td colspan="22">No surveys with a survey form in Week {{ selected_week }}.</td></tr>
+                <tr><td colspan="23">No surveys with a survey form in Week {{ selected_week }}.</td></tr>
             {% endfor %}
             </tbody>
         </table>

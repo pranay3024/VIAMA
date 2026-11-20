@@ -855,9 +855,16 @@ def delayed_surveys():
             return current_app.response_class("", mimetype="text/plain")
         return current_app.response_class("\n".join(lines), mimetype="text/plain")
 
-    # Rows whose defect report is due today (or overdue) go to the top; the
-    # sort is stable, so the rest keep their existing order.
-    delayed = sorted(delayed, key=lambda s: not getattr(s, "defect_due_now", False))
+    # Highlighted rows go to the top: a defect report due today (or overdue),
+    # and a survey with no end date. The sort is stable, so the rest keep their
+    # existing order.
+    delayed = sorted(
+        delayed,
+        key=lambda s: not (
+            getattr(s, "defect_due_now", False)
+            or not s.extracted_survey_end_date
+        ),
+    )
 
     # Aftab works through the dates first, so surveys whose dates are not yet
     # approved go above the approved ones. Stable, so the order inside each

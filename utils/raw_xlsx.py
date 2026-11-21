@@ -41,7 +41,11 @@ def stretch_labels(*values):
     labels = set()
     for value in values:
         text = str(value or "")
-        for part in [text, *re.split(r"\s*&\s*", text)]:
+        # A combined UPC ("N/08086/01001/AS & N/02027/05010/AS") is one stretch
+        # that only matches a file for the whole combination, so it is not split.
+        # Plain section numbers ("7 & 33") are split, as before.
+        parts = [text] if "/" in text else re.split(r"\s*&\s*", text)
+        for part in [text, *parts]:
             label = re.sub(r"[^A-Za-z0-9]", "", part).upper()
             if label:
                 labels.add(label)

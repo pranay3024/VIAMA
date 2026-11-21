@@ -592,3 +592,14 @@ class RescheduleReason(db.Model):
     rescheduled_to = db.Column(db.Date, nullable=True)
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     survey = db.relationship("Survey")
+
+
+class AdminNote(db.Model):
+    """The notepad on the admin delayed-reports page: one note per admin login."""
+
+    __tablename__ = "admin_notes"
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, nullable=False, unique=True, index=True)
+    body = db.Column(db.Text, nullable=False, default="")
+    updated_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)

@@ -9,6 +9,7 @@ from models.db_models import (
 )
 from models.db_models import User
 from flask import session
+from flask import jsonify
 import pytz
 import logging
 from sqlalchemy import and_, case, func, or_
@@ -298,6 +299,34 @@ def approve_survey_dates(survey_id):
         state=request.form.get("state") or None,
         delay=request.form.get("delay") or None,
     ))
+
+
+@admin_bp.route("/admin/delayed-notepad", methods=["GET", "POST"])
+def delayed_notepad():
+    """The admin's notepad: GET returns the saved note, POST saves the new text."""
+    from models.db_models import AdminNote
+
+    if session.get("role") != "admin":
+        return jsonify({"error": "forbidden"}), 403
+
+    user_id = session.get("user_id")
+    note = AdminNote.query.filter_by(user_id=user_id).first()
+
+    if request.method == "GET":
+        return jsonify({"body": note.body if note else ""})
+
+    body = (request.get_json(silent=True) or {}).get("body", "")
+    if not isinstance(body, str):
+        return jsonify({"error": "body must be text"}), 400
+
+    if note is None:
+        note = AdminNote(user_id=user_id, body=body)
+        db.session.add(note)
+    else:
+        note.body = body
+        note.updated_at = datetime.utcnow()
+    db.session.commit()
+    return jsonify({"saved": True, "updated_at": note.updated_at.isoformat()})
 
 
 @admin_bp.route("/admin/delayed-surveys", methods=["GET", "POST"])

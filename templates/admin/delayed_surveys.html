@@ -403,5 +403,69 @@
             }
         })();
     </script>
+
+    <button type="button" id="notepadOpen"
+        style="position:fixed;right:20px;bottom:20px;z-index:900;padding:11px 18px;border:none;border-radius:24px;background:#ff7a00;color:#fff;font-weight:700;box-shadow:0 4px 14px rgba(0,0,0,.2);cursor:pointer;">
+        📝 Notepad
+    </button>
+
+    <div id="notepadPanel" style="display:none;position:fixed;right:20px;bottom:20px;z-index:950;width:340px;max-width:92vw;background:#fff;border:1px solid #f1d0b1;border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.25);">
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;border-bottom:1px solid #f1e6da;">
+            <span style="font-weight:700;color:#20333b;">Notepad</span>
+            <span id="notepadStatus" style="font-size:12px;color:#62747a;"></span>
+            <button type="button" id="notepadClose" aria-label="Save and close"
+                style="border:none;background:none;font-size:20px;line-height:1;cursor:pointer;color:#6b7280;">&times;</button>
+        </div>
+        <textarea id="notepadText" placeholder="Write a message..."
+            style="display:block;box-sizing:border-box;width:100%;height:240px;padding:12px 14px;border:none;outline:none;resize:vertical;font:inherit;font-size:14px;"></textarea>
+    </div>
+
+    <script>
+    (function () {
+        const panel = document.getElementById('notepadPanel');
+        const openBtn = document.getElementById('notepadOpen');
+        const closeBtn = document.getElementById('notepadClose');
+        const text = document.getElementById('notepadText');
+        const status = document.getElementById('notepadStatus');
+
+        openBtn.addEventListener('click', function () {
+            panel.style.display = 'block';
+            openBtn.style.display = 'none';
+            status.textContent = 'Loading...';
+            fetch('/admin/delayed-notepad', { credentials: 'same-origin' })
+                .then(function (r) {
+                    if (!r.ok) throw new Error('HTTP ' + r.status);
+                    return r.json();
+                })
+                .then(function (data) {
+                    text.value = data.body || '';
+                    status.textContent = '';
+                    text.focus();
+                })
+                .catch(function (err) {
+                    status.textContent = 'Could not load: ' + err.message;
+                });
+        });
+
+        closeBtn.addEventListener('click', function () {
+            status.textContent = 'Saving...';
+            fetch('/admin/delayed-notepad', {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ body: text.value })
+            })
+                .then(function (r) {
+                    if (!r.ok) throw new Error('HTTP ' + r.status);
+                    panel.style.display = 'none';
+                    openBtn.style.display = 'block';
+                    status.textContent = '';
+                })
+                .catch(function (err) {
+                    status.textContent = 'Not saved: ' + err.message;
+                });
+        });
+    })();
+    </script>
 </body>
 </html>

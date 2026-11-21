@@ -29,3 +29,4 @@ viama_portal/
 .vercel
 .DS_Store
 Thumbs.db
+.env*

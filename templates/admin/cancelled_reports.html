@@ -79,8 +79,10 @@
                         <td>{{ item.section_no or '-' }}</td>
                         <td>{{ item.upc_code or '-' }}</td>
                         <td class="reason-label">
-                            {% if item.reason %}
-                                {{ item.reason }}
+                            {% if item.reasons %}
+                                {% for reason in item.reasons %}
+                                    {{ loop.index }}. {{ reason }}{% if not loop.last %}<br>{% endif %}
+                                {% endfor %}
                             {% else %}
                                 <form class="reason-form" method="POST" action="{{ url_for('admin.update_cancelled_survey_reason', survey_id=item.id) }}">
                                     <input type="hidden" name="week" value="{{ selected_week }}">

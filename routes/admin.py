@@ -2892,19 +2892,36 @@ def cancelled_survey_report():
         Survey.start_time.desc().nullslast(),
         Survey.id.desc(),
     ).all()
+    # Every reschedule reason a survey was given, in order, so a survey that was
+    # rescheduled several times and then cancelled lists all of them.
+    from models.db_models import RescheduleReason
+
+    reason_history = {}
+    survey_ids = [survey.id for survey in surveys]
+    if survey_ids:
+        history_rows = RescheduleReason.query.filter(
+            RescheduleReason.survey_id.in_(survey_ids)
+        ).order_by(RescheduleReason.created_at.asc(), RescheduleReason.id.asc()).all()
+        for row in history_rows:
+            if (row.reason or "").strip():
+                reason_history.setdefault(row.survey_id, []).append(row.reason.strip())
+
     records = []
     for survey in surveys:
         week_no = None
         if survey.start_time:
             week_no = ((survey.start_time.date() - project_start.date()).days // 7) + 1
         team_key = team_for_state(survey.state)
+        reasons = reason_history.get(survey.id) or (
+            [survey.captain_status_reason.strip()] if (survey.captain_status_reason or "").strip() else []
+        )
         records.append({
             "id": survey.id,
             "week_no": week_no,
             "team": team_display(team_key) if team_key else (survey.state or "Unassigned"),
             "section_no": survey.section_no,
             "upc_code": survey.upc_code,
-            "reason": (survey.captain_status_reason or "").strip(),
+            "reasons": reasons,
             "recorded_at": survey.captain_status_updated_at or survey.start_time,
         })
 

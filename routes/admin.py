@@ -900,6 +900,8 @@ def delayed_surveys():
     # approved go above the approved ones. Stable, so the order inside each
     # group is unchanged.
     if user_role == "aftab":
+        # Ongoing surveys are not shown to Aftab; the admin page keeps them.
+        delayed = [s for s in delayed if s.status != "ongoing"]
         delayed = sorted(delayed, key=lambda s: bool(s.survey_dates_approved))
 
     # ============================================================

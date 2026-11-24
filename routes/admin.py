@@ -533,12 +533,16 @@ def delayed_surveys():
     # calculated from the already-extracted end date.
     from utils.visibility import exclude_deleted
 
+    # The same rows the admin dashboard shows, whether or not the survey form
+    # has been uploaded yet.
     delayed_query = exclude_deleted(Survey.query, Survey).filter(
-        Survey.end_survey_pdf.isnot(None),
+        Survey.show_on_dashboard.is_(True),
+        db.or_(
+            Survey.status != "pending",
+            Survey.captain_status.in_(["rescheduled", "cancelled"]),
+        ),
         Survey.start_time >= week_start,
         Survey.start_time < week_end,
-        Survey.status.isnot(None),
-        Survey.status != "cancelled",
     )
 
     if selected_team in team_states:

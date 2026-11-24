@@ -212,6 +212,7 @@ def dashboard():
     status = request.args.get("status", "").strip()
     section_no = request.args.get("section_no", "").strip()
     form_pending = request.args.get("form_pending", "").strip() == "1"
+    delayed_only = request.args.get("delayed_only", "").strip() == "1"
 
     # Preserved when the approve / reject buttons submit (hidden inputs).
     filter_args = {
@@ -235,7 +236,7 @@ def dashboard():
     # Week defaults to the current project week, exactly like the admin
     # dashboard: an explicit week wins, any other active filter with no week
     # means "all weeks", and the untouched default view shows the current week.
-    other_filters_applied = any([state, team, cycle, day, status, section_no, form_pending])
+    other_filters_applied = any([state, team, cycle, day, status, section_no, form_pending, delayed_only])
     if week:
         try:
             week_no = int(week)
@@ -339,6 +340,28 @@ def dashboard():
             survey for survey in all_surveys
             if survey.raw_excel_received and not survey.raw_video_email_sent_at
         ]
+
+    # A survey is delayed (red) when it has no end date, or its defect report is
+    # due today or overdue and has not gone out. Same rule as the admin page.
+    from core.config import ist_now
+    from utils.defect_report_delay import defect_report_deadline
+
+    today_ist = ist_now().date()
+    for survey in all_surveys:
+        deadline = defect_report_deadline(survey.extracted_survey_end_date)
+        survey.delayed_red = bool(
+            not survey.extracted_survey_end_date
+            or (
+                deadline
+                and survey.raw_video_email_sent_at
+                and not survey.defect_report_email_sent_at
+                and today_ist >= deadline
+            )
+        )
+
+    if delayed_only:
+        all_surveys = [survey for survey in all_surveys if survey.delayed_red]
+    all_surveys = sorted(all_surveys, key=lambda survey: not survey.delayed_red)
 
     for survey in all_surveys:
 

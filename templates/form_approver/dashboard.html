@@ -24,7 +24,8 @@
         .pending-forms-view { display: inline-block; padding: 7px 12px; border-radius: 4px; background: #ff7a00; color: #fff; font-weight: 650; text-decoration: none; white-space: nowrap; }
         .pending-forms-empty { padding: 24px 10px; color: #62747a; text-align: center; }
         @media (max-width: 600px) { .pending-forms-body { padding: 10px; } .pending-forms-table th, .pending-forms-table td { padding: 9px 7px; } }
-    </style>
+    tr.fa-delayed td { background:#fee2e2 !important; color:#991b1b; font-weight:600; }
+</style>
 
 </head>
 <body>
@@ -99,6 +100,13 @@
             {% if request.args.get("form_pending") == "1" %}checked{% endif %}
             onchange="this.form.submit()">
             Pending approval only
+        </label>
+
+        <label style="font-weight:bold;color:#dc2626;">
+            <input type="checkbox" name="delayed_only" value="1"
+            {% if request.args.get("delayed_only") == "1" %}checked{% endif %}
+            onchange="this.form.submit()">
+            Delayed only
         </label>
 
         <select name="state">
@@ -343,7 +351,7 @@
 
    {% for survey in all_surveys %}
 
-<tr>
+<tr class="{{ 'fa-delayed' if survey.delayed_red else '' }}">
 
     <td>{{ loop.index }}</td>
 

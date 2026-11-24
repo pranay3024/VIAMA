@@ -892,7 +892,7 @@ def delayed_surveys():
         delayed,
         key=lambda s: not (
             getattr(s, "defect_due_now", False)
-            or not s.extracted_survey_end_date
+            or (not s.extracted_survey_end_date and s.end_survey_pdf)
         ),
     )
 

@@ -533,14 +533,11 @@ def delayed_surveys():
     # calculated from the already-extracted end date.
     from utils.visibility import exclude_deleted
 
-    # The same rows the admin dashboard shows, whether or not the survey form
-    # has been uploaded yet.
+    # Surveys the admin dashboard shows, whether or not the survey form has been
+    # uploaded yet. Pending, cancelled and rescheduled rows are left out.
     delayed_query = exclude_deleted(Survey.query, Survey).filter(
         Survey.show_on_dashboard.is_(True),
-        db.or_(
-            Survey.status != "pending",
-            Survey.captain_status.in_(["rescheduled", "cancelled"]),
-        ),
+        Survey.status.notin_(["pending", "cancelled", "rescheduled"]),
         Survey.start_time >= week_start,
         Survey.start_time < week_end,
     )
@@ -2566,13 +2563,8 @@ def survey_details_admin(survey_id):
     pdf_version_rows = []
 
     for position, version in enumerate(survey_pdf_versions):
+        # Stored as UTC; the template converts it to IST once, with its ist filter.
         uploaded_at = version.uploaded_at
-
-        if uploaded_at:
-            uploaded_at = uploaded_at + timedelta(
-                hours=5,
-                minutes=30
-            )
 
         is_last = position == len(survey_pdf_versions) - 1
 
@@ -2595,7 +2587,7 @@ def survey_details_admin(survey_id):
                 "version_no": 1,
                 "is_reupload": False,
                 "url": survey.end_survey_pdf,
-                "uploaded_at": display_end_time,
+                "uploaded_at": survey.survey_pdf_uploaded_at,
                 "is_current": True,
                 "reupload_reason": None,
             }

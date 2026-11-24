@@ -29,7 +29,8 @@
         .manual-form input[type="date"] { box-sizing: border-box; width: 100%; min-width: 0; }
         .manual-form button { width: 100%; }
         .flash-line { margin-bottom: 10px; }
-        .aftab-table tr.row-missing-end td { background: #fee2e2; color: #991b1b; font-weight: 600; }
+        .aftab-table tr.row-no-form td { background: #fef9c3; color: #713f12; }
+        .aftab-table tr.row-delayed td { background: #fee2e2; color: #991b1b; font-weight: 600; }
         @media (max-width: 700px) { .aftab-content { padding: 14px 10px 24px; } }
     </style>
 </head>
@@ -102,7 +103,7 @@
             </tr></thead>
             <tbody>
             {% for survey in delayed_surveys %}
-                <tr class="{{ 'row-missing-end' if not survey.extracted_survey_end_date else '' }}">
+                <tr class="{{ 'row-no-form' if not survey.end_survey_pdf else ('row-delayed' if (survey.defect_due_now or not survey.extracted_survey_end_date) else '') }}">
                     <td>{{ loop.index }}</td>
                     <td>{{ survey.upc_code or '-' }}</td>
                     <td>{{ survey.section_no }}_Cycle{{ survey.cycle_no }}</td>

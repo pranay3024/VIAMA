@@ -387,7 +387,7 @@ PIU_EMAIL_MAPPING = {
 
     "Purulia": "piupurulia@nhai.org",
 
-    "Raebareli": "Email-pdpiuraebareilly@nhai.org",
+    "Raebareli": "pdpiuraebareilly@nhai.org",
 
     "Ranchi": "ranchi@nhai.org",
 

@@ -25,6 +25,7 @@
         .pending-forms-empty { padding: 24px 10px; color: #62747a; text-align: center; }
         @media (max-width: 600px) { .pending-forms-body { padding: 10px; } .pending-forms-table th, .pending-forms-table td { padding: 9px 7px; } }
     tr.fa-delayed td { background:#fee2e2 !important; color:#991b1b; font-weight:600; }
+tr.fa-no-form td { background:#fef9c3 !important; color:#713f12; }
 </style>
 
 </head>
@@ -351,7 +352,7 @@
 
    {% for survey in all_surveys %}
 
-<tr class="{{ 'fa-delayed' if survey.delayed_red else '' }}">
+<tr class="{{ 'fa-no-form' if survey.no_form else ('fa-delayed' if survey.delayed_red else '') }}">
 
     <td>{{ loop.index }}</td>
 

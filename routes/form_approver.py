@@ -302,6 +302,12 @@ def dashboard():
         Survey.id.desc(),
     ).all()
 
+    # Ongoing, rescheduled and cancelled surveys are not for the form approver.
+    all_surveys = [
+        survey for survey in all_surveys
+        if survey.status not in ("ongoing", "rescheduled", "cancelled")
+    ]
+
     # Raw Excel Received: the file is in the RoadVision raw-XLSX list for this
     # stretch and cycle, or it was already stamped as received.
     try:
@@ -349,13 +355,20 @@ def dashboard():
     today_ist = ist_now().date()
     for survey in all_surveys:
         deadline = defect_report_deadline(survey.extracted_survey_end_date)
+        # Yellow: no survey form uploaded yet (shown yellow, never red).
+        survey.no_form = not survey.end_survey_pdf
+        # Red: delayed. A form that is in but has no end date, or a defect report
+        # that is due today or overdue and has not gone out.
         survey.delayed_red = bool(
-            not survey.extracted_survey_end_date
-            or (
-                deadline
-                and survey.raw_video_email_sent_at
-                and not survey.defect_report_email_sent_at
-                and today_ist >= deadline
+            not survey.no_form
+            and (
+                not survey.extracted_survey_end_date
+                or (
+                    deadline
+                    and survey.raw_video_email_sent_at
+                    and not survey.defect_report_email_sent_at
+                    and today_ist >= deadline
+                )
             )
         )
 

@@ -534,10 +534,10 @@ def delayed_surveys():
     from utils.visibility import exclude_deleted
 
     # Surveys the admin dashboard shows, whether or not the survey form has been
-    # uploaded yet. Pending, cancelled and rescheduled rows are left out.
+    # uploaded yet. Pending, ongoing, cancelled and rescheduled rows are left out.
     delayed_query = exclude_deleted(Survey.query, Survey).filter(
         Survey.show_on_dashboard.is_(True),
-        Survey.status.notin_(["pending", "cancelled", "rescheduled"]),
+        Survey.status.notin_(["pending", "ongoing", "cancelled", "rescheduled"]),
         Survey.start_time >= week_start,
         Survey.start_time < week_end,
     )
@@ -900,8 +900,6 @@ def delayed_surveys():
     # approved go above the approved ones. Stable, so the order inside each
     # group is unchanged.
     if user_role == "aftab":
-        # Ongoing surveys are not shown to Aftab; the admin page keeps them.
-        delayed = [s for s in delayed if s.status != "ongoing"]
         delayed = sorted(delayed, key=lambda s: bool(s.survey_dates_approved))
 
     # ============================================================

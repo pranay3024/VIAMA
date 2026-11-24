@@ -542,8 +542,6 @@ def regional_dashboard():
 
         all_surveys=all_surveys,
         timedelta=timedelta,
-        reschedule_min=(reschedule_week_start.date().isoformat()),
-        reschedule_max=((reschedule_week_end.date() - timedelta(days=1)).isoformat()),
 
         states=states,
         captains=captains,
@@ -585,8 +583,8 @@ def _reschedule_from_regional(assignment, state_list):
         return False
 
     try:
-        reason, reschedule_to = parse_reschedule_form(request.form)
-        apply_reschedule(assignment, reason, reschedule_to)
+        reason = parse_reschedule_form(request.form)
+        apply_reschedule(assignment, reason)
     except RescheduleError as exc:
         flash(str(exc), "error")
         return False
@@ -669,8 +667,6 @@ def regional_missed():
     return render_template(
         "regional/missed.html",
         missed_surveys=missed_surveys,
-        reschedule_min=week_start.date().isoformat(),
-        reschedule_max=(week_end.date() - timedelta(days=1)).isoformat(),
     )
 
 @regional_bp.route("/regional/schedules")

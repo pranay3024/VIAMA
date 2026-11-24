@@ -46,9 +46,6 @@ def _saved_reason(survey):
 def build_body(survey):
     reason = _saved_reason(survey)
     length = f"{survey.section_length:.2f} km" if survey.section_length else "-"
-    rescheduled_on = (
-        survey.reschedule_to_date.strftime("%d/%m/%Y") if survey.reschedule_to_date else "-"
-    )
     day = survey.survey_day or "-"
     return f"""
 <p>Dear Sir,</p>
@@ -62,7 +59,7 @@ Length: {length}<br>
 Original Schedule Day: {html.escape(day)}<br>
 Survey Schedule: This Week (As per Planned Schedule)<br>
 <b>Reason for Rescheduling: {html.escape(reason or '-')}</b></p>
-<p><b>Rescheduled To: {rescheduled_on}</b></p>
+<p><b>Rescheduled To: until further notice</b></p>
 <p>This is for your information and necessary action.</p>
 <p>Regards,<br>Team Dashcam-Ador</p>
 """

@@ -774,15 +774,10 @@ def select_stretch():
 
         return redirect("/survey-details")
 
-    ist_today = datetime.now(pytz.timezone("Asia/Kolkata")).date()
-    week_monday = ist_today - timedelta(days=ist_today.weekday())
-
     return render_template(
         "captain/select_stretch.html",
         user=user,
         assignments=assignments,
-        reschedule_min=week_monday.isoformat(),
-        reschedule_max=(week_monday + timedelta(days=6)).isoformat(),
     )
 
    
@@ -2418,8 +2413,8 @@ def mark_rescheduled(assignment_id):
 
 
     try:
-        reason, reschedule_to = parse_reschedule_form(request.form)
-        apply_reschedule(assignment, reason, reschedule_to)
+        reason = parse_reschedule_form(request.form)
+        apply_reschedule(assignment, reason)
     except RescheduleError as exc:
 
         flash(

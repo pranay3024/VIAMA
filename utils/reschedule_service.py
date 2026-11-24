@@ -20,20 +20,11 @@ class RescheduleError(ValueError):
 
 
 def parse_reschedule_form(form):
-    """The reason and the date from a reschedule form, or RescheduleError."""
+    """The reason from a reschedule form, or RescheduleError."""
     reason = (form.get("reason", "") or "").strip()
     if not reason:
         raise RescheduleError("Reschedule reason is mandatory.")
-
-    try:
-        reschedule_to = datetime.strptime(
-            (form.get("reschedule_date", "") or "").strip(),
-            "%Y-%m-%d",
-        ).date()
-    except ValueError:
-        raise RescheduleError("Reschedule date is mandatory (YYYY-MM-DD).")
-
-    return reason, reschedule_to
+    return reason
 
 
 def current_week_bounds():
@@ -51,16 +42,13 @@ def current_week_bounds():
     )
 
 
-def apply_reschedule(assignment, reason, reschedule_to):
+def apply_reschedule(assignment, reason):
     """Save a reschedule for this assignment in the current week, then send its notice.
 
     Raises RescheduleError for a date outside the current week. Returns the
     survey row that was rescheduled.
     """
     week_start, week_end, now_db = current_week_bounds()
-
-    if not (week_start.date() <= reschedule_to < week_end.date()):
-        raise RescheduleError("The reschedule date must be within this week.")
 
     # The current week's row is the same row whatever its status, so a second
     # reschedule updates it rather than adding another row.
@@ -116,7 +104,7 @@ def apply_reschedule(assignment, reason, reschedule_to):
     existing_survey.show_on_dashboard = True
     existing_survey.show_in_teamleader_dashboard = True
     existing_survey.reschedule_email_sent_at = None
-    existing_survey.reschedule_to_date = reschedule_to
+    existing_survey.reschedule_to_date = None
 
     # The assignment leaves the missed list (missed becomes pending again).
     if assignment.status == "missed":
@@ -131,7 +119,7 @@ def apply_reschedule(assignment, reason, reschedule_to):
     db.session.add(RescheduleReason(
         survey=existing_survey,
         reason=reason,
-        rescheduled_to=reschedule_to,
+        rescheduled_to=None,
     ))
     db.session.commit()
 

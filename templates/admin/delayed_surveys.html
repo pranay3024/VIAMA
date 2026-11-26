@@ -310,7 +310,7 @@
                             {% else %}
                                 <strong style="color:#a33;">NO</strong>
                             {% endif %}
-                            {% if survey.display_defect_report_received_at %}
+                            {% if survey.defect_report_api_received and survey.display_defect_report_received_at %}
                                 <br><span class="text-muted">{{ survey.display_defect_report_received_at.strftime('%d/%m/%Y %I:%M %p') }} IST</span>
                             {% endif %}
                         </td>

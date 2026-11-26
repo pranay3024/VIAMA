@@ -678,7 +678,7 @@ def delayed_surveys():
         )
 
     defect_report_files = []
-    if any(survey.raw_video_email_sent_at for survey in delayed):
+    if delayed:
         try:
             from utils.defect_report_api import (
                 find_defect_report_file,
@@ -687,16 +687,12 @@ def delayed_surveys():
 
             defect_report_files = list_defect_report_files()
             for survey in delayed:
-                report = (
-                    find_defect_report_file(
-                        survey.section_no,
-                        survey.upc_code,
-                        survey.cycle_no,
-                        survey.survey_type,
-                        defect_report_files,
-                    )
-                    if survey.raw_video_email_sent_at
-                    else None
+                report = find_defect_report_file(
+                    survey.section_no,
+                    survey.upc_code,
+                    survey.cycle_no,
+                    survey.survey_type,
+                    defect_report_files,
                 )
                 survey.defect_report_api_label = report.get("label") if report else None
                 survey.defect_report_api_received = report is not None
@@ -844,7 +840,7 @@ def delayed_surveys():
         elif extract_kind == "defect_recv_not_sent":
             rows = [
                 s for s in delayed
-                if (getattr(s, "defect_report_api_received", False) or s.defect_report_received_at)
+                if getattr(s, "defect_report_api_received", False)
                 and not s.defect_report_email_sent_at
             ]
             lines = [f"{s.section_no}_Cycle{s.cycle_no}" for s in rows]
@@ -1861,7 +1857,6 @@ def admin_dashboard():
                 if find_defect_report_file
                 else None
             )
-            or survey.defect_report_received_at
         )
 
     for survey in all_surveys:

@@ -24,6 +24,7 @@ from utils.raw_xlsx import (
     RawXlsxUnavailable,
     list_raw_xlsx_files,
     normalise_dn,
+    normalise_label,
     stretch_labels,
 )
 
@@ -32,7 +33,7 @@ log = logging.getLogger(__name__)
 
 
 def _normalised_label(value):
-    return re.sub(r"[^A-Za-z0-9]", "", str(value or "")).upper()
+    return normalise_label(value)
 
 
 def build_inventory_index(files, by_shift=True):

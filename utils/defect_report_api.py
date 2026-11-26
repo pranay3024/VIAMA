@@ -7,7 +7,7 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
-from utils.raw_xlsx import stretch_labels
+from utils.raw_xlsx import normalise_label, stretch_labels
 
 
 API_URL = "https://gis.roadvision.ai/api/defect-report"
@@ -76,7 +76,7 @@ def find_defect_report_file(section_no, upc_code, cycle_no, survey_type, files):
             continue
 
         label = str(item.get("label") or "")
-        normalized_label = re.sub(r"[^A-Za-z0-9]", "", label).casefold()
+        normalized_label = normalise_label(label).casefold()
         if normalized_label in identifiers:
             return item
 

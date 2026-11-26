@@ -145,9 +145,9 @@ def _raw_xlsx_label_for_survey(survey, raw_files):
             continue
 
         label = str(raw_file.get("label") or "")
-        normalized_label = "".join(
-            character for character in label if character.isalnum()
-        ).casefold()
+        from utils.raw_xlsx import normalise_label
+
+        normalized_label = normalise_label(label).casefold()
         if normalized_label in identifiers:
             return label
     return None

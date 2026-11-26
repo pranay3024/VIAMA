@@ -31,6 +31,14 @@ def normalise_dn(value):
     return ""
 
 
+def normalise_label(value):
+    """A RoadVision or survey label in upper case, without spaces or punctuation.
+
+    The ampersand is kept: "3&4" and "34" are different stretches.
+    """
+    return re.sub(r"[^A-Za-z0-9&]", "", str(value or "")).upper()
+
+
 def stretch_labels(*values):
     """The upper-case labels a section or UPC can be known by in RoadVision.
 
@@ -46,7 +54,7 @@ def stretch_labels(*values):
         # Plain section numbers ("7 & 33") are split, as before.
         parts = [text] if "/" in text else re.split(r"\s*&\s*", text)
         for part in [text, *parts]:
-            label = re.sub(r"[^A-Za-z0-9]", "", part).upper()
+            label = normalise_label(part)
             if label:
                 labels.add(label)
     return labels
@@ -61,7 +69,7 @@ def raw_xlsx_item_matches(item, section_no, upc_code, cycle_no, survey_type):
     if not labels:
         return False
 
-    label = re.sub(r"[^A-Za-z0-9]", "", str(item.get("label") or "")).upper()
+    label = normalise_label(item.get("label"))
     try:
         item_cycle = int(item.get("cycle"))
     except (TypeError, ValueError):

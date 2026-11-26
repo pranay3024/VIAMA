@@ -298,7 +298,7 @@
                             {% else %}
                                 <strong style="color:#a33;">NO</strong>
                             {% endif %}
-                            {% if survey.display_raw_video_received_at %}
+                            {% if survey.raw_video_api_received and survey.display_raw_video_received_at %}
                                 <br><span class="text-muted">{{ survey.display_raw_video_received_at.strftime('%d/%m/%Y %I:%M %p') }} IST</span>
                             {% endif %}
                         </td>

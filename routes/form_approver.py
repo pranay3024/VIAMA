@@ -332,7 +332,6 @@ def dashboard():
                 if raw_xlsx_is_listed
                 else False
             )
-            or survey.raw_video_received_at
         )
         survey.display_survey_form_sent_at = (
             survey.raw_video_email_sent_at + _IST_OFFSET

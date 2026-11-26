@@ -672,9 +672,7 @@ def delayed_surveys():
         )
         # A file that was already stamped as received stays YES even when the
         # live list cannot be read this time.
-        survey.raw_video_api_received = bool(
-            survey.raw_video_api_label or survey.raw_video_received_at
-        )
+        survey.raw_video_api_received = bool(survey.raw_video_api_label)
         survey.raw_video_api_unknown = (
             raw_inventory_failed and not survey.raw_video_api_received
         )
@@ -1842,7 +1840,6 @@ def admin_dashboard():
     for survey in all_surveys:
         survey.raw_excel_received = bool(
             _raw_xlsx_label_for_survey(survey, dashboard_raw_files)
-            or survey.raw_video_received_at
         )
         survey.display_survey_form_sent_at = (
             survey.raw_video_email_sent_at + ist_offset

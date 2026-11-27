@@ -175,11 +175,11 @@
                         {% endif %}
                     </td>
                     <td>
-                        {% if not survey.raw_video_email_sent_at %}
-                            Waiting for raw email
-                        {% elif survey.defect_report_api_received %}
+                        {% if survey.defect_report_api_received %}
                             <span class="approved">YES</span>
-                        {% else %}
+                        {% elif not survey.raw_video_email_sent_at %}
+Waiting for raw email
+{% else %}
                             <span class="missing">NO</span>
                         {% endif %}
                         {% if survey.defect_report_api_received and survey.display_defect_report_received_at %}

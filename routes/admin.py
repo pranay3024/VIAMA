@@ -332,8 +332,10 @@ def delayed_notepad():
 @admin_bp.route("/admin/delayed-surveys", methods=["GET", "POST"])
 def delayed_surveys():
     user_role = session.get("role")
-    if user_role not in ("admin", "aftab"):
+    if user_role not in ("admin", "aftab", "regional_manager"):
         return redirect("/")
+    # A regional manager sees the same page for their own states only.
+    is_regional = user_role == "regional_manager"
 
     if request.method == "POST" and user_role != "admin":
         return redirect("/")
@@ -466,7 +468,7 @@ def delayed_surveys():
     # is ready now - the same fast path /admin and /form-approver
     # already use. Idempotent, never raises.
     # ============================================================
-    if request.method == "GET":
+    if request.method == "GET" and not is_regional:
         try:
             from utils.approved_survey_email import send_pending_raw_emails_now
 
@@ -541,6 +543,17 @@ def delayed_surveys():
         Survey.start_time >= week_start,
         Survey.start_time < week_end,
     )
+
+    if is_regional:
+        from models.db_models import RegionalManagerState
+
+        manager = User.query.get(session.get("user_id"))
+        regional_states = [
+            row.state for row in RegionalManagerState.query.filter_by(
+                manager_email=manager.email
+            ).all()
+        ] if manager else []
+        delayed_query = delayed_query.filter(Survey.state.in_(regional_states))
 
     if selected_team in team_states:
         delayed_query = delayed_query.filter(
@@ -907,6 +920,7 @@ def delayed_surveys():
     )
     return render_template(
         template,
+        is_regional=is_regional,
         delayed_surveys=delayed,
         raw_sent_date=request.args.get("raw_sent_date", ""),
         defect_sent_date=request.args.get("defect_sent_date", ""),

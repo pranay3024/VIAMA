@@ -34,7 +34,7 @@
             </div>
         </div>
         <div style="display:flex;gap:15px;align-items:center;">
-            <a href="/admin" class="logout-btn">Dashboard</a>
+            <a href="{{ '/regional' if is_regional else '/admin' }}" class="logout-btn">Dashboard</a>
             <a href="/logout" class="logout-btn">Logout</a>
         </div>
     </div>
@@ -207,9 +207,11 @@
             {% endif %}
         </div>
 
+{% if not is_regional %}
                 <form method="post" style="margin-bottom:20px; display: none;">
             <button type="submit" class="search-btn">Sync Gemini and Gmail Data</button>
         </form>
+{% endif %}
 
         {% if message %}
         <div class="alert-popup">{{ message }}</div>
@@ -362,6 +364,7 @@ Waiting for raw email
             }
         }
 
+{% if not is_regional %}
         (async function () {
             let changed = false;
 
@@ -403,8 +406,10 @@ Waiting for raw email
                 window.location.reload();
             }
         })();
+{% endif %}
     </script>
 
+{% if not is_regional %}
     <button type="button" id="notepadOpen"
         style="position:fixed;right:20px;bottom:20px;z-index:99998;padding:11px 18px;border:none;border-radius:24px;background:#ff7a00;color:#fff;font-weight:700;box-shadow:0 4px 14px rgba(0,0,0,.2);cursor:pointer;">
         📝 Notepad
@@ -468,5 +473,6 @@ Waiting for raw email
         });
     })();
     </script>
+{% endif %}
 </body>
 </html>
